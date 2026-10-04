@@ -1,6 +1,6 @@
 # wort
 
-> **The project is moving to wort.** wort is a web app on a small self-hosted server: several users, invite-only login, everything runs locally. The plan is in [`PLAN.md`](PLAN.md), the rules in [`CLAUDE.md`](CLAUDE.md), measured decisions in [`DECISIONS.md`](DECISIONS.md). What follows describes the current CLI/TUI: it stays a fully local tool next to the web app and shares its dictionary code with it. Everything you look up is logged automatically, and `wort export` writes that history (plus your practice words) to JSON for import into the web app. The web UI is built only from dis-system (for now from its `dev-isolated` branch).
+![preview-image](preview.png)
 
 A terminal app for learning German words (EN↔DE). Works offline on Wiktionary data.
 
