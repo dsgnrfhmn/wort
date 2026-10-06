@@ -4,8 +4,8 @@
 > English; MVP = Steps 0-3 and 5 of `PLAN.md`. Sections marked
 > **[post-MVP]** describe features that are planned but not in the MVP.
 
-`wort` is a working name. Rename freely; nothing depends on it.
-(The current code in this repo is the `lernen` CLI/TUI prototype. It
+`wort` is the project, package and command name.
+(The current code in this repo is the `wort` CLI/TUI prototype. It
 **stays** as a fully local tool; the web app (`app/`) is added beside it and
 shares its lexicon/scoring code, see `PLAN.md`.)
 
@@ -132,19 +132,19 @@ Keep README and this file in sync after each session.
 
 ## Modules (update once the structure stabilizes)
 
-- `src/lernen/` — CLI + TUI (stays; fully local; command `wort`; Python package keeps the name `lernen`)
+- `src/wort/` — CLI + TUI (stays; fully local; command `wort`; Python package `wort`)
 - `app/` — FastAPI app, routes, templates
 - `app/ocr.py` — image validation + Tesseract **[post-MVP]**
 - `app/lexicon.py` — lemmatize, lookup, inflection, translation cache
-  (ported from `lernen/dictionary/*`)
+  (ported from `src/wort/dictionary/*`)
 - `app/grammar_check.py` — loopback-only LanguageTool client **[post-MVP]**
-  (ported from `lernen/exercises/grammar_check.py`)
+  (ported from `src/wort/exercises/grammar_check.py`)
 - `app/exercises.py` — exercise generation + local grading
-  (ported from `lernen/exercises/*`)
+  (ported from `src/wort/exercises/*`)
 - `app/scoring.py` — score + scheduling rules (pure functions, unit-tested)
-  (ported from `lernen/srs.py`)
+  (ported from `src/wort/srs.py`)
 - `scripts/import_lexicon.py` — builds the local dictionary DB
-  (ported from `lernen/dictionary/importer.py`)
+  (ported from `src/wort/dictionary/importer.py`)
 - `scripts/adduser.py` — admin user creation
 - `spikes/` — Step 0 measurement scripts (run on the server by the maintainer)
 - `vendor/dis-system/` — submodule

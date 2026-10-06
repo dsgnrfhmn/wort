@@ -2,10 +2,10 @@ import random
 
 import pytest
 
-from lernen.exercises import TYPES, build_session, pick_exercise
-from lernen.exercises import article, forms, question, sentence, translate
-from lernen.exercises.base import compare
-from lernen.exercises.grammar_check import Issue, server_url
+from wort.exercises import TYPES, build_session, pick_exercise
+from wort.exercises import article, forms, question, sentence, translate
+from wort.exercises.base import compare
+from wort.exercises.grammar_check import Issue, server_url
 
 
 class FixedRng(random.Random):
@@ -93,9 +93,9 @@ def test_separable_sentence(dictionary):
 
 
 def test_languagetool_stays_local(monkeypatch):
-    monkeypatch.setenv("LERNEN_LT_URL", "https://api.languagetool.org")
+    monkeypatch.setenv("WORT_LT_URL", "https://api.languagetool.org")
     assert server_url() is None
-    monkeypatch.setenv("LERNEN_LT_URL", "http://127.0.0.1:8081")
+    monkeypatch.setenv("WORT_LT_URL", "http://127.0.0.1:8081")
     assert server_url() == "http://127.0.0.1:8081"
 
 
@@ -124,7 +124,7 @@ def test_languagetool_client_against_local_server(monkeypatch):
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from urllib.parse import parse_qs
 
-    from lernen.exercises import grammar_check
+    from wort.exercises import grammar_check
 
     seen = {}
 
@@ -147,13 +147,13 @@ def test_languagetool_client_against_local_server(monkeypatch):
     server = HTTPServer(("127.0.0.1", 0), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        monkeypatch.delenv("LERNEN_LT_DISABLE")
-        monkeypatch.setenv("LERNEN_LT_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.delenv("WORT_LT_DISABLE")
+        monkeypatch.setenv("WORT_LT_URL", f"http://127.0.0.1:{server.server_port}")
         issues = grammar_check.check("Ich gehst heute.")
         assert seen == {"path": "/v2/check", "language": "de-DE", "text": "Ich gehst heute."}
         assert issues == [grammar_check.Issue("Kongruenz", 4, 4, ["gehe", "ging"])]
     finally:
         server.shutdown()
 
-    monkeypatch.setenv("LERNEN_LT_URL", "http://127.0.0.1:1")  # nothing listening
+    monkeypatch.setenv("WORT_LT_URL", "http://127.0.0.1:1")  # nothing listening
     assert grammar_check.check("Ich gehe.") is None

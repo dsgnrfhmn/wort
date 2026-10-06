@@ -7,8 +7,8 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
-from lernen.dictionary.lookup import Entry
-from lernen.text import levenshtein, normalize
+from wort.dictionary.lookup import Entry
+from wort.text import levenshtein, normalize
 
 VERDICT_ORDER = {"wrong": 0, "almost": 1, "correct": 2}
 

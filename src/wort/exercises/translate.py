@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import random
 
-from lernen.dictionary import grammar as g
-from lernen.dictionary.importer import gloss_keys
-from lernen.dictionary.lookup import Entry
-from lernen.exercises.base import Exercise, ExerciseType, Result, best_match, compare
+from wort.dictionary import grammar as g
+from wort.dictionary.importer import gloss_keys
+from wort.dictionary.lookup import Entry
+from wort.exercises.base import Exercise, ExerciseType, Result, best_match, compare
 
 
 def _german_display(entry: Entry) -> str:

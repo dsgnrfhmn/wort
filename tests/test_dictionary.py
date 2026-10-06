@@ -1,5 +1,5 @@
-from lernen.dictionary import grammar as g
-from lernen.dictionary.importer import clean_form, gloss_keys
+from wort.dictionary import grammar as g
+from wort.dictionary.importer import clean_form, gloss_keys
 
 
 def test_import_skips_form_of_and_other_languages(dictionary):
@@ -72,8 +72,8 @@ def _form_of(word, target, pos="noun"):
 
 
 def _build(tmp_path, raws):
-    from lernen.dictionary.importer import import_entries
-    from lernen.dictionary.lookup import Dictionary
+    from wort.dictionary.importer import import_entries
+    from wort.dictionary.lookup import Dictionary
 
     import_entries(raws, tmp_path / "d.db")
     return Dictionary(tmp_path / "d.db")
@@ -102,7 +102,7 @@ def test_pointer_without_a_lemma_adds_nothing(tmp_path):
 def test_own_forms_are_not_duplicated_by_pointers(tmp_path):
     haus = _entry("Haus", "noun", forms=[{"form": "Häuser", "tags": ["plural"]}])
     d = _build(tmp_path, [haus, _form_of("Häuser", "Haus")])
-    from lernen.text import normalize
+    from wort.text import normalize
 
     rows = d.conn.execute("SELECT count(*) FROM form_index WHERE form_norm = ?", (normalize("Häuser"),)).fetchone()[0]
     assert rows == 1  # indexed once, from the lemma's own form list

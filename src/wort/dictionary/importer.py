@@ -19,7 +19,7 @@ import urllib.request
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
-from lernen.text import normalize
+from wort.text import normalize
 
 MAX_EXAMPLES = 10  # example sentences kept per entry
 KAIKKI_URL = "https://kaikki.org/dictionary/German/kaikki.org-dictionary-German.jsonl"

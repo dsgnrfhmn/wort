@@ -31,7 +31,7 @@ Confirmed by maintainer (date)*.
 
 - **Decision (2026-10-04):**
   - A fully local CLI stays a product of its own, command **`wort`**
-    (replaces `lernen`; package and data dir keep the name `lernen`). `wort`
+    (replaces the earlier name `lernen`; renamed everywhere on 2026-10-04: package `wort`, data dir `~/.local/share/wort`, env vars `WORT_*`). `wort`
     opens an interactive session, `wort WORD` looks one word up, the TUI is
     `wort tui`. It is no longer removed on Step 1.
   - **Every query is saved automatically** as history (only what was typed,

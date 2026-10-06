@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import random
 
-from lernen.dictionary import grammar as g
-from lernen.dictionary.lookup import Entry
-from lernen.exercises.base import Exercise, ExerciseType, Result, best_match, strip_pronoun
+from wort.dictionary import grammar as g
+from wort.dictionary.lookup import Entry
+from wort.exercises.base import Exercise, ExerciseType, Result, best_match, strip_pronoun
 
 PERSON_LABEL = {"ich": "ich", "du": "du", "er": "er/sie/es", "wir": "wir", "ihr": "ihr", "sie": "sie/Sie"}
 

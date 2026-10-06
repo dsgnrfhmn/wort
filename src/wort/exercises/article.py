@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import random
 
-from lernen.dictionary import grammar as g
-from lernen.dictionary.lookup import Entry
-from lernen.exercises.base import Exercise, ExerciseType, choice_checker
+from wort.dictionary import grammar as g
+from wort.dictionary.lookup import Entry
+from wort.exercises.base import Exercise, ExerciseType, choice_checker
 
 
 def make(entry: Entry, rng: random.Random) -> Exercise:

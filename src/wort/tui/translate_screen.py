@@ -7,8 +7,8 @@ from textual.containers import Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Button, Input, Label, Static
 
-from lernen.dictionary.lookup import Entry
-from lernen.render.card import render_card
+from wort.dictionary.lookup import Entry
+from wort.render.card import render_card
 
 
 class WordAdded(Message):

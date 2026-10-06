@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from lernen.srs import SrsState, mastery, review
+from wort.srs import SrsState, mastery, review
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS words (

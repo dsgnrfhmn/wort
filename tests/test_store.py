@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from lernen.srs import SrsState, mastery, review
+from wort.srs import SrsState, mastery, review
 
 NOW = datetime(2026, 10, 3, 12, 0)
 

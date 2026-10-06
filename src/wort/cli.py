@@ -18,11 +18,11 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from lernen import paths
-from lernen.dictionary.grammar import GENDER_ARTICLE
-from lernen.dictionary.lookup import Dictionary, Entry
-from lernen.store import Store
-from lernen.transfer import export_words
+from wort import paths
+from wort.dictionary.grammar import GENDER_ARTICLE
+from wort.dictionary.lookup import Dictionary, Entry
+from wort.store import Store
+from wort.transfer import export_words
 
 def _make_console(**kwargs) -> Console:
     """Monochrome output (plus the article colors): no automatic number/string highlighting.
@@ -69,7 +69,7 @@ def _open_dictionary() -> Dictionary:
 
 
 def cmd_import(args: argparse.Namespace) -> None:
-    from lernen.dictionary import importer
+    from wort.dictionary import importer
 
     if args.file:
         source = Path(args.file)
@@ -107,7 +107,7 @@ def _summary(query: str, german: list[Entry], english: list[Entry]) -> str:
 
 def show(entries: list[Entry]) -> int:
     """Print the cards (or a not-found line); returns how many terminal lines that took."""
-    from lernen.render.card import render_card
+    from wort.render.card import render_card
 
     with console.capture() as captured:
         if not entries:
@@ -271,9 +271,9 @@ def cmd_export(args: argparse.Namespace) -> None:
 
 
 def cmd_tui(args: argparse.Namespace) -> None:
-    from lernen.tui.app import LernenApp
+    from wort.tui.app import WortApp
 
-    LernenApp(_open_dictionary(), Store(paths.user_db())).run()
+    WortApp(_open_dictionary(), Store(paths.user_db())).run()
 
 
 def build_parser() -> argparse.ArgumentParser:

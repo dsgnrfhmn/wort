@@ -21,7 +21,7 @@ wheels = [
 ]
 
 [[package]]
-name = "lernen"
+name = "wort"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

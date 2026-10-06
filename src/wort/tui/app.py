@@ -6,15 +6,15 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Header, TabbedContent, TabPane
 
-from lernen.dictionary.lookup import Dictionary
-from lernen.store import Store
-from lernen.tui.overview_screen import OverviewPane, PracticeWords
-from lernen.tui.practice_screen import PracticePane
-from lernen.tui.translate_screen import TranslatePane, WordAdded
+from wort.dictionary.lookup import Dictionary
+from wort.store import Store
+from wort.tui.overview_screen import OverviewPane, PracticeWords
+from wort.tui.practice_screen import PracticePane
+from wort.tui.translate_screen import TranslatePane, WordAdded
 
 
-class LernenApp(App):
-    TITLE = "lernen"
+class WortApp(App):
+    TITLE = "wort"
     SUB_TITLE = "Deutsch"
     CSS = """
     TabPane { padding: 0 1; }

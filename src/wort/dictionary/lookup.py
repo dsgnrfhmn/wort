@@ -7,7 +7,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from lernen.text import normalize
+from wort.text import normalize
 
 Form = tuple[str, tuple[str, ...]]
 

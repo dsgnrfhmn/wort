@@ -2,75 +2,79 @@
 
 ![preview-image](preview.png)
 
-A terminal app for learning German words (EN↔DE). Works offline on Wiktionary data.
+Self-hosted tool for learning German (EN↔DE). Fully local, works offline on Wiktionary data.
 
-- **Translate.** Look up a word in German or English and get a compact card: principal forms, translation, IPA, a short grammar table (verbs: Präsens / Präteritum / Perfekt / Futur I plus Imperativ; nouns: 4 cases, singular and plural; adjectives: comparison degrees) and all the example sentences the dictionary has (up to 10). The output is monochrome with square box lines (inflection endings are bold; verb conjugation endings are also underlined); the colors are the articles (**der** blue, **die** red, **das** green) and the card's main line, which is bold and takes the word class color: nouns the color of their article, verbs burgundy, adjectives/adverbs dark purple.
-- **History.** Every query you type is saved automatically (no save key). Your practice list is separate: `wort add WORD`.
-- **Practice.** Five exercise types, each with graded answers:
+**Status: work in progress.** Only word translation works end to end today.
 
-  | Type | Example |
-  |---|---|
-  | Translation | `Translate to German: house` → `das Haus` (the article is checked too) |
-  | Article | `___ Katze` → der / die / das |
-  | Forms | `Plural: das Haus → die ___`, `Präteritum, ich: gehen`, `Perfekt: er ___ ___` |
-  | Questions | "Which auxiliary verb does «gehen» take in the Perfekt?", "Is it separable?", "Partizip II of …?" (multiple choice) |
-  | Sentence | "Write a sentence with «gehen» in the form: Präteritum, ich". The required form is checked, and grammar is checked by a local LanguageTool (if running) |
+## Works now
 
-  Reviews follow the SM-2 algorithm: words that are due for review come first, then the weakest ones.
-- **Overview.** A table of all your words: mastery (0–100 %), accuracy per exercise type, number of attempts, when to review. The weakest words are on top.
+- **Translation (DE → EN).** `wort WORD` returns a compact card: principal forms, translation, IPA, grammar table, up to 10 example sentences.
+  - Verbs: Präsens / Präteritum / Perfekt / Futur I, Imperativ.
+  - Nouns: 4 cases, singular and plural.
+  - Adjectives: comparison degrees.
+  - Inflected forms are found too (`ging` → `gehen`).
+- **Interactive session.** `wort` opens a prompt: type words, `quit` to leave.
+- **Query history.** Every lookup is logged automatically to `user.db`.
+- **Export.** `wort export` writes history and practice words to JSON (for the future web app).
+
+## Prototype, not finished
+
+Exist in the code (`wort tui`, `wort add`, `wort list`) but are not part of the supported feature set yet:
+
+- Practice exercises (translation, article, forms, multiple choice, sentence)
+- SM-2 spaced repetition and mastery scores
+- Full-screen TUI (Textual)
+
+## Planned
+
+- **Word memorization**
+  - Per-word score and per-skill sub-scores
+  - Review scheduling (SM-2)
+  - Reliable practice sessions with graded answers
+- **Exercises**
+  - Translation, article, correct case/form
+  - Grammar multiple choice
+  - Sentence writing with local LanguageTool check
+- **Web view** (FastAPI + Jinja2, SQLite, vanilla JS; UI only from `dis-system`)
+  - Progress management: word list, scores, review queue
+  - Reading texts: add a text, every word clickable (lemma, translation, grammar note, "learn this word")
+  - Text from photo via local OCR (Tesseract)
+  - Invite-only multi-user accounts, private network only
+- Details: [`PLAN.md`](PLAN.md), rules: [`CLAUDE.md`](CLAUDE.md), decisions: [`DECISIONS.md`](DECISIONS.md)
 
 ## Installation
 
 Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone <repo> && cd language-learn-cli
+git clone <repo> && cd wort
 uv sync
 uv run wort import --download     # once: ~1 GB JSONL from kaikki.org → dictionary.db
-uv run wort                       # interactive session
+uv run wort gehen                 # look one word up
 ```
 
-If the dump is already downloaded: `uv run wort import --file kaikki.org-dictionary-German.jsonl`.
-Global install: `uv tool install .`, after which the `wort` command is available directly. The dictionary was imported with up to 3 examples per word before; run `wort import --download` again to get up to 10 (the same re-import also makes inflected forms like `zigtausende` findable).
+Already have the dump: `uv run wort import --file kaikki.org-dictionary-German.jsonl`.
+Global install: `uv tool install .`
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `wort` | interactive session: type a word (German or English, any inflected form) and get its card, then the next word. The previous word's card collapses into one `query — translation` line when you type the next word. Leave with `quit` (or Ctrl+D) |
-| `wort gehen` / `wort house` | look one word up and exit. Exit code 1 if nothing was found |
-| `wort t list` | explicit lookup, for words that are also commands (`list`, `add`, `import`, …). Inside the session no prefix is needed |
-| `wort tui` | full-screen interface: tabs Translate (F1), Practice (F2), Overview (F3). Quit: Ctrl+Q |
-| `wort add beabsichtigen [--pos verb]` | add a word to your practice list |
-| `wort list` | mastery of your practice words |
-| `wort history [--limit N]` | the queries you typed, newest last |
-| `wort export [FILE]` | write history and practice words as JSON (stdout without a file or with `-`), for import into the web app |
-| `wort import [--file F] [--download] [--keep]` | (re)import the dictionary. Progress is kept |
-
-Every lookup (found or not) is written to `user.db` automatically. Only what you typed is stored, not the cards. A lookup never changes the practice list.
-
-In the Overview tab: `p` practices the selected word, `d d` deletes it together with its history, `r` refreshes the table.
-
-The export file contains `format_version` 2, the queries (`query`, `found`, `queried_at`) and the practice words (`lemma`, `pos`, `added_at`). Scores and review history are not exported.
-
-## Grammar checking (optional, local)
-
-For the Sentence exercise the app talks to [LanguageTool](https://languagetool.org/dev) running **on your own computer**:
-
-```bash
-docker run -d --name languagetool -p 127.0.0.1:8081:8010 erikvl87/languagetool
-```
-
-Without LanguageTool the exercise only checks that the required word form is in the sentence and says that grammar was not checked.
+| `wort` | interactive session |
+| `wort WORD` | look one word up; exit code 1 if not found |
+| `wort t WORD` | explicit lookup for words that are also commands (`list`, `add`, …) |
+| `wort history [--limit N]` | queries you typed |
+| `wort export [FILE]` | history + practice words as JSON |
+| `wort import [--file F] [--download] [--keep]` | (re)import the dictionary |
+| `wort add WORD [--pos verb]` | *(prototype)* add to practice list |
+| `wort list` | *(prototype)* mastery of practice words |
+| `wort tui` | *(prototype)* full-screen interface |
 
 ## Data and privacy
 
-- Data is stored in `~/.local/share/lernen/` (or in `$XDG_DATA_HOME/lernen`, or in `$LERNEN_HOME`):
-  - `dictionary.db` — the imported dictionary, read-only;
-  - `user.db` — your words, answers, SRS state.
-- **The program uses the network only once:** when it downloads the dump from `kaikki.org` with `wort import --download`. No API keys or cloud services are needed.
-- The LanguageTool client accepts only loopback addresses (`127.0.0.1`, `localhost`, `::1`), so sentences never reach the public `api.languagetool.org`. The address is set with `LERNEN_LT_URL`. A remote server is allowed only explicitly: `LERNEN_LT_ALLOW_REMOTE=1`.
-- The Docker command above publishes the port on `127.0.0.1` only, so the server is not reachable from the local network.
+- Data lives in `~/.local/share/wort/` (or `$XDG_DATA_HOME/wort`, or `$WORT_HOME`): `dictionary.db` (read-only), `user.db` (history, words, SRS state).
+- The only network use: `wort import --download` fetches the dump from `kaikki.org`. No API keys, no cloud services.
+- Optional LanguageTool client accepts loopback addresses only (`WORT_LT_URL`; remote needs `WORT_LT_ALLOW_REMOTE=1`).
 
 ## Development
 
@@ -78,20 +82,16 @@ Without LanguageTool the exercise only checks that the required word form is in 
 uv run pytest
 ```
 
-Layout:
-
 ```
-src/lernen/
+src/wort/
   cli.py                 # commands, interactive session
-  transfer.py            # export / import format (history + practice words)
-  dictionary/importer.py # kaikki JSONL → SQLite
-  dictionary/lookup.py   # DE/EN lookup (ä→ae, ß→ss normalization), word forms
-  dictionary/grammar.py  # form selection by tags (tense, person, case, number)
-  render/card.py         # compact word card (Rich)
-  store.py, srs.py       # user.db, SM-2, mastery
-  exercises/             # translate, article, forms, question, sentence, grammar_check
-  tui/                   # Textual: Translate / Practice / Overview
-tests/fixtures/german_sample.jsonl  # small sample in kaikki format for tests
+  transfer.py            # export format
+  dictionary/            # importer, lookup, grammar form selection
+  render/card.py         # word card (Rich)
+  store.py, srs.py       # user.db, SM-2
+  exercises/             # prototype exercises
+  tui/                   # Textual interface
+tests/fixtures/german_sample.jsonl
 ```
 
-The dictionary comes from [Wiktionary](https://en.wiktionary.org) (CC BY-SA), as parsed by [kaikki.org / wiktextract](https://kaikki.org).
+Dictionary data: [Wiktionary](https://en.wiktionary.org) (CC BY-SA) via [kaikki.org / wiktextract](https://kaikki.org).

@@ -11,9 +11,9 @@ from textual.containers import Vertical
 from textual.message import Message
 from textual.widgets import DataTable, Static
 
-from lernen.exercises import LABELS
-from lernen.render.card import MUTED, render_card
-from lernen.store import WordStats
+from wort.exercises import LABELS
+from wort.render.card import MUTED, render_card
+from wort.store import WordStats
 
 
 def mastery_bar(value: int, width: int = 10) -> Text:

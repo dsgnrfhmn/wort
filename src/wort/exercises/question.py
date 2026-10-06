@@ -5,9 +5,9 @@ from __future__ import annotations
 import random
 from collections.abc import Callable
 
-from lernen.dictionary import grammar as g
-from lernen.dictionary.lookup import Entry
-from lernen.exercises.base import Exercise, ExerciseType, choice_checker, shuffled_choices
+from wort.dictionary import grammar as g
+from wort.dictionary.lookup import Entry
+from wort.exercises.base import Exercise, ExerciseType, choice_checker, shuffled_choices
 
 _UMLAUT = {"a": "ä", "o": "ö", "u": "ü", "au": "äu"}
 

@@ -10,9 +10,9 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Input, Select, Static
 
-from lernen.exercises import LABELS, TYPES, Exercise, Result, build_session
-from lernen.render.card import MUTED, render_card
-from lernen.store import Word
+from wort.exercises import LABELS, TYPES, Exercise, Result, build_session
+from wort.render.card import MUTED, render_card
+from wort.store import Word
 
 VERDICT_STYLE = {"correct": ("✔ Correct", "bold"), "almost": ("≈ Almost", "bold italic"), "wrong": ("✘ Wrong", "bold italic reverse")}
 

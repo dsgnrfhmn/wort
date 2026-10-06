@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from lernen.store import Store
+from wort.store import Store
 
 FORMAT_VERSION = 2
 MAX_WORDS = 10_000

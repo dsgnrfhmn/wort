@@ -1,6 +1,6 @@
 """Optional grammar checking through a LanguageTool server running on this machine.
 
-Only loopback URLs are used unless LERNEN_LT_ALLOW_REMOTE=1, so sentences never
+Only loopback URLs are used unless WORT_LT_ALLOW_REMOTE=1, so sentences never
 leave the computer by accident (the public api.languagetool.org is not used).
 """
 
@@ -26,9 +26,9 @@ class Issue:
 
 
 def server_url() -> str | None:
-    url = os.environ.get("LERNEN_LT_URL", DEFAULT_URL).rstrip("/")
+    url = os.environ.get("WORT_LT_URL", DEFAULT_URL).rstrip("/")
     host = urllib.parse.urlparse(url).hostname
-    if host not in _LOCAL_HOSTS and os.environ.get("LERNEN_LT_ALLOW_REMOTE") != "1":
+    if host not in _LOCAL_HOSTS and os.environ.get("WORT_LT_ALLOW_REMOTE") != "1":
         return None
     return url
 
@@ -36,7 +36,7 @@ def server_url() -> str | None:
 def check(text: str, timeout: float = 5.0) -> list[Issue] | None:
     """Grammar issues in `text`, or None if no local LanguageTool is reachable."""
     url = server_url()
-    if url is None or os.environ.get("LERNEN_LT_DISABLE") == "1":
+    if url is None or os.environ.get("WORT_LT_DISABLE") == "1":
         return None
     data = urllib.parse.urlencode({"language": "de-DE", "text": text}).encode()
     try:

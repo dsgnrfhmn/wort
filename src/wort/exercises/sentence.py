@@ -6,11 +6,11 @@ import random
 import re
 from collections.abc import Callable
 
-from lernen.dictionary import grammar as g
-from lernen.dictionary.lookup import Entry
-from lernen.exercises import grammar_check
-from lernen.exercises.base import Exercise, ExerciseType, Result
-from lernen.text import normalize
+from wort.dictionary import grammar as g
+from wort.dictionary.lookup import Entry
+from wort.exercises import grammar_check
+from wort.exercises.base import Exercise, ExerciseType, Result
+from wort.text import normalize
 
 PERSON_LABEL = {"ich": "ich", "du": "du", "er": "er/sie/es", "wir": "wir"}
 

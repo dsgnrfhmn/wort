@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from lernen.dictionary.lookup import Entry
+from wort.dictionary.lookup import Entry
 
 ARTICLES = {
     "m": {"nominative": "der", "genitive": "des", "dative": "dem", "accusative": "den"},

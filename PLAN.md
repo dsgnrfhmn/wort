@@ -9,14 +9,14 @@ This file is the ordered execution plan and what "done" means at each step.
 > 3. **MVP = Step 0–3 and Step 5.** Photo/OCR (old Step 4), LanguageTool
 >    sentence practice (old Step 6) and operations (old Step 7) are
 >    **post-MVP**; they keep their numbers so references stay stable.
-> 4. **The `lernen` prototype in this repo is the core.** Its dictionary
+> 4. **The `wort` CLI/TUI prototype in this repo is the core.** Its dictionary
 >    importer, lookup, grammar, exercises and SRS are shared with the new
 >    web app (`app/`). Items that already exist in prototype form are marked
->    *(ported from lernen: …)* — "ported" is not "done": each still has to
+>    *(ported from the prototype: …)* — "ported" is not "done": each still has to
 >    meet its step's Definition of done.
 > 5. **Security/deploy simplified** to what protects a shared host (see
 >    Step 1); upload/LanguageTool/cap rules apply when those features ship.
-> 6. **Two front ends, one lexicon** (2026-10-04): the fully local `lernen`
+> 6. **Two front ends, one lexicon** (2026-10-04): the fully local `wort`
 >    CLI/TUI **stays** next to the web app (Step C). The CLI logs every
 >    query; history and practice words reach the web app by **export/import** — no network path from the dev
 >    machine. dis-system is taken from its **`dev-isolated`** branch for now
@@ -53,8 +53,8 @@ Post-MVP (details at the end of the file):
   `DECISIONS.md`.
 - **kaikki.org is not reachable** from cloud sessions; the dictionary spike
   runs on the dev machine or the server.
-- **Repo name and layout undecided** (`lernen` vs `wort`; rename vs new
-  repo) — must be decided before Step 1.
+- **Repo name and layout undecided** (rename `language-learn-cli` vs new
+  repo) — must be decided before Step 1. The package/command name is `wort`.
 
 ---
 
@@ -68,11 +68,11 @@ per item with evidence, not opinion.
       % with inflection tables, % with English glosses, % with example
       sentences. Record license terms (CC BY-SA attribution in the UI
       footer).
-      *(ported from lernen: kaikki importer for en-Wiktionary, English glosses only; tested on a 10-entry fixture, never on the real dump)*
+      *(ported from the prototype: kaikki importer for en-Wiktionary, English glosses only; tested on a 10-entry fixture, never on the real dump)*
 - [ ] **Lemmatizer**: compare at least two lightweight options (e.g.
       `simplemma`, spaCy small German model) on 100 inflected forms
       (`ging`, `Häusern`, `besseren`…) **and** against the lexicon's own
-      form index (lernen already maps forms → lemma). Record accuracy, RAM,
+      form index (the prototype already maps forms → lemma). Record accuracy, RAM,
       startup time **on the server**.
 - [ ] **Known limitation to record**: separable verbs (`fängt … an`) and
       compounds. Lookup handles the token's own lemma only; note it, don't
@@ -87,7 +87,7 @@ confirms before Step 1.
 ## Step C — CLI (`wort`)
 
 Fully local; works on the dev machine with its own `dictionary.db` and
-`user.db`. Command `wort` (the Python package keeps the name `lernen`).
+`user.db`. Command `wort` (Python package `wort`).
 
 - [x] `wort WORD`: card with forms (nouns: 4 cases × number; verbs: Präsens,
       Präteritum, Perfekt with auxiliary, Futur I; adjectives: degrees) and
@@ -126,7 +126,7 @@ and monochrome/square rendering; an exported file imports into the web app
 Security is simplified to what protects the shared host. The upload,
 LanguageTool and cap rules from `CLAUDE.md` apply when those features ship.
 
-- [ ] Repo layout per `CLAUDE.md` modules. `src/lernen` (CLI + TUI, Textual/
+- [ ] Repo layout per `CLAUDE.md` modules. `src/wort` (CLI + TUI, Textual/
       Rich deps) **stays**; `app/` (web) is added beside it and shares the
       lexicon/scoring code — one module, not copies.
 - [ ] **dis-system first:** update the submodule to the current head of
@@ -162,12 +162,12 @@ LanguageTool and cap rules from `CLAUDE.md` apply when those features ship.
 
 - [ ] `scripts/import_lexicon.py` builds `lexicon.db` from the Step 0
       dataset (separate DB file from user data).
-      *(ported from lernen: `dictionary/importer.py`)*
+      *(ported from the prototype: `dictionary/importer.py`)*
 - [ ] Lookup page: input → lemma → part of speech, article/gender,
       translation (English glosses), inflection table (nouns/adjectives:
       4 cases × number; verbs: Präsens, Präteritum, Perfekt with auxiliary,
       Futur I), examples. Inflection table is a dis-system component.
-      *(ported from lernen: `lookup.py`, `grammar.py`, `render/card.py` — has Präsens/Präteritum/Partizip II/aux/Imperativ and 4-case noun tables; Perfekt rows and Futur I to add)*
+      *(ported from the prototype: `lookup.py`, `grammar.py`, `render/card.py` — has Präsens/Präteritum/Partizip II/aux/Imperativ and 4-case noun tables; Perfekt rows and Futur I to add)*
 - [ ] **Translation miss**: explicit "no translation" state plus "add my own
       translation" → `translation_cache` row with `source = user`, owner
       user id, timestamp. Visible only to that user.
@@ -187,12 +187,12 @@ requests during the whole run (show the log / sandbox denial counter).
 - [ ] Schema: `user_words` (user, lemma, status `learning/known`, score
       0–100, sub-scores `translation`, `form`, `usage`, `last_seen`,
       `next_due`, `added_from` lookup).
-      *(ported from lernen: `store.py` `words`/`srs` tables — single user, no sub-scores)*
+      *(ported from the prototype: `store.py` `words`/`srs` tables — single user, no sub-scores)*
 - [ ] "Learn this word" button on the lookup page.
 - [ ] Word list page: dis-system table; sort by score / due date; filter by
       status; multi-select (header actions disabled until ≥1 row selected) →
       "Practice selected".
-      *(ported from lernen: TUI overview — mastery bar, per-exercise accuracy, due label)*
+      *(ported from the prototype: TUI overview — mastery bar, per-exercise accuracy, due label)*
 - [ ] Per-user isolation: every query filtered by user id.
 - [ ] **Import from CLI:** accepts the JSON from `wort export` (file input
       or paste). Treated as untrusted user data: size/length caps, schema and
@@ -215,7 +215,7 @@ import file is rejected with a visible error and changes nothing.
       weighted by exercise type, applied to the matching sub-score;
       `next_due` grows with consecutive correct answers). Pure functions
       with unit tests. FSRS is a later upgrade, not MVP.
-      *(ported from lernen: `srs.py` — SM-2 + recency-weighted mastery; to be rewritten as the documented sub-score formula)*
+      *(ported from the prototype: `srs.py` — SM-2 + recency-weighted mastery; to be rewritten as the documented sub-score formula)*
 - [ ] Exercise types with local grading:
       - flashcard de→en and en→de (accept answers from lexicon and the
         user's own translations; user can mark "I was right" → logged as
@@ -224,7 +224,7 @@ import file is rejected with a visible error and changes nothing.
         Haus*?", "Präteritum, er: *gehen*?");
       - article (der/die/das) and grammar multiple-choice (aux, separable,
         Partizip II, plural).
-      *(ported from lernen: `exercises/` translate (de↔en), forms, article, question; tolerant matching for umlauts/typos)*
+      *(ported from the prototype: `exercises/` translate (de↔en), forms, article, question; tolerant matching for umlauts/typos)*
       The `sentence` exercise type stays out until Step 6 exists.
 - [ ] Session flow: selected words → N exercises → feedback after each →
       summary with score changes.
@@ -233,7 +233,7 @@ import file is rejected with a visible error and changes nothing.
       do not sync. Revisit if that turns out to matter.
 - [ ] `attempts` table: every answer logged (exercise type, prompt, answer,
       verdict, score delta).
-      *(ported from lernen: `reviews` table without prompt/delta)*
+      *(ported from the prototype: `reviews` table without prompt/delta)*
 
 **Definition of done:** unit tests for scoring pass; a full session on 5
 words updates scores exactly as the formula predicts (show before/after).
@@ -278,12 +278,12 @@ empty after processing.
         questions are templates per case/tense, filled from the lexicon);
       - "write your own sentence with word X in form Y";
       - meaning in context: cloze from local example sentences.
-      *(ported from lernen: `exercises/sentence.py` — required-form check incl. separable verbs and Perfekt)*
+      *(ported from the prototype: `exercises/sentence.py` — required-form check incl. separable verbs and Perfekt)*
 - [ ] Grading: (1) required form present (lexicon); (2) LanguageTool via
       `app/grammar_check.py` on `127.0.0.1` returns issues
       `{span, message, replacements}`. Response is schema-validated;
       invalid / timeout / LT down → visible error state, **no score change**.
-      *(ported from lernen: loopback-only LT client with tests against a local fake server)*
+      *(ported from the prototype: loopback-only LT client with tests against a local fake server)*
 - [ ] Feedback UI highlights error spans (dis-system inline error component).
 - [ ] Per-user daily cap on LanguageTool checks, enforced server-side; cap
       reached → clear message, other exercises still available.
@@ -323,7 +323,7 @@ Decided 2026-10-04: local-only; note language English; MVP = Step 0–3, 5.
   word list is exported/imported.)
 - Who ships the exported file to the server? (Currently: the maintainer,
   manually; the dev machine has no path to the server.)
-- **Package / repo name and layout**: `wort` vs. `lernen`; rename this repo
+- **Repo name and layout**: rename this repo
   (`language-learn-cli`) or start a new one — before Step 1.
 - **Outbound rule**: keep `IPAddressDeny=any` + subnet allowlist, or relax
   it — before Step 1.

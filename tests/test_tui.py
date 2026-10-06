@@ -1,8 +1,8 @@
 from textual.widgets import DataTable, Input, Static, TabbedContent
 
-from lernen.tui.app import LernenApp
-from lernen.tui.practice_screen import PracticePane
-from lernen.tui.translate_screen import ResultCard
+from wort.tui.app import WortApp
+from wort.tui.practice_screen import PracticePane
+from wort.tui.translate_screen import ResultCard
 
 
 async def _type(pilot, text: str) -> None:
@@ -11,7 +11,7 @@ async def _type(pilot, text: str) -> None:
 
 
 async def test_translate_add_practice_overview(dictionary, store):
-    app = LernenApp(dictionary, store)
+    app = WortApp(dictionary, store)
     async with app.run_test(size=(110, 50)) as pilot:
         # Translate: search English, add the top result.
         await _type(pilot, "house")
@@ -53,7 +53,7 @@ async def test_translate_add_practice_overview(dictionary, store):
 
 async def test_overview_delete_needs_confirmation(dictionary, store):
     store.add_word("Hund", "noun", None)
-    app = LernenApp(dictionary, store)
+    app = WortApp(dictionary, store)
     async with app.run_test(size=(110, 50)) as pilot:
         await pilot.press("f3")
         await pilot.pause()

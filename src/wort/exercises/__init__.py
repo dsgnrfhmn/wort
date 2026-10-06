@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import random
 
-from lernen.dictionary.lookup import Dictionary, Entry
-from lernen.exercises import article, forms, question, sentence, translate
-from lernen.exercises.base import Exercise, ExerciseType, Result
-from lernen.store import Store, Word
+from wort.dictionary.lookup import Dictionary, Entry
+from wort.exercises import article, forms, question, sentence, translate
+from wort.exercises.base import Exercise, ExerciseType, Result
+from wort.store import Store, Word
 
 TYPES: dict[str, ExerciseType] = {t.kind: t for t in (translate.TYPE, article.TYPE, forms.TYPE, question.TYPE, sentence.TYPE)}
 LABELS = {kind: t.label for kind, t in TYPES.items()}

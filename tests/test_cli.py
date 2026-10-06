@@ -6,13 +6,13 @@ import sys
 
 import pytest
 
-from lernen import cli, paths
-from lernen.dictionary import grammar as g
-from lernen.dictionary.importer import MAX_EXAMPLES, import_file
-from lernen.dictionary.lookup import Dictionary
-from lernen.render.card import render_card
-from lernen.store import Store
-from lernen.transfer import FORMAT_VERSION, export_words, parse_export
+from wort import cli, paths
+from wort.dictionary import grammar as g
+from wort.dictionary.importer import MAX_EXAMPLES, import_file
+from wort.dictionary.lookup import Dictionary
+from wort.render.card import render_card
+from wort.store import Store
+from wort.transfer import FORMAT_VERSION, export_words, parse_export
 
 
 @pytest.fixture

@@ -9,8 +9,8 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from lernen.dictionary import grammar as g
-from lernen.dictionary.lookup import Entry
+from wort.dictionary import grammar as g
+from wort.dictionary.lookup import Entry
 
 # Monochrome: bold/italic plus one mid grey for secondary text.
 # Underline is used only for the changing parts of verb forms (conjugation endings).
