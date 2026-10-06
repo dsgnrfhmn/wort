@@ -223,6 +223,31 @@ def test_session_treats_command_words_as_words(home, monkeypatch):
     assert _queries() == [("list", False)]
 
 
+def test_session_history_shows_unique_queries_and_is_not_logged(home, monkeypatch, capsys):
+    _stdin(monkeypatch, "gehen\nHaus\nhaus\ngehen\n/history\nquit\n")
+    cli.main([])
+    out = capsys.readouterr().out
+    table = out[out.rindex("Query"):]
+    assert table.count("gehen") == 1 and table.lower().count("haus") == 1  # no duplicates, case-insensitive
+    assert re.search(r"│\s*1\s*│\s*haus", table) and re.search(r"│\s*2\s*│\s*gehen", table)  # numbered; order = last asked, newest at the bottom
+    assert "Meaning" in table and "to go" in table and "house" in table and "Last" not in table
+    assert "haus" in table and "Haus" not in table  # latest spelling wins
+    assert [q for q, _ in _queries()] == ["gehen", "Haus", "haus", "gehen"]  # /history itself is not logged
+
+
+def test_session_unknown_slash_command_is_not_looked_up_or_logged(home, monkeypatch, capsys):
+    _stdin(monkeypatch, "/foo\n/history\n")
+    cli.main([])
+    assert "Unknown command: /foo" in capsys.readouterr().out
+    assert _queries() == []
+
+
+def test_session_history_without_queries(home, monkeypatch, capsys):
+    _stdin(monkeypatch, "/history\n")
+    cli.main([])
+    assert "No queries yet." in capsys.readouterr().out
+
+
 def test_session_without_dictionary_explains(monkeypatch, capsys):
     _stdin(monkeypatch, "gehen\n")
     with pytest.raises(SystemExit):
@@ -349,7 +374,7 @@ def test_session_shows_banner_on_a_terminal_only(home, monkeypatch, capsys):
     cli.main([])
     out = _plain(capsys.readouterr().out)
     assert all(line.rstrip() in out for line in cli.BANNER.split("\n"))
-    assert out.index(cli.BANNER.split("\n")[0].rstrip()) < out.index("Type a word")
+    assert cli.FOOTER in out and "type a word" not in out  # the command list, and no sentence about typing
 
     _stdin(monkeypatch, "quit\n")  # not a terminal: no banner, nothing but results
     monkeypatch.setattr(cli, "_interactive", lambda: False)
@@ -582,6 +607,7 @@ def test_picker_remeasures_the_screen_on_resize(dictionary, capsys):
     assert frames[0].count("\r\n") == 39 and frames[2].count("\r\n") == 7  # painted to the current height
 
 
+
 def test_phrase_is_looked_up_word_by_word(home, monkeypatch, capsys):
     _interactive(monkeypatch, "gehen Haus\nquit\n")
     left = _keys(monkeypatch, "2", "h", "q")
@@ -630,3 +656,357 @@ def test_single_result_that_fits_is_printed_as_before(home, monkeypatch, capsys)
     _keys(monkeypatch)  # no picker for a card that fits: reading a key would raise
     cli.main([])
     assert "Singular" in _plain(capsys.readouterr().out)
+
+
+def test_banner_is_pinned_in_a_scroll_region(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nquit\n", rows=40)
+    cli.main([])
+    out = capsys.readouterr().out
+    height = len(cli.BANNER.split("\n"))  # nothing asked yet: just the banner on top
+    assert f"\x1b[{height + 1};39r" in out  # between banner and the footer row (40) it scrolls, they do not
+    assert f"\x1b[40;1H\x1b[2K" in out and cli.FOOTER in out  # the command list sits on the last row
+    assert out.rstrip("\n").endswith("\x1b7\x1b[r\x1b8")  # the region is released on the way out
+
+
+def test_collapse_cannot_reach_into_the_pinned_banner(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nHaus\nquit\n", rows=20)  # the gehen card is taller than the 9 working rows
+    cli.main([])
+    out = capsys.readouterr().out
+    height = len(cli.BANNER.split("\n")) + 1  # banner rows and the footer row are pinned
+    assert re.findall(r"\x1b\[(\d+)A\x1b\[J", out)[0] == str(20 - height - 1)  # the region's height - 1
+
+
+def test_small_window_gets_no_pinned_banner(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "quit\n", rows=12)
+    cli.main([])
+    out = _plain(capsys.readouterr().out)
+    assert "r\x1b[" not in out and not re.search(r"\x1b\[\d+;\d+r", out)  # no scroll region
+    assert all(line.rstrip() in out for line in cli.BANNER.split("\n"))  # but the banner is still printed once
+
+
+def test_banner_is_redrawn_after_resize(monkeypatch, capsys):
+    from rich.console import Console
+
+    from wort.header import Header
+
+    rows = [30]
+    header = Header(Console(width=80, force_terminal=True), cli.BANNER, "footer", lambda: rows[0])
+    assert header.start()
+    capsys.readouterr()
+    rows[0] = 45
+    header.refresh()
+    out = capsys.readouterr().out
+    assert "\x1b[6;44r" in out and out.startswith("\x1b7") and out.rstrip().endswith("\x1b8\x1b[?2026l".rstrip())  # new region, cursor kept
+    assert "\x1b[30;1H\x1b[2K\x1b[45;1H" in out  # the old footer row is blanked, the footer moves to the new last row
+    rows[0] = 10
+    header.refresh()  # too small now: the banner is released
+    assert not header.active and "\x1b[r" in capsys.readouterr().out
+
+
+def test_picker_keeps_the_banner_fixed_while_scrolling(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "Haus\nquit\n", rows=18)  # the Haus card (13 lines) does not fit under the banner
+    _keys(monkeypatch, "j", " ", "G", "q")
+    cli.main([])
+    out = capsys.readouterr().out
+    view = out[out.index("\x1b[?1049h") : out.index("\x1b[?1049l")]
+    frames = view.split("\x1b[H")[1:]
+    assert len(frames) == 4
+    banner_top = cli.BANNER.split("\n")[0].rstrip()
+    for frame in frames:  # the banner heads every frame; each frame is exactly one screen high
+        assert banner_top in _plain(frame).split("\r\n")[0]
+        assert frame.count("\r\n") == 17
+    height = len(cli.BANNER.split("\n"))  # the picker pins the banner, nothing else
+    first, last = map(int, re.search(r"(\d+)-(\d+)/\d+", _plain(frames[0])).groups())
+    assert last - first + 1 == 18 - height - 1  # room = rows - banner - hint row
+
+
+def test_picker_has_no_banner_in_a_small_window(dictionary, capsys):
+    from rich.console import Console
+
+    from wort import picker
+    from wort.header import Header
+
+    console = Console(width=60, force_terminal=True)
+    header = Header(console, cli.BANNER, "hint", lambda: 12)  # too small to pin
+    keys = iter(["q"])
+    picker.pick(dictionary.lookup("house")[1], console, lambda: 12, keys=lambda: next(keys), banner=header.pinned_lines)
+    assert cli.BANNER.split("\n")[0].rstrip() not in _plain(capsys.readouterr().out)
+
+
+def test_footer_stays_pinned_and_there_is_no_typing_hint(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nclear\nquit\n", rows=40)
+    cli.main([])
+    out = capsys.readouterr().out
+    assert cli.FOOTER == "/history . /clear-history . clear . quit" and "type a word" not in out
+    assert out.count("\x1b[40;1H\x1b[2K") >= 3  # painted at the start, again when the recent words went, and on `clear`
+    assert "─" * 20 not in _plain(out.split("Präsens")[0].split("\x1b[H")[1].split("\x1b[6;")[0])  # no separator in the header
+
+
+def test_recent_words_are_bullets_under_the_banner_while_idle(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nHaus\nhaus\nKatze\nclear\nquit\n", rows=40)
+    cli.main([])
+    out = capsys.readouterr().out
+    assert "• " not in _plain(out[: out.index("Präsens")]).split(cli.PROMPT.strip())[0]  # nothing asked yet: no bullets
+    idle = _plain(out[out.rindex("\x1b[H\x1b[2J") :]).split(cli.PROMPT.strip())[0]  # the header repainted by `clear`
+    bullets = re.findall(r"• (\S+) — ([^\r\n]*)", idle)
+    assert [q for q, _ in bullets] == ["Katze", "haus", "gehen"]  # newest first, no duplicates
+    assert all(meaning.strip() for _, meaning in bullets)  # each with its translation
+
+
+def test_only_the_last_five_words_are_kept(store, dictionary):
+    for word in ["a1", "b2", "c3", "d4", "e5", "f6", "b2"]:
+        store.log_query(word, False)
+    assert [q for q, _ in cli._recent(store, dictionary)] == ["b2", "f6", "e5", "d4", "c3"]
+    store.log_query("Haus", True)
+    assert cli._recent(store, dictionary)[0] == ("Haus", "house; home")
+
+
+def test_small_windows_get_no_bullets(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nclear\nquit\n", rows=15)  # room for the banner and the footer, not for a bullet
+    cli.main([])
+    out = _plain(capsys.readouterr().out)
+    assert "• " not in out[out.rindex("\x1b[H\x1b[2J") :].split(cli.PROMPT.strip())[0] and cli.FOOTER in out
+
+
+def test_bullets_are_hidden_in_the_history_view(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nclear\n/history\nquit\n", rows=40)
+    _keys(monkeypatch, "q")  # close the history
+    cli.main([])
+    out = capsys.readouterr().out
+    view = _plain(out[out.rindex("\x1b[?1049h") : out.rindex("\x1b[?1049l")])
+    assert cli.BANNER.split("\n")[0].rstrip() in view and cli.FOOTER not in view
+    assert view.split("\x1b[H")[-1].count("• gehen") == 1  # only the history's own bullet, not a recent-words bullet
+    back = _plain(out[out.rindex("\x1b[?1049l") :])
+    assert cli.FOOTER in back and "• gehen" in back  # both are back when the view is closed
+
+
+def test_footer_is_not_in_the_picker_banner(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "house\nquit\n", rows=40)
+    _keys(monkeypatch, "q")
+    cli.main([])
+    out = capsys.readouterr().out
+    view = out[out.index("\x1b[?1049h") : out.index("\x1b[?1049l")]
+    assert cli.FOOTER not in view and cli.BANNER.split("\n")[0].rstrip() in view
+
+
+def _history_screen(out: str) -> str:
+    """Everything the history view painted (it runs on the alternate screen, after any search view)."""
+    return _plain(out[out.rindex("\x1b[?1049h") : out.rindex("\x1b[?1049l")])
+
+
+def test_history_is_an_accordion_of_bullets(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nhouse\nqwertzuiop\n/history\nquit\n")
+    # the `house` results picker takes the first key; then the history: up to `house`, open it, open the 2nd
+    # result in place, close that, close the entry, close the view
+    left = _keys(monkeypatch, "q", "k", "l", "2", "h", "q", "q")
+    cli.main([])
+    assert left == []
+    out = capsys.readouterr().out
+    screen = _history_screen(out)
+    rows = [l.replace("\x1b[2K", "") for l in screen.split("\r\n")]
+    qw = next(l for l in rows if "qwertzuiop" in l)  # a history entry is one bullet line: word, then its translation
+    assert qw.startswith("• qwertzuiop — nothing found")
+    assert next(l for l in rows if "gehen" in l and l.startswith("• ")).endswith("to work, to function")
+    assert "Gebäude" in screen and "Singular" in screen  # the 2nd result opened into its full card in place
+    assert _queries() == [("gehen", True), ("house", True), ("qwertzuiop", False)]  # viewing logs nothing
+
+
+def test_history_miss_opens_as_nothing_found_with_suggestions(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "Hasu\n/history\nquit\n")
+    left = _keys(monkeypatch, "q", "l", "q", "q")  # close the `Did you mean` list; open the entry; collapse; close
+    cli.main([])
+    assert left == []
+    screen = _history_screen(capsys.readouterr().out)
+    assert "Nothing found. Did you mean:" in screen and "Haus" in screen and "Singular" in screen  # one suggestion: its card
+    assert _queries() == [("Hasu", False)]
+
+
+def test_history_card_taller_than_the_screen_opens_on_its_own_screen(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "Haus\n/history\nquit\n", rows=10)  # the Haus card does not fit in 9 rows
+    # (`Haus` itself is a tall single card: its own view takes `q` first.) Then: open the entry, step to its
+    # result, open it (too tall: own screen), scroll, close that screen, collapse, close
+    left = _keys(monkeypatch, "q", "l", "j", "l", "j", "q", "q", "q")
+    cli.main([])
+    assert left == []
+    out = capsys.readouterr().out
+    screen = _history_screen(out)
+    assert "j k scroll" in screen and re.search(r"2-\d+/\d+", screen)  # the full card scrolled on its own screen
+    assert "┏━ Haus" in screen  # and it is drawn as the selected card there too
+    assert out.count("\x1b[?1049h") == 2 and out.count("\x1b[?1049l") == 2  # no nested alternate screen
+
+
+def test_history_without_a_terminal_is_still_the_table(home, monkeypatch, capsys):
+    _stdin(monkeypatch, "gehen\n/history\nquit\n")
+    cli.main([])
+    out = capsys.readouterr().out
+    assert "Meaning" in out and "gehen" in out and "\x1b[?1049h" not in out
+
+
+def test_history_active_card_keeps_the_selected_border(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "house\n/history\nquit\n")
+    left = _keys(monkeypatch, "q", "l", "2", "q", "q")  # close the search picker; open the entry; open result 2; close both
+    cli.main([])
+    assert left == []
+    out = capsys.readouterr().out
+    view = out[out.rindex("\x1b[?1049h") : out.rindex("\x1b[?1049l")]
+    frames = view.split("\x1b[H")[1:]
+    opened = [f for f in frames if "Singular" in _plain(f)]  # frames with the full Gebäude card in place
+    assert opened and all("┏━ Gebäude" in _plain(f) for f in opened)  # heavy border: it is the selected one
+    assert all("┌─ Gebäude" not in _plain(f) for f in opened)
+
+
+def test_history_row_is_a_bullet_cut_to_one_line(dictionary):
+    from datetime import datetime
+
+    from rich.console import Console
+
+    from wort.history_view import Item, _row
+
+    console = Console(width=40, force_terminal=False)
+    item = Item("Katze", True, 3, datetime(2026, 10, 6), "house cat")
+    with console.capture() as cap:
+        console.print(_row(item, 39))
+    assert cap.get().rstrip("\n") == "• Katze — house cat"  # no status, no date
+
+    long = Item("durchbringen", True, 1, datetime(2026, 10, 6), "to be able to bring (something) through; to cause")
+    with console.capture() as cap:
+        console.print(_row(long, 39))
+    (line,) = cap.get().rstrip("\n").split("\n")
+    assert line.startswith("• durchbringen — to be") and line.endswith("…") and len(line) == 39
+
+
+def test_history_selected_entry_is_bracketed_by_two_grey_separators(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\nHaus\n/history\nquit\n")
+    _keys(monkeypatch, "k", "q")  # up to `gehen`, then close
+    cli.main([])
+    out = capsys.readouterr().out
+    view = out[out.rindex("\x1b[?1049h") : out.rindex("\x1b[?1049l")]
+    rows = [l.replace("\x1b[2K", "") for l in _plain(view.split("\x1b[H")[-1]).split("\r\n")]
+    at = next(n for n, l in enumerate(rows) if l.startswith("• gehen —"))
+    assert set(rows[at - 1].strip()) == {"━"} and set(rows[at + 1].strip()) == {"━"}  # above and below
+    other = next(n for n, l in enumerate(rows) if l.startswith("• Haus —"))
+    assert "━" not in rows[other + 1]  # the others are plain bullets (the line above it is `gehen`'s lower separator)
+    assert sum(set(l.strip()) == {"━"} for l in rows) == 2  # exactly two separators in the whole list
+
+
+def test_no_state_label_next_to_the_banner(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\n/history\nquit\n", rows=40)
+    _keys(monkeypatch, "q")
+    cli.main([])
+    out = _plain(capsys.readouterr().out)
+    assert "translate\n" not in out.replace("translate>", "") and "history" not in out.split("/history")[0]  # no label anywhere
+    assert not re.search(r"█\s+(translate|history)\b", out)  # nor beside the block letters, on the main screen or in the view
+
+
+def test_hiding_the_recent_words_closes_the_gap(monkeypatch, capsys):
+    from rich.console import Console
+
+    from wort.header import Header
+
+    header = Header(Console(width=80, force_terminal=True), cli.BANNER, "footer", lambda: 40)
+    header.recent = [("Haus", "house"), ("gehen", "to go")]
+    assert header.start() and header.height == 5 + 2  # banner and two bullets
+    capsys.readouterr()
+    header.hide_recent()
+    out = capsys.readouterr().out
+    assert header.height == 5 and "\x1b[2S\x1b[2A" in out  # content scrolled up by the freed rows, cursor with it
+    assert "\x1b[6;39r" in out  # the region now starts right under the banner
+    assert out.startswith("\x1b7") and "\x1b8" in out
+    header.hide_recent()  # idempotent
+    assert capsys.readouterr().out == ""
+
+
+
+def test_history_keeps_everything_but_recent_words_are_per_session(home, monkeypatch, capsys):
+    old = Store(paths.user_db())
+    old.log_query("Katze", True)  # an earlier session
+    old.log_query("Haus", True)
+    _interactive(monkeypatch, "gehen\nclear\n/history\nquit\n", rows=40)
+    _keys(monkeypatch, "q")  # close the history view
+    cli.main([])
+    out = capsys.readouterr().out
+    view = _history_screen(out)
+    assert all(word in view for word in ("Katze", "Haus", "gehen"))  # /history: the whole stored history
+    assert [q for q, _ in _queries()] == ["Katze", "Haus", "gehen"]
+    start = _plain(out[: out.index("Präsens")]).split(cli.PROMPT.strip())[0]
+    assert "• Katze" not in start and "• Haus" not in start  # the bullets under the banner start empty in a new session
+    idle = _plain(out[out.rindex("\x1b[H\x1b[2J") :]).split(cli.PROMPT.strip())[0]
+    assert "• gehen" in idle and "Katze" not in idle  # ...and fill from this session's queries only
+
+
+def test_history_table_without_a_terminal_lists_everything(home, monkeypatch, capsys):
+    Store(paths.user_db()).log_query("Katze", True)  # an earlier session
+    _stdin(monkeypatch, "/history\nquit\n")
+    cli.main([])
+    assert "Katze" in capsys.readouterr().out
+
+
+def test_unique_queries_after_a_marker(store):
+    store.log_query("a", True)
+    mark = store.last_query_id()
+    assert store.unique_queries(mark) == [] and mark > 0
+    store.log_query("A", True)
+    store.log_query("b", False)
+    assert [(q, f, n) for q, f, n, _ in store.unique_queries(mark)] == [("A", True, 1), ("b", False, 1)]
+    assert [n for *_, n, _ in store.unique_queries()][0] == 2  # without a marker: all history, `a`/`A` merged
+
+
+def test_recent_words_start_empty_in_a_new_session(store, dictionary):
+    store.log_query("Haus", True)
+    mark = store.last_query_id()
+    assert cli._recent(store, dictionary, mark) == []
+    store.log_query("gehen", True)
+    assert [q for q, _ in cli._recent(store, dictionary, mark)] == ["gehen"]
+
+
+def test_prompt_follows_the_header_directly(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "quit\n", rows=40)
+    cli.main([])
+    out = capsys.readouterr().out
+    header = out[out.index("\x1b[H\x1b[2K█") : out.index("\x1b[6;39r")]  # what is painted above the region
+    assert len(header.split("\r\n")) == 5  # the five banner rows and nothing after them
+    assert "\x1b[6;1H" in out  # the prompt starts on the very next row
+
+
+def test_clear_history_asks_and_deletes_only_the_history(home, monkeypatch, capsys):
+    store = Store(paths.user_db())
+    store.add_word("Haus", "noun", None)  # a practice word must survive
+    _stdin(monkeypatch, "gehen\nHaus\n/clear-history\nn\n/history\n/clear-history\ny\n/history\nquit\n")
+    cli.main([])
+    out = capsys.readouterr().out
+    assert "Delete the whole history (2 words" in out and "Kept." in out  # first answer: no
+    assert "History cleared." in out and "No queries yet." in out  # second answer: yes; then it is empty
+    assert _queries() == []
+    assert [w.lemma for w in Store(paths.user_db()).words()] == ["Haus"]  # practice words are not history
+
+
+def test_clear_history_on_an_empty_history_asks_nothing(home, monkeypatch, capsys):
+    _stdin(monkeypatch, "/clear-history\nquit\n")
+    cli.main([])
+    assert "The history is already empty." in capsys.readouterr().out
+
+
+def test_words_asked_after_clearing_show_up_again(home, monkeypatch, capsys):
+    _interactive(monkeypatch, "gehen\n/clear-history\ny\nHaus\nclear\nquit\n", rows=40)
+    cli.main([])
+    out = capsys.readouterr().out
+    idle = _plain(out[out.rindex("\x1b[H\x1b[2J") :]).split(cli.PROMPT.strip())[0]
+    assert "• Haus" in idle and "gehen" not in idle  # the new session starts from nothing (ids restart too)
+    assert [q for q, _ in _queries()] == ["Haus"]
+
+
+def test_unknown_command_lists_both(home, monkeypatch, capsys):
+    _stdin(monkeypatch, "/nope\nquit\n")
+    cli.main([])
+    assert "Available: /history, /clear-history" in capsys.readouterr().out
+
+
+def test_history_separator_is_grey_not_bold():
+    from rich.console import Console
+
+    from wort.history_view import _rule
+
+    console = Console(width=20, force_terminal=True, color_system="256")
+    with console.capture() as cap:
+        console.print(_rule(console))
+    assert cap.get() == "\x1b[38;5;242m" + "━" * 20 + "\x1b[0m\n"  # the muted grey, no bold attribute

@@ -19,6 +19,8 @@ from rich.table import Table
 from rich.text import Text
 
 from wort import paths, picker
+from wort import history_view
+from wort.header import Header
 from wort.dictionary.grammar import GENDER_ARTICLE
 from wort.dictionary.lookup import Dictionary, Entry
 from wort.render.card import MUTED
@@ -197,10 +199,63 @@ def _bind_ctrl_l() -> None:
         readline.parse_and_bind(r'"\C-l": "\C-a\C-kclear\C-m"')
 
 
-def _browse(entries: list[Entry], heading: str = "", listed: bool = False) -> str:
+def _print_unique_queries(dictionary: Dictionary, store: Store) -> None:
+    rows = store.unique_queries()
+    if not rows:
+        _print("No queries yet.")
+        return
+    table = _table("#", "Query", "Meaning", "Found", "Times")
+    for number, (query, found, count, _) in enumerate(rows, 1):
+        meaning = resolve(dictionary, query)[1] if found else "—"  # lookup only, not logged
+        table.add_row(str(number), query, Text(meaning, style=MUTED), "yes" if found else "no", str(count))
+    console.print(table)
+
+
+def _browse(header: Header, entries: list[Entry], heading: str = "", listed: bool = False) -> str:
     """Let the user pick among several entries; returns a key that should start the next word, or ''."""
-    with picker.cbreak():
-        return picker.pick(entries, console, lambda: shutil.get_terminal_size().lines, heading=heading, listed=listed) or ""
+    with picker.cbreak(), header.suspended():
+        return picker.pick(entries, console, lambda: shutil.get_terminal_size().lines, heading=heading, listed=listed, banner=header.pinned_lines) or ""
+
+
+def _recent(store: Store, dictionary: Dictionary, since: int = 0) -> list[tuple[str, str]]:
+    """The last five different words asked in this session with their translation, newest first."""
+    asked = list(reversed(store.unique_queries(since)))[:5]
+    return [(q, resolve(dictionary, q)[1] if found else "nothing found") for q, found, *_ in asked]
+
+
+def _browse_history(header: Header, dictionary: Dictionary, store: Store) -> None:
+    """The `/history` accordion: everything ever asked; nothing in it is logged or added."""
+    items = [
+        history_view.Item(query, found, count, ts, resolve(dictionary, query)[1] if found else "nothing found")
+        for query, found, count, ts in store.unique_queries()
+    ]
+
+    def load(item: history_view.Item) -> tuple[list[Entry], str]:
+        if item.found:
+            entries, _, note = resolve(dictionary, item.query)
+            return entries, note
+        similar = dictionary.suggest(item.query)
+        return similar, "Nothing found. Did you mean:" if similar else ""
+
+    # order matters: the pinned banner is repainted by `suspended` on the way out, which must be after the
+    # alternate screen was left
+    with picker.cbreak(), header.suspended(), header.recent_hidden(), picker.fullscreen():
+        history_view.browse(items, load, console, lambda: shutil.get_terminal_size().lines, banner=header.pinned_lines)
+
+
+def _clear_history(store: Store) -> bool:
+    """Ask, then delete the whole stored query history. True if it was deleted."""
+    entries = len(store.unique_queries())
+    if not entries:
+        _print("The history is already empty.")
+        return False
+    answer = input(f"Delete the whole history ({entries} words, it cannot be undone)? [y/N] ").strip().lower()
+    if answer not in ("y", "yes"):
+        _print("Kept.")
+        return False
+    store.clear_queries()
+    _print("History cleared.")
+    return True
 
 
 def _did_you_mean(similar: list[Entry]) -> str:
@@ -227,6 +282,14 @@ def _input(prompt: str, prefill: str = "") -> str:
 
 
 def cmd_session(args: argparse.Namespace | None = None) -> None:
+    header = Header(console, BANNER, FOOTER)
+    try:
+        _session(header)
+    finally:
+        header.stop()  # give the terminal its scroll region back
+
+
+def _session(header: Header) -> None:
     """Interactive session: every line is a word to look up; `quit` leaves.
 
     On a terminal, the previous word's card collapses into one `• query — translation`
@@ -237,12 +300,15 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
     except ImportError:
         pass
     dictionary, store = _open_dictionary(), Store(paths.user_db())
+    since = store.last_query_id()  # the recent words under the banner show only what is asked from now on
     interactive = _interactive()
     prompt = PROMPT if interactive else ""
     if interactive:
         _bind_ctrl_l()
-        _banner()
-        _print("Type a word (German or English). `quit` to leave, `clear` or Ctrl-L to clear the screen.")
+        header.recent = _recent(store, dictionary, since)
+        if not header.start():  # window too small to pin the banner: print it once, as plain output
+            _banner()
+            _print(FOOTER)
     last: tuple[int, Text] | None = None  # (screen lines used by the last query+cards, its summary)
     below = 0  # screen lines added after it (blank inputs)
 
@@ -253,7 +319,7 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
         rows, summary = last
         # Up to the old query line, then clear to the end. A card taller than the
         # screen can only be erased as far as the cursor can reach (its top has scrolled off).
-        erase = min(rows + below + typed_lines, shutil.get_terminal_size().lines - 1)
+        erase = min(rows + below + typed_lines, header.usable_rows() - 1)
         sys.stdout.write(f"\x1b[{erase}A\x1b[J")
         console.print(_fit(summary), markup=False)
         last, below = None, 0
@@ -261,6 +327,13 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
     pending = ""  # a key that closed the picker: it is the first letter of the next word
     while True:
         try:
+            if interactive and last is not None and picker.has_terminal():
+                # the previous result collapses into its bullet line as soon as typing starts, not at Enter
+                if not pending:
+                    sys.stdout.write(prompt)
+                    sys.stdout.flush()
+                    picker.wait_for_key()
+                collapse(0)  # the cursor is on a fresh line below the result: no typed line to count
             line = _input(prompt, pending)
         except (EOFError, KeyboardInterrupt):
             if interactive:
@@ -270,18 +343,37 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
         query = " ".join(line.split())
         typed = _screen_lines(prompt + line)
         if not query:
-            below += typed
+            if last is not None:
+                below += typed
             continue
         if query.lower() in QUIT_WORDS:
             if interactive:
                 collapse(typed)
             return
+        if query.startswith("/"):  # session commands are never looked up or logged
+            if interactive:
+                collapse(typed)
+            if query.lower() == HISTORY_COMMAND:
+                if interactive and picker.usable() and store.unique_queries():
+                    _browse_history(header, dictionary, store)
+                else:
+                    _print_unique_queries(dictionary, store)
+            elif query.lower() == CLEAR_HISTORY_COMMAND:
+                if _clear_history(store):
+                    since = 0  # the ids start over: everything logged from now on belongs to this session
+                    header.recent = []
+            else:
+                _print(f"Unknown command: {query}. Available: {HISTORY_COMMAND}, {CLEAR_HISTORY_COMMAND}")
+            continue
         if query.lower() in CLEAR_WORDS:
             if interactive:
-                _clear_screen()
+                header.recent_visible = True  # nothing is being searched any more
+                header.clear() if header.active else _clear_screen()
                 last, below = None, 0  # nothing of the old screen is left to collapse
             continue
+        header.hide_recent()  # a search is on screen from here on
         entries, summary, note = find(dictionary, store, query)
+        header.recent = _recent(store, dictionary, since)
         if not interactive:
             if note:
                 _print(note)
@@ -298,14 +390,14 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
                 rows += _print_lines(f"Too many words: a phrase is looked up word by word up to {MAX_PHRASE_WORDS}.")
             similar = dictionary.suggest(query)
             if similar and picker.usable():
-                pending = _browse(similar, "Did you mean:", listed=True)
+                pending = _browse(header, similar, "Did you mean:", listed=True)
             elif similar:
                 rows += _print_lines(_did_you_mean(similar))
             last = (_screen_lines(echo) + rows, summary)
             continue
-        rows_on_screen = shutil.get_terminal_size().lines
+        rows_on_screen = header.usable_rows()
         if picker.usable() and (len(entries) > 1 or (entries and picker.too_tall(entries[0], console, rows_on_screen))):
-            pending = _browse(entries, note)
+            pending = _browse(header, entries, note)
             last = (_screen_lines(echo), summary)  # the picker erased its own output
             continue
         rows = _print_lines(note) if note else 0

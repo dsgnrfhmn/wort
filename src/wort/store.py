@@ -106,6 +106,33 @@ class Store:
             for r in self.conn.execute("SELECT * FROM queries ORDER BY id")
         ]
 
+    def clear_queries(self) -> int:
+        """Delete the whole query history (practice words and reviews are not touched); returns how many rows."""
+        count = self.conn.execute("DELETE FROM queries").rowcount
+        self.conn.commit()
+        return count
+
+    def last_query_id(self) -> int:
+        """The id of the newest logged query (0 if none): a marker for 'since now'."""
+        return self.conn.execute("SELECT COALESCE(MAX(id), 0) FROM queries").fetchone()[0]
+
+    def unique_queries(self, after_id: int = 0) -> list[tuple[str, bool, int, datetime]]:
+        """One row per query, case-insensitive: (latest spelling, found at the latest try, count, latest time).
+
+        Oldest first, so the most recent query ends up at the bottom. Only queries logged after `after_id`
+        (see `last_query_id`) count: that is how a session sees just its own.
+        """
+        latest: dict[str, Query] = {}
+        counts: dict[str, int] = {}
+        for q in self.queries():
+            if q.id <= after_id:
+                continue
+            key = q.query.casefold()
+            latest.pop(key, None)  # re-insert so dict order follows the latest occurrence
+            latest[key] = q
+            counts[key] = counts.get(key, 0) + 1
+        return [(q.query, q.found, counts[key], q.ts) for key, q in latest.items()]
+
     def get_word(self, lemma: str, pos: str) -> Word | None:
         row = self.conn.execute("SELECT * FROM words WHERE lemma = ? AND pos = ?", (lemma, pos)).fetchone()
         return self._word(row) if row else None
