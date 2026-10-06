@@ -18,9 +18,10 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from wort import paths
+from wort import paths, picker
 from wort.dictionary.grammar import GENDER_ARTICLE
 from wort.dictionary.lookup import Dictionary, Entry
+from wort.render.card import MUTED
 from wort.store import Store
 from wort.transfer import export_words
 
@@ -47,8 +48,12 @@ BANNER = """
 """.strip("\n")  # solid block letters
 
 COMMANDS = {"tui", "import", "t", "add", "list", "history", "export"}
+FOOTER = "/history . /clear-history . clear . quit"
+PROMPT = "translate> "
 QUIT_WORDS = {"quit"}
 CLEAR_WORDS = {"clear"}
+HISTORY_COMMAND = "/history"
+CLEAR_HISTORY_COMMAND = "/clear-history"
 
 
 def _print(text: str) -> None:
@@ -86,23 +91,44 @@ def cmd_import(args: argparse.Namespace) -> None:
         source.unlink(missing_ok=True)
 
 
-def find(dictionary: Dictionary, store: Store, query: str) -> tuple[list[Entry], str]:
-    """Look `query` up, log it, and return (entries, one-line summary 'query — translation')."""
-    query = " ".join(query.split())
+MAX_PHRASE_WORDS = 5
+
+
+def resolve(dictionary: Dictionary, query: str) -> tuple[list[Entry], str, str]:
+    """Look `query` up without logging: (entries, short translation, note).
+
+    A phrase that is not in the dictionary as a whole is looked up word by word (best entry per word);
+    `note` then says so and lists typo corrections. It is empty for an ordinary lookup.
+    """
     german, english = dictionary.lookup(query)
-    store.log_query(query, bool(german or english))
-    return german + english, _summary(query, german, english)
+    if not (german or english) and " " in query:
+        entries, fixes = dictionary.lookup_words(query, MAX_PHRASE_WORDS)
+        if entries:
+            note = "One result per word" + "".join(f" · corrected {a} → {b}" for a, b in fixes)
+            return entries, " / ".join(e.glosses[0] for e in entries if e.glosses), note
+    return german + english, _translation(german, english), ""
 
 
-def _summary(query: str, german: list[Entry], english: list[Entry]) -> str:
+def find(dictionary: Dictionary, store: Store, query: str) -> tuple[list[Entry], Text, str]:
+    """Look `query` up, log it as typed, and return (entries, one-line summary '• query — translation', note)."""
+    query = " ".join(query.split())
+    entries, meaning, note = resolve(dictionary, query)
+    store.log_query(query, bool(entries))
+    line = Text("• ")  # the query as typed in the normal foreground, the translation in muted grey
+    line.append(query)
+    line.append(f" — {meaning}", style=MUTED)
+    return entries, line, note
+
+
+def _translation(german: list[Entry], english: list[Entry]) -> str:
     if not (german or english):
-        return f"{query} — nothing found"
+        return "nothing found"
     if german:  # a German word: show its English meaning(s), ignore weaker English-side matches
         parts = ["; ".join(e.glosses[:2]) for e in german]
     else:  # an English word: show the German equivalents
         parts = [f"{GENDER_ARTICLE[e.gender]} {e.lemma}" if e.pos == "noun" and e.gender in GENDER_ARTICLE else e.lemma for e in english]
     unique = list(dict.fromkeys(p for p in parts if p))
-    return f"{query} — {' / '.join(unique[:3])}"
+    return " / ".join(unique[:3])
 
 
 def show(entries: list[Entry]) -> int:
@@ -124,9 +150,14 @@ def cmd_lookup(args: argparse.Namespace) -> None:
     query = " ".join(args.word).strip()
     if not query:
         sys.exit(1)
-    entries, _ = find(_open_dictionary(), Store(paths.user_db()), query)
+    dictionary = _open_dictionary()
+    entries, _, note = find(dictionary, Store(paths.user_db()), query)
+    if note:
+        _print(note)
     show(entries)
     if not entries:
+        if similar := dictionary.suggest(query):
+            _print(_did_you_mean(similar))
         sys.exit(1)
 
 
@@ -139,9 +170,9 @@ def _screen_lines(text: str) -> int:
     return max(1, -(-len(text) // max(console.width, 1)))
 
 
-def _fit(text: str) -> str:
-    width = max(console.width - 1, 10)
-    return text if len(text) <= width else text[: width - 1] + "…"
+def _fit(text: Text) -> Text:
+    text.truncate(max(console.width - 1, 10), overflow="ellipsis")
+    return text
 
 
 def _banner() -> None:
@@ -166,10 +197,39 @@ def _bind_ctrl_l() -> None:
         readline.parse_and_bind(r'"\C-l": "\C-a\C-kclear\C-m"')
 
 
+def _browse(entries: list[Entry], heading: str = "", listed: bool = False) -> str:
+    """Let the user pick among several entries; returns a key that should start the next word, or ''."""
+    with picker.cbreak():
+        return picker.pick(entries, console, lambda: shutil.get_terminal_size().lines, heading=heading, listed=listed) or ""
+
+
+def _did_you_mean(similar: list[Entry]) -> str:
+    return "Did you mean: " + ", ".join(dict.fromkeys(e.lemma for e in similar)) + "?"
+
+
+def _print_lines(text: str) -> int:
+    _print(text)
+    return _screen_lines(text)
+
+
+def _input(prompt: str, prefill: str = "") -> str:
+    """`input()`, optionally with text already typed (needs GNU readline; otherwise the text is dropped)."""
+    try:
+        import readline
+    except ImportError:
+        return input(prompt)
+    if prefill:
+        readline.set_startup_hook(lambda: readline.insert_text(prefill))
+    try:
+        return input(prompt)
+    finally:
+        readline.set_startup_hook()
+
+
 def cmd_session(args: argparse.Namespace | None = None) -> None:
     """Interactive session: every line is a word to look up; `quit` leaves.
 
-    On a terminal, the previous word's card collapses into one `query — translation`
+    On a terminal, the previous word's card collapses into one `• query — translation`
     line as soon as the next word is typed.
     """
     try:
@@ -178,12 +238,12 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
         pass
     dictionary, store = _open_dictionary(), Store(paths.user_db())
     interactive = _interactive()
-    prompt = "wort> " if interactive else ""
+    prompt = PROMPT if interactive else ""
     if interactive:
         _bind_ctrl_l()
         _banner()
         _print("Type a word (German or English). `quit` to leave, `clear` or Ctrl-L to clear the screen.")
-    last: tuple[int, str] | None = None  # (screen lines used by the last query+cards, its summary)
+    last: tuple[int, Text] | None = None  # (screen lines used by the last query+cards, its summary)
     below = 0  # screen lines added after it (blank inputs)
 
     def collapse(typed_lines: int) -> None:
@@ -195,16 +255,18 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
         # screen can only be erased as far as the cursor can reach (its top has scrolled off).
         erase = min(rows + below + typed_lines, shutil.get_terminal_size().lines - 1)
         sys.stdout.write(f"\x1b[{erase}A\x1b[J")
-        console.print(Text(_fit(summary)), markup=False)
+        console.print(_fit(summary), markup=False)
         last, below = None, 0
 
+    pending = ""  # a key that closed the picker: it is the first letter of the next word
     while True:
         try:
-            line = input(prompt)
+            line = _input(prompt, pending)
         except (EOFError, KeyboardInterrupt):
             if interactive:
                 print()
             return
+        pending = ""
         query = " ".join(line.split())
         typed = _screen_lines(prompt + line)
         if not query:
@@ -219,14 +281,35 @@ def cmd_session(args: argparse.Namespace | None = None) -> None:
                 _clear_screen()
                 last, below = None, 0  # nothing of the old screen is left to collapse
             continue
-        entries, summary = find(dictionary, store, query)
+        entries, summary, note = find(dictionary, store, query)
         if not interactive:
+            if note:
+                _print(note)
             show(entries)
+            if not entries and (similar := dictionary.suggest(query)):
+                _print(_did_you_mean(similar))
             continue
         collapse(typed)
         echo = prompt + query
         console.print(Text(echo), markup=False)
-        last = (_screen_lines(echo) + show(entries), summary)
+        if not entries:  # a typo? offer close matches in the same numbered list
+            rows = show(entries)  # "Nothing found."
+            if len(query.split()) > MAX_PHRASE_WORDS:
+                rows += _print_lines(f"Too many words: a phrase is looked up word by word up to {MAX_PHRASE_WORDS}.")
+            similar = dictionary.suggest(query)
+            if similar and picker.usable():
+                pending = _browse(similar, "Did you mean:", listed=True)
+            elif similar:
+                rows += _print_lines(_did_you_mean(similar))
+            last = (_screen_lines(echo) + rows, summary)
+            continue
+        rows_on_screen = shutil.get_terminal_size().lines
+        if picker.usable() and (len(entries) > 1 or (entries and picker.too_tall(entries[0], console, rows_on_screen))):
+            pending = _browse(entries, note)
+            last = (_screen_lines(echo), summary)  # the picker erased its own output
+            continue
+        rows = _print_lines(note) if note else 0
+        last = (_screen_lines(echo) + rows + show(entries), summary)
 
 
 def cmd_add(args: argparse.Namespace) -> None:

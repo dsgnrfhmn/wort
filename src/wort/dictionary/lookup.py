@@ -7,7 +7,7 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from wort.text import normalize
+from wort.text import damerau_levenshtein, normalize
 
 Form = tuple[str, tuple[str, ...]]
 
@@ -98,3 +98,55 @@ class Dictionary:
         seen = {e.id for e in german}
         english = [e for e in self.lookup_english(query, limit) if e.id not in seen]
         return german, english
+
+    def lookup_words(self, query: str, max_words: int = 5) -> tuple[list[Entry], list[tuple[str, str]]]:
+        """For a phrase that is not in the dictionary as a whole: the best entry of each word, in order.
+
+        A word without a match is replaced by its closest typo suggestion; those replacements are
+        returned as (typed, corrected) pairs. More than `max_words` words, or one word: nothing.
+        """
+        words = query.split()
+        if not 2 <= len(words) <= max_words:
+            return [], []
+        found: dict[int, Entry] = {}
+        fixes: list[tuple[str, str]] = []
+        for word in words:
+            german, english = self.lookup(word, limit=1)
+            hit = (german or english)[:1]
+            if not hit and (hit := self.suggest(word, limit=1)):
+                fixes.append((word, hit[0].lemma))
+            for entry in hit:
+                found.setdefault(entry.id, entry)
+        return list(found.values()), fixes
+
+    def suggest(self, query: str, limit: int = 9) -> list[Entry]:
+        """Entries whose lemma, inflected form or English gloss is a typo away from `query`.
+
+        Meant for a query that found nothing. Candidates share the first letter and are at most
+        two letters longer or shorter (index range scans); the edit budget is 1 for words up to
+        five letters and 2 for longer ones. Closest first.
+        """
+        norm = normalize(query)
+        if len(norm) < 3 or " " in norm:
+            return []
+        budget = 1 if len(norm) <= 5 else 2
+        low, high = norm[0], chr(ord(norm[0]) + 1)
+        span = (low, high, len(norm) - budget, len(norm) + budget)
+        words = {
+            row[0]
+            for table, column in (("entries", "lemma_norm"), ("form_index", "form_norm"), ("en_index", "en_word"))
+            for row in self.conn.execute(
+                f"SELECT DISTINCT {column} FROM {table} WHERE {column} >= ? AND {column} < ?"
+                f" AND length({column}) BETWEEN ? AND ?",
+                span,
+            )
+        }
+        scored = sorted((d, w) for w in words if 0 < (d := damerau_levenshtein(norm, w)) <= budget)
+        found: dict[int, Entry] = {}
+        for _, word in scored:
+            german, english = self.lookup(word, limit=2)
+            for entry in german + english:
+                found.setdefault(entry.id, entry)
+            if len(found) >= limit:
+                break
+        return list(found.values())[:limit]

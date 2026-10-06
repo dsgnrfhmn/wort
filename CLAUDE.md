@@ -21,9 +21,9 @@ MVP features:
 - **CLI (`wort`)**: fully local. `wort` opens an interactive session (type
   words, `quit` to leave); `wort WORD` looks one word up. The card shows full
   grammar and all example sentences; output is monochrome (grey, bold, italic; verb conjugation endings are underlined) with square box
-  lines; colors: the articles (der blue, die red, das green) and the card's main
+  lines; colors: the nominative singular article (der blue, die red, das green; plural and other cases stay grey) and the card's main
   line, which takes the word class color (noun: its article's color, verb:
-  burgundy, adj/adv: dark purple). Every query is logged automatically to the user DB (query history,
+  the terminal's own text color, i.e. black on a light theme, adj/adv: dark purple). Every query is logged automatically to the user DB (query history,
   separate from the practice word list). History and words reach the web app
   by **export/import** (`wort export` → JSON → import on the word list page);
   there is no network path from the CLI to the server. The TUI stays (`wort tui`).

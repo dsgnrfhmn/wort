@@ -14,8 +14,8 @@ from wort.dictionary.lookup import Entry
 
 # Monochrome: bold/italic plus one mid grey for secondary text.
 # Underline is used only for the changing parts of verb forms (conjugation endings).
-# Colors: the three articles (der blue, die red, das green) and the main line of a card,
-# which takes the word class color (noun: its article's color, verb: burgundy, adj/adv: dark purple).
+# Colors: the nominative singular article (der blue, die red, das green) and the main line of a card,
+# which takes the word class color (noun: its article's color, verb: terminal text color (black on light), adj/adv: dark purple).
 ENDING = "bold"  # inflection endings stand out in bold against the plain stem
 VERB_ENDING = "bold underline"  # verb conjugation endings: bold and underlined
 STEM = ""
@@ -23,7 +23,7 @@ MUTED = "grey42"  # secondary text; darker than the terminal's "dim" attribute
 HEAD = "bold"
 # Fixed 256-color indices, not the terminal theme's ANSI palette (a theme can turn that grey).
 ARTICLE_COLORS = {"der": "color(33)", "die": "color(160)", "das": "color(34)"}  # blue, red, green
-POS_COLORS = {"verb": "color(88)", "adj": "color(54)", "adv": "color(54)"}  # burgundy, dark purple
+POS_COLORS = {"verb": "default", "adj": "color(54)", "adv": "color(54)"}  # verb: the terminal's own text color (black on a light theme), not grey; dark purple
 
 
 def pos_color(entry: Entry) -> str:
@@ -41,26 +41,25 @@ GENDER_LABELS = {"m": "maskulin", "f": "feminin", "n": "neutrum"}
 CONJ_LABELS = {"weak": "regelmäßig", "strong": "unregelmäßig (stark)", "irregular": "unregelmäßig"}
 
 
-def prefix_text(prefix: str, tint: str = "", plural: bool = False) -> Text:
+def prefix_text(prefix: str, tint: str = "", colored: bool = True) -> Text:
     """Small italic words before a form ('des', 'ich bin'); der/die/das get their color.
 
-    `die` meaning the plural is plain grey: only the singular `die` (feminine) is red.
+    Only the nominative singular article is colored (`colored=True`); the articles of the
+    plural and of genitive, dative and accusative are plain grey.
     """
     text = Text()
     for word in prefix.split():
-        color = ARTICLE_COLORS.get(word, tint or MUTED)
-        if plural and word == "die":
-            color = MUTED
+        color = ARTICLE_COLORS.get(word, tint or MUTED) if colored else MUTED
         text.append(word + " ", style=f"italic {color}")
     return text
 
 
-def highlight(form: str, stem: str, prefix: str = "", ending: str = ENDING, color: str = "", plural: bool = False) -> Text:
+def highlight(form: str, stem: str, prefix: str = "", ending: str = ENDING, color: str = "", colored: bool = True) -> Text:
     """Render a form with its ending highlighted, e.g. beabsichtig[te].
 
     With `color` the whole form is tinted and the stem is bold (the card's main line).
     """
-    text = prefix_text(prefix, color, plural)
+    text = prefix_text(prefix, color, colored)
     stem_style = f"bold {color}" if color else STEM
     ending = f"{ending} {color}".strip()
     words = form.split(" ")
@@ -113,9 +112,9 @@ def _header(entry: Entry, stem: str) -> Text:
     if entry.pos == "noun":
         parts = [prefix_text(g.GENDER_ARTICLE.get(entry.gender, ""), color) + Text(entry.lemma, style=main)]
         if (gen := g.noun_form(entry, "genitive", "singular")) and entry.gender:
-            parts.append(highlight(gen, stem, g.ARTICLES[entry.gender]["genitive"], color=color))
+            parts.append(highlight(gen, stem, g.ARTICLES[entry.gender]["genitive"], color=color, colored=False))
         if pl := g.plural(entry):
-            parts.append(highlight(pl, stem, "die", color=color, plural=True))
+            parts.append(highlight(pl, stem, "die", color=color, colored=False))
         return _joined(parts)
     if entry.pos == "adj":
         parts = [Text(entry.lemma, style=main)]
@@ -173,22 +172,44 @@ def _noun_table(entry: Entry, stem: str) -> Table | None:
         art_sg = g.ARTICLES[entry.gender][case] if entry.gender in g.ARTICLES else ""
         table.add_row(
             g.CASE_LABELS[case],
-            highlight(sg, stem, art_sg) if sg else Text("—", style=MUTED),
-            highlight(pl, stem, g.ARTICLES["pl"][case], plural=True) if pl else Text("—", style=MUTED),
+            highlight(sg, stem, art_sg, colored=case == "nominative") if sg else Text("—", style=MUTED),
+            highlight(pl, stem, g.ARTICLES["pl"][case], colored=False) if pl else Text("—", style=MUTED),
         )
     return table if rows > 1 else None
 
 
-def render_card(entry: Entry, *, max_glosses: int = 4, footer: str | None = None) -> RenderableType:
-    stem = g.stem_of(entry)
-    parts: list[RenderableType] = []
+def _title(entry: Entry) -> Text:
+    return Text.assemble((entry.lemma, f"{HEAD} {pos_color(entry)}".strip()), (f"  {_meta_line(entry)}", MUTED))
 
-    first = _header(entry, stem)
+
+def _lead(entry: Entry, max_glosses: int) -> list[RenderableType]:
+    """Everything above the first rule: the forms line and the translations."""
+    first = _header(entry, g.stem_of(entry))
     if entry.ipa:
         first.append("   ")
         first.append(entry.ipa, style=MUTED)
-    parts.append(first)
-    parts.append(Text("; ".join(entry.glosses[:max_glosses])))
+    return [first, Text("; ".join(entry.glosses[:max_glosses]))]
+
+
+def render_compact(entry: Entry, number: int, selected: bool, *, max_glosses: int = 4) -> RenderableType:
+    """A result in a list of several: numbered, forms line and translations only (no tables, no examples)."""
+    title = Text()  # built by appending: a base style on the first Text would leak onto the word
+    title.append(f" [{number}] ", style="bold" if selected else f"bold {MUTED}")
+    title.append_text(_title(entry))
+    title.stylize(f"not bold {MUTED}", len(title) - len(f"  {_meta_line(entry)}"))  # a bold border must not bold the meta
+    return Panel(
+        Group(*_lead(entry, max_glosses)),
+        title=title,
+        title_align="left",
+        box=box.HEAVY if selected else box.SQUARE,  # heavy lines make the selection visible in any theme
+        border_style="bold" if selected else MUTED,
+        padding=(0, 1),
+    )
+
+
+def render_card(entry: Entry, *, max_glosses: int = 4, footer: str | None = None, selected: bool = False) -> RenderableType:
+    stem = g.stem_of(entry)
+    parts: list[RenderableType] = _lead(entry, max_glosses)
 
     table = None
     if entry.pos == "verb":
@@ -206,13 +227,16 @@ def render_card(entry: Entry, *, max_glosses: int = 4, footer: str | None = None
             if en:
                 parts.append(Text(f"  {en}", style=MUTED))
 
+    title = _title(entry)
+    if selected:  # the cursor is on this card: heavy, bold border (as for a selected result); keep the meta grey
+        title.stylize(f"not bold {MUTED}", len(title) - len(f"  {_meta_line(entry)}"))
     return Panel(
         Group(*parts),
-        title=Text.assemble((entry.lemma, f"{HEAD} {pos_color(entry)}".strip()), (f"  {_meta_line(entry)}", MUTED)),
+        title=title,
         title_align="left",
         subtitle=Text(footer, style=MUTED) if footer else None,
         subtitle_align="right",
-        box=box.SQUARE,
-        border_style=MUTED,
+        box=box.HEAVY if selected else box.SQUARE,
+        border_style="bold" if selected else MUTED,
         padding=(0, 1),
     )

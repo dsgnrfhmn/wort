@@ -14,6 +14,9 @@ Self-hosted tool for learning German (EN↔DE). Fully local, works offline on Wi
   - Adjectives: comparison degrees.
   - Inflected forms are found too (`ging` → `gehen`).
 - **Interactive session.** `wort` opens a prompt: type words, `quit` to leave.
+- **Several results.** In the session they show as a numbered compact list (forms and translations only). `j`/`k` move, a digit, `l` or Enter opens the full card, `h` goes back, `q`/Esc closes. In an open card `j`/`k` scroll and space/`b` page when it is taller than the screen. Without a terminal everything is printed in full.
+- **Phrases.** Several words (up to five, e.g. `warten auf dem`) are looked up as a whole first, otherwise word by word: one result per word in the numbered list, typos corrected per word. The history keeps what you typed.
+- **Typos.** When nothing is found, close matches (one or two letters off, a swap counts as one) are offered in the same numbered list under `Did you mean:`. The history keeps what you typed.
 - **Query history.** Every lookup is logged automatically to `user.db`.
 - **Export.** `wort export` writes history and practice words to JSON (for the future web app).
 
