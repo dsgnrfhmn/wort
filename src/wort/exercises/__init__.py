@@ -42,6 +42,8 @@ def build_session(
         entry = dictionary.find_lemma(word.lemma, word.pos)
         if entry is None:
             continue
+        if kinds == {"sentence"} and not sentence.TYPE.available(entry):
+            continue
         session.append((word, pick_exercise(entry, store.stats(word).by_exercise, rng, kinds)))
         if len(session) >= limit:
             break

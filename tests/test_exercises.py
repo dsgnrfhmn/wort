@@ -6,6 +6,7 @@ from wort.exercises import TYPES, build_session, pick_exercise
 from wort.exercises import article, forms, question, sentence, translate
 from wort.exercises.base import compare
 from wort.exercises.grammar_check import Issue, server_url
+from wort.dictionary.lookup import Entry
 
 
 class FixedRng(random.Random):
@@ -90,6 +91,61 @@ def test_separable_sentence(dictionary):
     ex = sentence.make(dictionary.find_lemma("anfangen"), FixedRng(), checker=lambda t: [])
     assert ex.check("Ich fange morgen mit der Arbeit an.").ok
     assert ex.check("Ich fange morgen mit der Arbeit.").verdict == "wrong"
+
+
+@pytest.mark.parametrize("pos, forms", [
+    ("noun", []),
+    ("verb", []),
+    ("adj", []),
+    ("noun", [("Information", ("genitive", "singular"))]),
+    ("verb", [("regnet", ("present", "third-person", "singular", "subordinate-clause"))]),
+    ("adj", [("einzigartige", ("nominative", "singular", "feminine", "weak"))]),
+])
+def test_sentence_unavailable_without_required_forms(pos, forms):
+    entry = Entry(1, "word", pos, gender="f", glosses=["meaning"], forms=forms)
+    assert not sentence.TYPE.available(entry)
+
+
+@pytest.mark.parametrize("lemma", ["Information", "regnen", "einzigartig"])
+def test_sentence_generation_rejects_missing_targets(sentence_dictionary, lemma):
+    entry = sentence_dictionary.find_lemma(lemma)
+    with pytest.raises(ValueError, match="No sentence targets"):
+        sentence.make(entry, FixedRng())
+
+
+def test_sentence_without_inflections_can_use_adverb_lemma():
+    entry = Entry(1, "heute", "adv", glosses=["today"])
+    assert sentence.TYPE.available(entry)
+    ex = sentence.make(entry, FixedRng(), checker=lambda text: [])
+    assert ex.check("Heute ist Montag.").ok
+
+
+def test_mixed_session_uses_available_exercises(sentence_dictionary, store):
+    class PreferSentenceRng(FixedRng):
+        def choices(self, population, weights=None, *, cum_weights=None, k=1):
+            return [next((t for t in population if t.kind == "sentence"), population[0])]
+
+    for lemma, pos in [("Information", "noun"), ("regnen", "verb"), ("einzigartig", "adj"), ("Haus", "noun")]:
+        store.add_word(lemma, pos, None)
+    session = build_session(store, sentence_dictionary, rng=PreferSentenceRng())
+    assert len(session) == 4
+    assert [word.lemma for word, ex in session if ex.kind == "sentence"] == ["Haus"]
+    assert all(ex.kind != "sentence" for word, ex in session if word.lemma != "Haus")
+    assert all(s.attempts == 0 for s in store.all_stats())
+
+
+def test_sentence_session_skips_unavailable_words_before_limit(sentence_dictionary, store):
+    for lemma, pos in [("Information", "noun"), ("regnen", "verb"), ("einzigartig", "adj"), ("Haus", "noun")]:
+        store.add_word(lemma, pos, None)
+    session = build_session(store, sentence_dictionary, limit=1, kinds={"sentence"}, rng=FixedRng())
+    assert [(word.lemma, ex.kind) for word, ex in session] == [("Haus", "sentence")]
+
+
+def test_sentence_session_with_no_usable_forms_is_empty(sentence_dictionary, store):
+    for lemma, pos in [("Information", "noun"), ("regnen", "verb"), ("einzigartig", "adj")]:
+        store.add_word(lemma, pos, None)
+    assert build_session(store, sentence_dictionary, kinds={"sentence"}, rng=FixedRng()) == []
+    assert all(s.attempts == 0 for s in store.all_stats())
 
 
 def test_languagetool_stays_local(monkeypatch):
