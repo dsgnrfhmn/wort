@@ -1,0 +1,46 @@
+services:
+  # TLS front. Published on the LAN IP only (not 0.0.0.0, not localhost), same as <other-service>.
+  wort-tls:
+    image: docker.io/library/nginx:alpine
+    container_name: wort-tls
+    ports:
+      - "${WORT_BIND_IP:?set WORT_BIND_IP to the server LAN IP}:8455:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # TLS cert and key live outside the repository (never in git). See DEPLOY.md.
+      - ${HOME}/.config/wort/certs:/etc/nginx/certs:ro
+    restart: unless-stopped
+
+  # The FastAPI app. Shares wort-tls's network namespace, so it listens on that namespace's
+  # 127.0.0.1:8000 and nginx proxies to it. No `ports:` of its own: unreachable from the LAN.
+  # Restarting wort-tls restarts this service too (the namespace belongs to wort-tls).
+  wort-web:
+    build: ./deploy/web
+    image: localhost/wort-web:local
+    container_name: wort-web
+    network_mode: "service:wort-tls"
+    depends_on:
+      - wort-tls
+    working_dir: /app
+    command: ["uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "8000"]
+    environment:
+      WORT_HOME: /data                  # web.db goes here (the wort-data volume)
+      PYTHONPATH: /app/src:/app
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ./:/app:ro
+      - wort-data:/data
+      # The dictionary is built by the CLI importer on the host; the web app only reads it.
+      - ${HOME}/.local/share/wort/dictionary.db:/data/dictionary.db:ro
+    tmpfs:
+      - /tmp
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  # web.db (imported history, favorites). Rootless podman: container root is the host user.
+  wort-data:

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% set page = 'history' %}
+{% block title %}History · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title='Import', info='wort export file' %}{% include "components/table-header/template.html" %}{% endwith %}
+  <form id="import-form" class="wort-row" method="post" action="/import" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="file" name="file" accept="application/json,.json" aria-label="wort export file" required>
+    {% with priority='primary', underline='dotted', label='Import', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+</section>
+
+<section class="wort-section">
+  {% with type='title-info', title='History', info=(rows | length) ~ ' words' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% if rows %}
+  <div class="wort-table" role="table" aria-label="History" style="grid-template-columns: max-content 1fr max-content max-content max-content;">
+    {% with label='Favorite' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Word' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Found' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Count' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Last' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% for r in rows %}
+    {% with selected=false, cells=[
+      {'type': '1-action', 'content': 'Remove' if r.favorite else 'Add', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="fav-' ~ loop.index ~ '"'},
+      {'type': 'text-active-cell', 'content': r.query},
+      {'type': 'status-label', 'content': 'found' if r.found else 'not found'},
+      {'type': 'text-passive-cell', 'content': r.count},
+      {'type': 'date', 'content': r.last_at.strftime('%Y-%m-%d %H:%M')}
+    ] %}{% include "components/table-row/template.html" %}{% endwith %}
+    {% endfor %}
+  </div>
+  <div class="wort-forms">
+    {% for r in rows %}
+    <form id="fav-{{ loop.index }}" method="post" action="/favorites/toggle">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="lemma" value="{{ r.query }}">
+      <input type="hidden" name="next" value="/">
+    </form>
+    {% endfor %}
+  </div>
+  {% else %}
+  {% with message='No history yet. Run `wort export` and import the file above.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% endif %}
+</section>
+{% endblock %}

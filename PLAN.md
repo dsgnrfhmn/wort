@@ -19,8 +19,8 @@ This file is the ordered execution plan and what "done" means at each step.
 > 6. **Two front ends, one lexicon** (2026-10-04): the fully local `wort`
 >    CLI/TUI **stays** next to the web app (Step C). The CLI logs every
 >    query; history and practice words reach the web app by **export/import** — no network path from the dev
->    machine. dis-system is taken from its **`dev-isolated`** branch for now
->    (main-vs-pin to be decided later).
+>    machine. dis-system is taken from its **`main`** branch for now
+>    (`dev-isolated` no longer exists; main-vs-pin to be decided later).
 
 ## Sequencing principle
 
@@ -130,7 +130,7 @@ LanguageTool and cap rules from `CLAUDE.md` apply when those features ship.
       Rich deps) **stays**; `app/` (web) is added beside it and shares the
       lexicon/scoring code — one module, not copies.
 - [ ] **dis-system first:** update the submodule to the current head of
-      `dev-isolated`, record the commit hash in `DECISIONS.md` (D00b). This is
+      `main`, record the commit hash in `DECISIONS.md` (D00b). This is
       temporary; whether to switch to a pinned tag or `main` is an open
       question. Updating dis-system itself happens in its own repo and needs
       the maintainer's confirmation.
@@ -318,7 +318,7 @@ Decided 2026-10-04: local-only; note language English; MVP = Step 0–3, 5.
 - **More example sentences:** keep Wiktionary only (up to 10, many words
   have none), or add Tatoeba as a local corpus?
 - **dis-system repo** (owner/repo) — before Step 1. Source for now: branch
-  `dev-isolated`; later decision: pinned tag, or track `main`.
+  `main` (2026-10-18); later decision: pinned tag, or track `main`.
 - Do CLI/TUI scores ever need to reach the web app? (Currently no: only the
   word list is exported/imported.)
 - Who ships the exported file to the server? (Currently: the maintainer,

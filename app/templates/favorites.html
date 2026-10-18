@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% set page = 'favorites' %}
+{% block title %}Favorites · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title='Favorites', info=(favorites | length) ~ ' words' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% if favorites %}
+  <div class="wort-table" role="table" aria-label="Favorites" style="grid-template-columns: 1fr max-content max-content;">
+    {% with label='Word' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Exercise' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Remove' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% for f in favorites %}
+    {% with selected=false, cells=[
+      {'type': 'text-active-cell', 'content': f.lemma},
+      {'type': 'link', 'content': 'Exercise', 'href': '/exercise/' ~ (f.lemma | urlencode) ~ ('?pos=' ~ (f.pos | urlencode) if f.pos else '')},
+      {'type': '1-action', 'content': 'Remove', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="fav-' ~ loop.index ~ '"'}
+    ] %}{% include "components/table-row/template.html" %}{% endwith %}
+    {% endfor %}
+  </div>
+  <div class="wort-forms">
+    {% for f in favorites %}
+    <form id="fav-{{ loop.index }}" method="post" action="/favorites/toggle">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="lemma" value="{{ f.lemma }}">
+      <input type="hidden" name="pos" value="{{ f.pos }}">
+      <input type="hidden" name="next" value="/favorites">
+    </form>
+    {% endfor %}
+  </div>
+  {% else %}
+  {% with message='No favorites yet. Add a word on the History page.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% endif %}
+</section>
+{% endblock %}

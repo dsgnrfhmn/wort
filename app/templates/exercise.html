@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% set page = 'favorites' %}
+{% block title %}{{ entry.lemma }} · exercise · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title=entry.lemma, info=gloss %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with message='Write a sentence with «' ~ entry.lemma ~ '» in the form: ' ~ task %}{% include "components/empty-state/template.html" %}{% endwith %}
+  <form class="wort-row" method="post" action="/exercise/{{ entry.lemma | urlencode }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="pos" value="{{ pos }}">
+    <input type="hidden" name="index" value="{{ index }}">
+    {% with name='sentence', label='Your sentence', value=sentence, placeholder='Your sentence', fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+    {% with priority='primary', underline='dotted', label='Check', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+</section>
+
+{% if result %}
+<section class="wort-section" aria-live="polite">
+  {% with type='title-info', title='Result', info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% if result.error %}
+    {% with message=result.error %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% else %}
+    {% if not result.checked %}
+      {% with message='Grammar was not checked: LanguageTool is not reachable.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% elif result.ok %}
+      {% with message='Form and grammar are correct.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% endif %}
+    {% if result.missing %}
+      {% with message='Missing the required form: ' ~ (result.missing | join(' ')) %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% endif %}
+    {% if result.remarks %}
+      {% with message='Corrected: ' ~ result.corrected %}{% include "components/empty-state/template.html" %}{% endwith %}
+      {% for r in result.remarks %}
+        {% with message='«' ~ r.fragment ~ '»: ' ~ r.message ~ (' → ' ~ (r.replacements | join(', ')) if r.replacements else '') %}{% include "components/empty-state/template.html" %}{% endwith %}
+      {% endfor %}
+    {% endif %}
+    {% for line in summary %}
+      {% with message=line %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% endfor %}
+  {% endif %}
+  {% with type='link', content='New question', href='/exercise/' ~ (entry.lemma | urlencode) ~ ('?pos=' ~ (pos | urlencode) if pos else '') %}{% include "components/table-cell/template.html" %}{% endwith %}
+</section>
+{% endif %}
+{% endblock %}

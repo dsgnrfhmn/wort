@@ -1,0 +1,5 @@
+# wort-web image: python plus the web dependencies. The code is bind-mounted read-only
+# from the repository (compose.yaml), not copied in.
+# Keep this list in sync with the `web` group in pyproject.toml.
+FROM docker.io/library/python:3.13-slim
+RUN pip install --no-cache-dir "fastapi>=0.110" "jinja2>=3.1" "uvicorn>=0.29" "python-multipart>=0.0.9"

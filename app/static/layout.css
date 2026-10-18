@@ -1,0 +1,9 @@
+/* Layout only: page regions and grids, spacing from dis-system tokens. No colors, type or component styles. */
+body { margin: 0; background-color: var(--ds-color-bg-surface-pressed); }
+.wort-main { max-width: calc(var(--ds-spacing-9) * 24); margin: 0 auto; padding: var(--ds-spacing-7) var(--ds-spacing-5); display: grid; gap: var(--ds-spacing-7); }
+.wort-section { display: grid; gap: var(--ds-spacing-3); }
+.wort-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-3); }
+.wort-row > .ds-input { flex: 1 1 calc(var(--ds-spacing-9) * 6); width: auto; }
+.wort-table { display: grid; width: 100%; overflow-x: auto; background-color: var(--ds-color-bg-surface); }
+.wort-table .ds-table-row { display: contents; }
+.wort-forms { display: none; }
