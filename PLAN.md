@@ -58,9 +58,11 @@ Design vs. built (components dis-system lacks; **not** patched locally, per CLAU
 - word tooltip with translations in feedback ("Sätze-Tooltip"; dis-system `tooltip` is attribute-only; also AI-dependent);
 - `pane` takes only string content, no block slot (the detail page uses raw `ds-pane` markup);
 - row checkbox has no keyboard handler (known gap in dis-system `table-row`).
-- Not built: Texte (OCR, post-MVP), DE→UK language-pair switch, "Doch richtig?", "Diese Regel üben" and
-  free-answer grading in Abfrage (provider methods exist and are tested, no routes yet), Ukrainian glosses
-  (dictionary is English; Ukrainian is only the learner's own translation).
+- AI call sites wired, all off by default and falling back locally: sentence check, "Fehler erklären",
+  task wording (`tasks`), "Doch richtig?" (`recheck`), "Diese Regel üben" (`rule`), Abfrage free answers
+  (`answer`). Tested with the fake provider only; the Anthropic provider is an unreviewed draft.
+- Not built: Texte (OCR, post-MVP), DE→UK language-pair switch, Ukrainian glosses (the dictionary is
+  English; Ukrainian is only the learner's own translation and the AI task translations).
 - dis-system props added on branch `dsgnrfhmn/form-props` (needs maintainer PR/merge, no Figma source for them):
   input name/id/label/disabled/required/autocomplete/password, text-button submit/href,
   table-cell submit, table-header-actions submit, table-row extra_attrs.

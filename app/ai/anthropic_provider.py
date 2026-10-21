@@ -37,6 +37,23 @@ def explain_payload(sentence: str, check: schemas.SentenceCheck) -> dict:
             "rule": check.rule, "schema": schemas.Explanation.model_json_schema()}
 
 
+def tasks_payload(words: list[str], n: int) -> dict:
+    return {"request": "generate_tasks", "words": words, "n": n, "schema": schemas.TaskSet.model_json_schema()}
+
+
+def recheck_payload(sentence: str, words: list[str], task: str, objection: str) -> dict:
+    return sentence_payload(sentence, words, task) | {"request": "recheck", "objection": objection}
+
+
+def rule_payload(rule: str, n: int) -> dict:
+    return {"request": "more_for_rule", "rule": rule, "n": n, "schema": schemas.TaskSet.model_json_schema()}
+
+
+def answer_payload(question: str, answer: str, expected: str) -> dict:
+    return {"request": "grade_answer", "question": question, "answer": answer, "expected": expected,
+            "schema": schemas.AnswerGrade.model_json_schema()}
+
+
 class AnthropicProvider:
     def __init__(self, config: AiConfig):
         try:
@@ -64,18 +81,14 @@ class AnthropicProvider:
         return self._ask(self._config.model, explain_payload(sentence, check), schemas.Explanation)
 
     def generate_tasks(self, words, n):
-        return self._ask(self._config.model, {"request": "generate_tasks", "words": words, "n": n,
-                                              "schema": schemas.TaskSet.model_json_schema()}, schemas.TaskSet)
+        return self._ask(self._config.model, tasks_payload(words, n), schemas.TaskSet)
 
     def recheck(self, sentence, words, task, objection):
-        payload = sentence_payload(sentence, words, task) | {"request": "recheck", "objection": objection}
-        return self._ask(self._config.check_model, payload, schemas.SentenceCheck)
+        return self._ask(self._config.check_model, recheck_payload(sentence, words, task, objection),
+                         schemas.SentenceCheck)
 
     def more_for_rule(self, rule, n):
-        return self._ask(self._config.model, {"request": "more_for_rule", "rule": rule, "n": n,
-                                              "schema": schemas.TaskSet.model_json_schema()}, schemas.TaskSet)
+        return self._ask(self._config.model, rule_payload(rule, n), schemas.TaskSet)
 
     def grade_answer(self, question, answer, expected):
-        return self._ask(self._config.model, {"request": "grade_answer", "question": question, "answer": answer,
-                                              "expected": expected, "schema": schemas.AnswerGrade.model_json_schema()},
-                         schemas.AnswerGrade)
+        return self._ask(self._config.model, answer_payload(question, answer, expected), schemas.AnswerGrade)

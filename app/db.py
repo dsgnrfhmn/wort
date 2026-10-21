@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
 from app import scoring
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -70,12 +70,13 @@ CREATE TABLE IF NOT EXISTS attempts (
     answer TEXT NOT NULL,
     verdict TEXT NOT NULL CHECK (verdict IN ('correct', 'almost', 'wrong')),
     delta INTEGER NOT NULL,
+    state_before TEXT,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS practice_sessions (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL CHECK (kind IN ('saetze', 'abfrage')),
+    kind TEXT NOT NULL,
     items TEXT NOT NULL,
     pos INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
@@ -169,6 +170,22 @@ class WebStore:
         self.conn.execute("PRAGMA busy_timeout = 5000")
         self._migrate()
 
+    def _migrate_v1(self) -> None:
+        """v1 -> v2: attempts.state_before (for revisions); practice_sessions.kind loses its CHECK."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(attempts)")}
+        if "state_before" not in cols:
+            self.conn.execute("ALTER TABLE attempts ADD COLUMN state_before TEXT")
+        sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE name = 'practice_sessions'").fetchone()
+        if sql and "CHECK" in sql["sql"]:
+            self.conn.executescript(
+                "ALTER TABLE practice_sessions RENAME TO practice_sessions_v1;"
+                "CREATE TABLE practice_sessions (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL "
+                "REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL, items TEXT NOT NULL, "
+                "pos INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);"
+                "INSERT INTO practice_sessions SELECT id, user_id, kind, items, pos, created_at FROM practice_sessions_v1;"
+                "DROP TABLE practice_sessions_v1;"
+            )
+
     def _migrate(self) -> None:
         version = self.conn.execute("PRAGMA user_version").fetchone()[0]
         legacy = version == 0 and self.conn.execute(
@@ -179,6 +196,8 @@ class WebStore:
         self.conn.executescript(SCHEMA)
         if legacy:
             self.conn.executescript(_COPY_V0)
+        if version == 1:
+            self._migrate_v1()
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 
@@ -333,6 +352,12 @@ class WebStore:
     def record_attempt(self, user_id: int, word_id: int, skill: str, kind: str, prompt: str,
                        answer: str, verdict: str, now: datetime | None = None) -> int | None:
         """Log one graded answer and update the word. Returns the score change, None for an unknown word."""
+        out = self.record_attempt_full(user_id, word_id, skill, kind, prompt, answer, verdict, now)
+        return None if out is None else out[1]
+
+    def record_attempt_full(self, user_id: int, word_id: int, skill: str, kind: str, prompt: str,
+                            answer: str, verdict: str, now: datetime | None = None) -> tuple[int, int] | None:
+        """Like record_attempt but returns (attempt_id, delta); keeps the pre-answer state for revisions."""
         now = now or datetime.now()
         w = self.word(user_id, word_id)
         if w is None:
@@ -345,11 +370,42 @@ class WebStore:
             (after.translation, after.form, after.usage, after.streak, _ts(now),
              _ts(scoring.next_due(after, verdict, now)), user_id, word_id),
         )
-        self.conn.execute(
-            "INSERT INTO attempts (user_id, word_id, skill, kind, prompt, answer, verdict, delta, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, word_id, skill, kind, prompt, answer, verdict, delta, _ts(now)),
+        cur = self.conn.execute(
+            "INSERT INTO attempts (user_id, word_id, skill, kind, prompt, answer, verdict, delta, state_before, "
+            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, word_id, skill, kind, prompt, answer, verdict, delta, json.dumps(asdict(w.state)), _ts(now)),
         )
+        self.conn.commit()
+        return cur.lastrowid, delta
+
+    def revise_attempt(self, user_id: int, attempt_id: int, new_verdict: str,
+                       now: datetime | None = None) -> int | None:
+        """Regrade one answer: the word is set to the state it would have had with the new verdict.
+
+        Only valid while it is still the word's latest attempt (otherwise later answers would be
+        rewritten); returns the new score change, or None when not allowed.
+        """
+        now = now or datetime.now()
+        a = self.conn.execute(
+            "SELECT * FROM attempts WHERE user_id = ? AND id = ?", (user_id, attempt_id)
+        ).fetchone()
+        if a is None or a["state_before"] is None:
+            return None
+        latest = self.conn.execute(
+            "SELECT MAX(id) FROM attempts WHERE user_id = ? AND word_id = ?", (user_id, a["word_id"])
+        ).fetchone()[0]
+        if latest != attempt_id:
+            return None
+        before = scoring.WordState(**json.loads(a["state_before"]))
+        after = scoring.revise_verdict(before, a["skill"], new_verdict)
+        delta = scoring.score_delta(before, after)
+        self.conn.execute(
+            "UPDATE user_words SET translation = ?, form = ?, usage = ?, streak = ?, next_due = ? "
+            "WHERE user_id = ? AND id = ?",
+            (after.translation, after.form, after.usage, after.streak,
+             _ts(scoring.next_due(after, new_verdict, now)), user_id, a["word_id"]),
+        )
+        self.conn.execute("UPDATE attempts SET verdict = ?, delta = ? WHERE id = ?", (new_verdict, delta, attempt_id))
         self.conn.commit()
         return delta
 

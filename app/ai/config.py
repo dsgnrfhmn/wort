@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_CAP = 50
+FEATURES = frozenset({"check", "explain", "tasks", "recheck", "rule", "answer"})
 
 
 @dataclass(frozen=True)
@@ -16,11 +17,14 @@ class AiConfig:
     check_model: str = DEFAULT_MODEL  # set to a stronger model only if the 20-30 case test shows misses
     daily_cap: int = DEFAULT_CAP
     timeout: float = 20.0
+    features: frozenset[str] = FEATURES  # call sites that may use the API; others stay local
     api_key: str = field(default="", repr=False)  # never printed, never logged
 
     def __post_init__(self):
         if self.enabled and not self.api_key:
             raise ValueError("WORT_AI_ENABLED=1 but ANTHROPIC_API_KEY is not set")
+        if not self.features <= FEATURES:
+            raise ValueError(f"unknown WORT_AI_FEATURES: {sorted(self.features - FEATURES)}")
         if self.daily_cap < 1:
             raise ValueError("WORT_AI_DAILY_CAP must be at least 1")
 
@@ -33,4 +37,6 @@ def load(env: dict[str, str] | None = None) -> AiConfig:
         check_model=env.get("WORT_AI_CHECK_MODEL", env.get("WORT_AI_MODEL", DEFAULT_MODEL)),
         daily_cap=int(env.get("WORT_AI_DAILY_CAP", DEFAULT_CAP)),
         api_key=env.get("ANTHROPIC_API_KEY", ""),
+        features=frozenset(f.strip() for f in env["WORT_AI_FEATURES"].split(",") if f.strip())
+        if "WORT_AI_FEATURES" in env else FEATURES,
     )

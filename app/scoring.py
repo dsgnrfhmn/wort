@@ -58,6 +58,11 @@ def apply_verdict(state: WordState, skill: str, verdict: str) -> WordState:
     return replace(state, **{skill: new}, streak=streak)
 
 
+def revise_verdict(before: WordState, skill: str, new_verdict: str) -> WordState:
+    """State as if the answer had been graded `new_verdict` instead (`before` = state before that answer)."""
+    return apply_verdict(before, skill, new_verdict)
+
+
 def score_delta(before: WordState, after: WordState) -> int:
     """Change of the displayed word score; a word without a score counts as 0."""
     return (word_score(after) or 0) - (word_score(before) or 0)

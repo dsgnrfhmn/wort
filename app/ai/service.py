@@ -35,14 +35,31 @@ class AiService:
     def remaining(self, user_id: int) -> int:
         return self.limit.remaining(user_id, datetime.now()) if self.available else 0
 
+    def uses(self, feature: str) -> bool:
+        """True when AI is on and this call site is allowed (WORT_AI_FEATURES)."""
+        return self.available and feature in self.config.features
+
     def check_sentence(self, user_id: int, sentence: str, words: list[str], task: str) -> SentenceCheck:
-        return self._run(user_id, "check_sentence", lambda p: p.check_sentence(sentence, words, task))
+        return self._run(user_id, "check", lambda p: p.check_sentence(sentence, words, task))
 
     def explain(self, user_id: int, sentence: str, check: SentenceCheck):
         return self._run(user_id, "explain", lambda p: p.explain(sentence, check))
 
-    def _run(self, user_id: int, name: str, call):
-        if not self.available:
+    def generate_tasks(self, user_id: int, words: list[str], n: int):
+        return self._run(user_id, "tasks", lambda p: p.generate_tasks(words, n))
+
+    def recheck(self, user_id: int, sentence: str, words: list[str], task: str, objection: str):
+        return self._run(user_id, "recheck", lambda p: p.recheck(sentence, words, task, objection))
+
+    def more_for_rule(self, user_id: int, rule: str, n: int):
+        return self._run(user_id, "rule", lambda p: p.more_for_rule(rule, n))
+
+    def grade_answer(self, user_id: int, question: str, answer: str, expected: str):
+        return self._run(user_id, "answer", lambda p: p.grade_answer(question, answer, expected))
+
+    def _run(self, user_id: int, feature: str, call):
+        name = feature
+        if not self.uses(feature):
             raise AiUnavailable("KI ist ausgeschaltet.")
         try:
             self.limit.take(user_id, datetime.now())

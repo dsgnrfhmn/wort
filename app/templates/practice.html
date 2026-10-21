@@ -11,7 +11,7 @@
 
 <section class="wort-section">
   {% with type='title-info', title='Aufgabe ' ~ (pos + 1), info=prompt %}{% include "components/table-header/template.html" %}{% endwith %}
-  {% with message='Prüfung: ' ~ ('KI' if ai_on and item.kind == 'sentence' else 'lokal') %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with message='Prüfung: ' ~ ('KI' if ai_check or item.kind in ('bedeutung', 'erklaere') and ai_on else 'lokal') %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% if hint %}{% with message='Hinweis: ' ~ hint %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
   {% if choices %}
     {% with message='Antworte mit einer Nummer oder dem Wort: ' ~ (choices | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}
@@ -32,16 +32,30 @@
   {% if result.verdict != 'correct' %}
     {% for line in facts %}{% with message=line %}{% include "components/empty-state/template.html" %}{% endwith %}{% endfor %}
   {% endif %}
-  {% if ai_note %}{% with message=ai_note ~ ' Lokale Prüfung wurde verwendet.' %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+  {% if ai_note %}{% with message=ai_note %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
   {% if explanation %}
     {% with type='title-info', title='Erklärung', info=explanation.rule %}{% include "components/table-header/template.html" %}{% endwith %}
     {% with message=explanation.explanation %}{% include "components/empty-state/template.html" %}{% endwith %}
     {% with message='Merke: ' ~ explanation.merke %}{% include "components/empty-state/template.html" %}{% endwith %}
     {% with message=explanation.explanation_uk %}{% include "components/empty-state/template.html" %}{% endwith %}
-  {% elif ai_on and result.verdict in ('wrong', 'almost') and item.kind == 'sentence' %}
+  {% elif can_explain and result.verdict in ('wrong', 'almost') %}
   <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/explain">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% with priority='secondary', underline='dotted', label='Fehler erklären (' ~ ai_left ~ ' KI-Anfragen heute übrig)', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+  {% endif %}
+  {% if translations %}{% with message='Übersetzung: ' ~ (translations | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+  {% if can_recheck and result.verdict in ('wrong', 'almost') %}
+  <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/recheck">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% with name='objection', label='Doch richtig? Warum?', fill='filled', required=true, placeholder='Doch richtig? Warum?' %}{% include "components/input/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='dotted', label='Doch richtig? (' ~ ai_left ~ ' KI-Anfragen heute übrig)', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+  {% endif %}
+  {% if can_rule and result.verdict in ('wrong', 'almost') %}
+  <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/regel">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% with priority='secondary', underline='dotted', label='Diese Regel üben', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
   </form>
   {% endif %}
   <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/next">
@@ -52,7 +66,7 @@
 {% else %}
 <form class="wort-form wort-answer" method="post" action="/ueben/s/{{ sess.id }}/answer">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% with type='textarea' if item.kind == 'sentence' else 'text', name='text', label='Deine Antwort', rows=3, fill='filled', required=true, placeholder='Deine Antwort' %}{% include "components/input/template.html" %}{% endwith %}
+  {% with type='textarea' if item.kind in ('sentence', 'erklaere') else 'text', name='text', label='Deine Antwort', rows=3, fill='filled', required=true, placeholder='Deine Antwort' %}{% include "components/input/template.html" %}{% endwith %}
   <div class="wort-row">
     {% with priority='primary', underline='dotted', label='Senden', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>

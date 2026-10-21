@@ -49,4 +49,5 @@ class FakeProvider:
 
     def grade_answer(self, question, answer, expected):
         self._call("grade_answer", question, answer, expected)
-        return AnswerGrade(verdict="richtig" if expected.lower() in answer.lower() else "falsch", comment="")
+        parts = [x.strip().lower() for x in expected.split(";") if x.strip()]
+        return AnswerGrade(verdict="richtig" if any(x in answer.lower() for x in parts) else "falsch", comment="")

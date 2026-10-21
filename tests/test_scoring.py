@@ -73,3 +73,12 @@ def test_unknown_skill_or_verdict_fails_loud():
         s.apply_verdict(s.WordState(), "grammar", "correct")
     with pytest.raises(ValueError):
         s.apply_verdict(s.WordState(), "form", "perfect")
+
+
+@pytest.mark.parametrize("old,new", [("wrong", "correct"), ("correct", "wrong"), ("almost", "correct"), ("correct", "almost")])
+def test_revision_equals_grading_the_new_verdict_from_the_same_start(old, new):
+    start = s.WordState(translation=3, form=5, usage=2, streak=2)
+    graded_old = s.apply_verdict(start, "form", old)
+    revised = s.revise_verdict(start, "form", new)
+    assert revised == s.apply_verdict(start, "form", new)
+    assert graded_old != revised or old == new

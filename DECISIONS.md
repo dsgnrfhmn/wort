@@ -37,6 +37,14 @@ Confirmed by maintainer (date)*.
   `api.anthropic.com`, so `IPAddressDeny=any` / "no outbound network" in CLAUDE.md no longer hold as
   written; learner text leaves the network. Blast radius if the service is compromised: spend on the
   key (capped by the workspace limit) and every sentence sent. Needs the egress design in DEPLOY.md §6.
+- **Call sites and what each sends** (all behind `WORT_AI_FEATURES`, default all, only when
+  `WORT_AI_ENABLED=1`; each falls back to the local behaviour):
+  `check` sentence + required forms + task; `explain` (on click) answer + error list + rule name;
+  `tasks` the selected lemmas (one call per session); `recheck` ("Doch richtig?", once per answer)
+  sentence + forms + task + the learner's objection (max 300 characters); `rule` ("Diese Regel üben")
+  the rule's name only; `answer` (Abfrage free answers) question + answer + dictionary glosses.
+  A revised verdict re-applies the score of that one answer (`WebStore.revise_attempt`); invalid,
+  failed or capped calls change no score.
 - **Still local:** translation and forms (Wiktionary), OCR (Tesseract), tooltips (dictionary + spaCy),
   scores and filters.
 - **Confirmed by maintainer:** _
