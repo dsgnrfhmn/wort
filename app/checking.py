@@ -10,6 +10,7 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from wort import sanitize
 from wort.dictionary.lookup import Entry
 from wort.exercises import grammar_check
 from wort.exercises.grammar_check import Issue
@@ -60,7 +61,7 @@ def apply_corrections(text: str, issues: list[Issue]) -> str:
 
 
 def check_sentence(sentence: str, required: list[str], checker: Checker = grammar_check.check) -> CheckResult:
-    sentence = " ".join(sentence.split())
+    sentence = sanitize.text(sentence, 2000)
     if not sentence:
         return CheckResult(sentence, "", error="Write a sentence first.")
     if len(sentence) > MAX_SENTENCE:
@@ -73,6 +74,8 @@ def check_sentence(sentence: str, required: list[str], checker: Checker = gramma
     if issues is None:
         return CheckResult(sentence, sentence, missing=missing, checked=False)
     remarks = [
-        Remark(sentence[i.offset: i.offset + i.length], i.message, i.replacements) for i in issues
+        Remark(sanitize.text(sentence[i.offset: i.offset + i.length], 100), sanitize.text(i.message, 300),
+               [r for r in (sanitize.text(x, 100) for x in i.replacements[:5]) if r])
+        for i in issues
     ]
     return CheckResult(sentence, apply_corrections(sentence, issues), remarks, missing)

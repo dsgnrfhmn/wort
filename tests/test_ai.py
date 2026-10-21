@@ -62,9 +62,9 @@ def test_schema_rejects_malformed_and_oversized(bad):
 
 def test_request_payload_has_only_allowed_fields():
     p = sentence_payload("Ich stelle ein Antrag", ["Antrag"], "Akkusativ")
-    assert set(p) == {"request", "sentence", "words", "task", "schema"}
+    assert set(p) == {"request", "sentence", "words", "task"}
     chk = schemas.parse(schemas.SentenceCheck, json.dumps(GOOD))
-    assert set(explain_payload("S", chk)) == {"request", "sentence", "errors", "rule", "schema"}
+    assert set(explain_payload("S", chk)) == {"request", "sentence", "errors", "rule"}
 
 
 def test_daily_limit_per_user_and_day(tmp_path):
@@ -199,10 +199,10 @@ def test_features_validation_and_gate(tmp_path):
 
 def test_payloads_contain_only_allowed_fields():
     from app.ai import anthropic_provider as ap
-    assert set(ap.tasks_payload(["Haus"], 5)) == {"request", "words", "n", "schema"}
-    assert set(ap.recheck_payload("S", ["W"], "T", "O")) == {"request", "sentence", "words", "task", "schema", "objection"}
-    assert set(ap.rule_payload("Akkusativ", 5)) == {"request", "rule", "n", "schema"}
-    assert set(ap.answer_payload("Q", "A", "E")) == {"request", "question", "answer", "expected", "schema"}
+    assert set(ap.tasks_payload(["Haus"], 5)) == {"request", "words", "n"}
+    assert set(ap.recheck_payload("S", ["W"], "T", "O")) == {"request", "sentence", "words", "task", "objection"}
+    assert set(ap.rule_payload("Akkusativ", 5)) == {"request", "rule", "n"}
+    assert set(ap.answer_payload("Q", "A", "E")) == {"request", "question", "answer", "expected"}
 
 
 def test_task_wording_comes_from_the_ai_with_translation_and_local_form_check(tmp_path, dict_path):

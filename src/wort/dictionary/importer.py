@@ -18,6 +18,7 @@ import sqlite3
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
+from wort import sanitize
 from wort.text import normalize
 
 MAX_EXAMPLES = 10  # example sentences kept per entry
@@ -172,7 +173,28 @@ def gloss_keys(gloss: str) -> Iterator[str]:
             yield part
 
 
+def _safe_entry(entry: dict) -> dict | None:
+    """The dump is untrusted: clean every string; an entry whose lemma is unsafe is skipped."""
+    try:
+        entry["lemma"] = sanitize.word(entry["lemma"], 100)
+    except sanitize.Unsafe:
+        return None
+    for key in ("ipa", "gender", "aux", "conj"):
+        if entry.get(key):
+            entry[key] = sanitize.text(entry[key], 80)
+    entry["glosses"] = [g for g in (sanitize.text(g, 300) for g in entry["glosses"]) if g]
+    entry["examples"] = [(a, b) for a, b in ((sanitize.text(t, 120), sanitize.text(e, 300)) for t, e in entry["examples"]) if a]
+    entry["forms"] = [(f, [t for t in (sanitize.text(t, 40) for t in tags) if t])
+                      for f, tags in ((sanitize.text(f, 100), tags) for f, tags in entry["forms"]) if f]
+    return entry if entry["glosses"] else None
+
+
 def parse_entry(raw: dict) -> dict | None:
+    entry = _parse_entry(raw)
+    return _safe_entry(entry) if entry else None
+
+
+def _parse_entry(raw: dict) -> dict | None:
     if raw.get("lang_code", "de") != "de" or raw.get("pos") not in POS_KEPT:
         return None
     glosses, examples, only_form_of = _glosses_and_examples(raw)

@@ -111,7 +111,8 @@ def test_other_users_cannot_open_or_answer_a_session_or_use_foreign_word_ids(env
     assert cb.get(loc).status_code == 404
     assert cb.post(f"/ueben/s/{sid}/answer", data={"csrf": cb.cookies.get("wort_csrf"), "text": "x"}).status_code == 404
     r = cb.post("/ueben/abfrage", data={"csrf": cb.cookies.get("wort_csrf"), "ids": [w.id for w in store.words(a)]})
-    assert r.status_code == 303 and r.headers["location"].startswith("/?message=")  # nothing usable, no session
+    assert r.status_code == 303 and r.headers["location"] == "/"  # nothing usable, no session
+    assert "keine" in cb.get("/").text  # the one-time message comes from a server-set cookie, not the URL
 
 
 def test_csrf_and_input_limits(env):

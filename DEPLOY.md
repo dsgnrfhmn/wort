@@ -67,26 +67,33 @@ history to that one user; it cannot read data or sign in.
     curl -k --max-time 3 http://<LAN-IP>:8000/   # refused
     # from a second LAN host: https://<LAN-IP>:8455 loads; from outside the LAN it does not
 
-## 6. AI calls (off; NOT applied until D0 is confirmed in DECISIONS.md)
+## 6. AI calls (web backend only; off until the key is installed)
 
-Default: `WORT_AI_ENABLED` unset, no key anywhere, the app makes no outbound connections. To enable
-later, the maintainer does all of this on the server; the dev machine never holds a key.
+D0r is confirmed (2026-10-21). Default stays off: `WORT_AI_ENABLED` unset, no key, no outbound connection.
+The maintainer does all of this on the server; the dev machine, the CLI machine and agent hosts never hold the key.
 
-- **Key**: a separate Anthropic workspace with a spend limit; one key in an env file outside the repo
-  (`~/.config/wort/ai.env`, mode 600, owned by the service user), passed with `env_file:`; never in git,
-  never in the image, never in logs. Variables: `WORT_AI_ENABLED=1`, `ANTHROPIC_API_KEY`,
-  `WORT_AI_MODEL` (default `claude-haiku-5-5`), `WORT_AI_CHECK_MODEL` (only if the 20-30 case test shows
-  Haiku missing errors), `WORT_AI_DAILY_CAP` (default 50 calls per user per day).
-- **Network**: today the stack has no egress rule beyond the host's. Enabling needs egress to
-  `api.anthropic.com:443` only. IP allow-lists do not fit a hosted API; use an egress proxy that
-  allows that one hostname, or firewall rules refreshed from DNS. Open question for the maintainer.
-- **SDK**: `anthropic` is not a project dependency; install it into the image only when enabling, and
-  check the request shape, model ids and error handling in `app/ai/anthropic_provider.py` against the
-  official documentation (the file is a reviewed draft, it has never made a call).
-- **Data sent**: only the learner's sentence or answer, the target forms and the task text. Never photos
-  or Texte. The daily cap is enforced on the server before the request; failures count as calls.
-- **Failure behaviour**: invalid or failed replies change no score; sentence checks fall back to the
-  local check and say so.
+1. **Key**: a separate Anthropic workspace with a spend limit; one key in `~/.config/wort/ai.env`
+   (`chmod 600`, outside the repo), passed to `wort-web` only (`env_file:`), never to `wort-sync`:
+
+       WORT_AI_ENABLED=1
+       ANTHROPIC_API_KEY=sk-ant-...
+       WORT_AI_DAILY_CAP=50                 # calls per user per day (failed calls count)
+       WORT_AI_FEATURES=check,explain       # start small; add tasks,recheck,rule,answer one by one
+       # WORT_AI_MODEL=claude-haiku-5-5     # default; WORT_AI_CHECK_MODEL only if spikes/ai_eval.md says Haiku misses errors
+
+2. **SDK**: `podman build --build-arg WITH_AI=1` (installs `anthropic`); on a plain venv `uv sync --group ai`.
+3. **Prove it**: `PYTHONPATH=.:src python scripts/ai_smoke.py` (six real calls, fixed non-private examples);
+   it must print `ALL PASS`. Then run the Haiku-vs-Sonnet test (`spikes/ai_eval.md`).
+4. **Network (the part code cannot do)**: `wort-web` needs egress to `api.anthropic.com:443` and nothing else;
+   in compose it shares nginx's network namespace, so decide where the rule lives. IP allow-lists do not fit a
+   hosted API. Options: (a) an egress proxy that allows that one hostname, set as `HTTPS_PROXY` for `wort-web`
+   only (the SDK honours it); (b) host firewall rules refreshed from DNS. `wort-sync` and the CLI get no egress.
+   The base URL is fixed in code (`app/ai/anthropic_provider.py`), so `ANTHROPIC_BASE_URL` cannot redirect traffic.
+5. **Data sent**: only the learner's sentence/answer, target forms, task, rule name, lemmas, glosses, and the
+   objection (max 300 characters), each through `wort.sanitize.for_model`; never photos or Texte. Replies are
+   schema-validated and must be plain text (no markup, links or hidden characters), else nothing is graded.
+6. **Failure behaviour**: invalid, refused, failed or capped calls change no score; sentence checks fall back
+   to the local check and say so. Logs hold only block name, model, token counts and request id (redacted).
 
 ## 7. CLI network (the CLI has no network except the sync port)
 

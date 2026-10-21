@@ -26,6 +26,8 @@
   {% if result.feedback %}{% with message=result.feedback %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
   {% if result.corrected and result.corrected != answer %}{% with message='Korrigiert: ' ~ result.corrected %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
   {% if result.verdict == 'wrong' and result.expected %}{% with message='Erwartet: ' ~ result.expected %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+  {% if result.natural and result.natural != result.corrected %}{% with message='Natürlicher: ' ~ result.natural %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+  {% for w in result.word_results or [] %}{% with message=('✓ ' if w.ok else '✗ ') ~ w.word ~ (': ' ~ w.note if w.note else '') %}{% include "components/empty-state/template.html" %}{% endwith %}{% endfor %}
   {% for r in result.remarks or [] %}
     {% with message='«' ~ r.fragment ~ '»: ' ~ r.message ~ (' → ' ~ (r.replacements | join(', ')) if r.replacements else '') %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% endfor %}

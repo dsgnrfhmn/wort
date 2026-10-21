@@ -8,13 +8,13 @@ import random
 import secrets
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from wort import paths
+from wort import paths, sanitize
 from wort.dictionary.lookup import Dictionary
 from wort.exercises import grammar_check
 from wort.exercises.sentence import targets
@@ -29,6 +29,8 @@ from app.importer import import_export
 
 STATIC = Path(__file__).parent / "static"
 CSRF_COOKIE = "wort_csrf"
+FLASH_COOKIE = "wort_flash"  # a server-set message for the next page: never reflected from a URL
+MAX_FLASH = 200
 
 
 class LoginRequired(Exception):
@@ -43,6 +45,7 @@ def create_app(
     throttle: auth.LoginThrottle | None = None,
     ai: ai_service.AiService | None = None,
 ) -> FastAPI:
+    sanitize.install_log_redaction()
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     db_file = db_path or paths.data_dir() / "web.db"
     app.state.db_path = db_file
@@ -76,8 +79,21 @@ def create_app(
 
     def render(request: Request, name: str, status: int = 200, **ctx) -> HTMLResponse:
         token = request.cookies.get(CSRF_COOKIE) or secrets.token_urlsafe(32)
+        flash = request.cookies.get(FLASH_COOKIE)
+        if flash and not ctx.get("message"):
+            ctx["message"] = sanitize.text(unquote(flash), MAX_FLASH)
         response = templates.TemplateResponse(request, name, {"csrf": token, **ctx}, status_code=status)
         response.set_cookie(CSRF_COOKIE, token, httponly=True, samesite="strict", secure=secure_cookies)
+        if flash:
+            response.delete_cookie(FLASH_COOKIE)
+        return response
+
+    def redirect(url: str, message: str = "") -> RedirectResponse:
+        """303 to an in-app path, with an optional one-time message set by the server (not a query string)."""
+        response = RedirectResponse(url, status_code=303)
+        if message:
+            response.set_cookie(FLASH_COOKIE, quote(sanitize.text(message, MAX_FLASH)), max_age=60, httponly=True,
+                                samesite="strict", secure=secure_cookies)
         return response
 
     def verify_csrf(request: Request, token: str) -> None:
@@ -92,7 +108,7 @@ def create_app(
     @app.post("/login")
     def login(request: Request, csrf: str = Form(...), name: str = Form(""), password: str = Form("")):
         verify_csrf(request, csrf)
-        name = name.strip()[: auth.MAX_FIELD]
+        name = sanitize.text(name, auth.MAX_FIELD)
         key = name.casefold()
         if throttle.blocked(key):
             return render(request, "login.html", 429, user=None, error="Too many attempts. Try again in a few minutes.")
@@ -118,7 +134,7 @@ def create_app(
 
     shared = SimpleNamespace(
         store=store, render=render, verify_csrf=verify_csrf, current_user=current_user, dict_path=dictionary_path,
-        quote=quote, facts=lexicon.summary, checker=check,
+        redirect=redirect, facts=lexicon.summary, checker=check,
         ai=ai or ai_service.build(ai_config.load(), store),
     )
     @app.get("/texte", response_class=HTMLResponse)
@@ -129,8 +145,8 @@ def create_app(
     practice.register(app, shared)
 
     @app.get("/history", response_class=HTMLResponse)
-    def history(request: Request, message: str = "", user: User = Depends(current_user)):
-        return render(request, "history.html", rows=store.history(user.id), message=message, user=user)
+    def history(request: Request, user: User = Depends(current_user)):
+        return render(request, "history.html", rows=store.history(user.id), user=user)
 
     @app.post("/import")
     async def import_history(request: Request, csrf: str = Form(...), file: UploadFile = File(...),
@@ -141,18 +157,20 @@ def create_app(
             result = import_export(store, user.id, raw)
         except ValueError as e:
             return render(request, "history.html", 400, rows=store.history(user.id), user=user,
-                          message=f"Import failed: {e}", message_status="error")
+                          message=f"Import failed: {sanitize.text(str(e), 150)}", message_status="error")
         msg = (f"Imported {result.queries_new} new of {result.queries_total} queries, "
                f"{result.words_new} new of {result.words_total} words.")
-        return RedirectResponse(f"/history?message={quote(msg)}", status_code=303)
+        return redirect("/history", msg)
 
     @app.post("/favorites/toggle")
     def toggle(request: Request, csrf: str = Form(...), lemma: str = Form(...), pos: str = Form(""), next: str = Form("/history"),
                user: User = Depends(current_user)):
         verify_csrf(request, csrf)
-        lemma, pos = lemma.strip(), pos.strip()
-        if not lemma or len(lemma) > 100 or len(pos) > 100:
-            raise HTTPException(400, "invalid word")
+        try:
+            lemma = sanitize.word(lemma, 100)
+            pos = sanitize.word(pos, 100) if pos.strip() else ""
+        except sanitize.Unsafe:
+            raise HTTPException(400, "invalid word") from None
         store.toggle_favorite(user.id, lemma, pos)
         return RedirectResponse(next if next in ("/history", "/favorites") else "/history", status_code=303)
 
@@ -161,9 +179,14 @@ def create_app(
         return render(request, "favorites.html", favorites=store.favorites(user.id), user=user)
 
     def exercise_context(lemma: str, pos: str, index: int | None):
+        try:
+            lemma = sanitize.word(lemma, 100)
+            pos = sanitize.word(pos, 100) if pos.strip() else ""
+        except sanitize.Unsafe:
+            raise HTTPException(400, "invalid word") from None
         entry = lexicon.find_entry(dictionary(), lemma, pos)
         if entry is None or not (opts := targets(entry)):
-            raise HTTPException(404, f"no dictionary entry with exercises for «{lemma}»")
+            raise HTTPException(404, "no dictionary entry with exercises for this word")
         if index is None:
             index = random.randrange(len(opts))
         if not 0 <= index < len(opts):
@@ -184,7 +207,7 @@ def create_app(
                        user: User = Depends(current_user)):
         verify_csrf(request, csrf)
         entry, index, task, required, gloss = exercise_context(lemma, pos, index)
-        result = check_sentence(sentence, required, check)
+        result = check_sentence(sanitize.text(sentence, 400), required, check)
         return render(request, "exercise.html", entry=entry, pos=pos, index=index, task=task, gloss=gloss,
                       sentence=sentence, result=result, summary=lexicon.summary(entry), user=user)
 

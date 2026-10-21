@@ -10,6 +10,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from wort.dictionary import grammar as g
 from wort.dictionary.lookup import Dictionary, Entry
 
+from wort import sanitize
+
 from app.db import User, UserWord, WebStore
 
 PAGE = 20
@@ -86,7 +88,7 @@ def register(app, ctx) -> None:
 
     @app.get("/", response_class=HTMLResponse)
     def word_list(request: Request, sort: str = "added", dir: str = "desc", limit: int = PAGE,
-                  preset: str = "", message: str = "", user: User = Depends(current_user)):
+                  preset: str = "", user: User = Depends(current_user)):
         sort = sort if sort in SORTS else "added"
         limit = max(1, min(limit, MAX_LIMIT))
         all_words = store.words(user.id)
@@ -96,7 +98,7 @@ def register(app, ctx) -> None:
         dic = dictionary_or_none()
         week = datetime.now().timestamp() - 7 * 86400
         return ctx.render(
-            request, "words.html", user=user, page="words", message=message,
+            request, "words.html", user=user, page="words",
             rows=[view(w, dic) for w in shown], selected=selected, total=len(words), limit=limit,
             sort=sort, dir=dir, this_week=sum(1 for w in all_words if w.added_at.timestamp() >= week),
         )
@@ -135,7 +137,7 @@ def register(app, ctx) -> None:
     def set_translation(request: Request, word_id: int, csrf: str = Form(...), text: str = Form(""),
                         user: User = Depends(current_user)):
         ctx.verify_csrf(request, csrf)
-        text = " ".join(text.split())
+        text = sanitize.text(text, MAX_OWN + 1)
         if len(text) > MAX_OWN:
             raise HTTPException(400, f"translation is limited to {MAX_OWN} characters")
         if not store.set_own_translation(user.id, word_id, text):

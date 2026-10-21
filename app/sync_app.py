@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from wort import paths
+from wort import paths, sanitize
 
 from app import auth
 from app.db import WebStore
@@ -32,6 +32,7 @@ def _bearer(header: str | None) -> str:
 
 
 def create_sync_app(db_path: Path | None = None, throttle: auth.LoginThrottle | None = None) -> FastAPI:
+    sanitize.install_log_redaction()
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     store = WebStore(db_path or paths.data_dir() / "web.db")
     limiter = throttle or auth.LoginThrottle(limit=20, window=600)  # accepted requests per user per 10 min
@@ -60,7 +61,7 @@ def create_sync_app(db_path: Path | None = None, throttle: auth.LoginThrottle | 
         try:
             result = import_export(store, user.id, raw)
         except ValueError as e:
-            return reply(400, {"error": str(e)[:200]})
+            return reply(400, {"error": sanitize.text(str(e), 200)})
         return reply(200, {"queries_total": result.queries_total, "queries_new": result.queries_new,
                            "words_total": result.words_total, "words_new": result.words_new})
 

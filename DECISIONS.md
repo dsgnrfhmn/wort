@@ -33,10 +33,12 @@ Confirmed by maintainer (date)*.
 - **Open:** quality check on real sentences once the model is installed.
 - **Confirmed by maintainer:** 2026-10-21 (variant A, CLI/TUI only)
 
-## D0r — Revisit D0: Haiku for sentence feedback (PROPOSED, not confirmed)
+## D0r — Revisit D0: Haiku for sentence feedback (CONFIRMED 2026-10-21)
 
-> **Status: proposed 2026-10-21. Not in force.** D0 stays the rule until the maintainer confirms
-> this entry. The code (`app/ai/`) is behind `WORT_AI_ENABLED`, off by default.
+> **Status: confirmed by the maintainer 2026-10-21** ("outbound access for the AI from the server
+> side"): the web backend may call the API. Still open and not decided by this entry: the host egress
+> design (DEPLOY.md §6), the separate spend-limited key, the Haiku-vs-Sonnet test. The code (`app/ai/`)
+> stays behind `WORT_AI_ENABLED`, off until the key is installed.
 
 - **Question:** allow a hosted model (Haiku) for the checks the local stack cannot do well:
   sentence feedback (corrections, "Natürlicher", per-word results, rule name), "Fehler erklären",
@@ -62,12 +64,13 @@ Confirmed by maintainer (date)*.
   failed or capped calls change no score.
 - **Still local:** translation and forms (Wiktionary), OCR (Tesseract), tooltips (dictionary + spaCy),
   scores and filters.
-- **Confirmed by maintainer:** _
+- **Confirmed by maintainer:** 2026-10-21 (in session: outbound access for the AI from the server side;
+  scope as above: web backend only, one host, off until the key is installed)
 
 ## D00d — Network model: CLI offline except one write-only sync port
 
 - **Decision (2026-10-21, requested by the maintainer):** only the web side may have outbound network
-  access (the AI API host, and only after D0r is confirmed). The CLI has none except loopback and one
+  access (the AI API host only; D0r confirmed 2026-10-21, off until the key is installed). The CLI has none except loopback and one
   HTTPS endpoint that receives its words JSON.
 - **Mechanism:** `wort sync` → `POST https://<server-ip>:8456/sync` with `Authorization: Bearer <token>`.
   The token is created on the server (`scripts/synctoken.py`), stored hashed, scoped to one user, can only

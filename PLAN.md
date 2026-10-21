@@ -60,7 +60,9 @@ Design vs. built (components dis-system lacks; **not** patched locally, per CLAU
 - row checkbox has no keyboard handler (known gap in dis-system `table-row`).
 - AI call sites wired, all off by default and falling back locally: sentence check, "Fehler erklären",
   task wording (`tasks`), "Doch richtig?" (`recheck`), "Diese Regel üben" (`rule`), Abfrage free answers
-  (`answer`). Tested with the fake provider only; the Anthropic provider is an unreviewed draft.
+  (`answer`). Tested with the fake provider and a mock transport; **never run against the live API from this
+  repo**: run `scripts/ai_smoke.py` on the server. Sanitization: `src/wort/sanitize.py` at every boundary
+  (forms, flash, imported/synced JSON, dictionary dump, AI request and reply, logs, error details, terminal).
 - Not built: Texte (OCR, post-MVP), DE→UK language-pair switch, Ukrainian glosses (the dictionary is
   English; Ukrainian is only the learner's own translation and the AI task translations).
 - dis-system props added on branch `dsgnrfhmn/form-props` (needs maintainer PR/merge, no Figma source for them):

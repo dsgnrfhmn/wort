@@ -17,6 +17,8 @@ from wort.dictionary.lookup import Dictionary, Entry
 from wort.exercises import TYPES, pick_exercise
 from wort.exercises.sentence import targets
 
+from wort import sanitize
+
 from app.ai.schemas import AnswerGrade, SentenceCheck, TaskSet
 from app.ai.service import AiService, AiUnavailable
 from app.checking import CheckResult, check_sentence
@@ -47,6 +49,8 @@ class Graded:
     checked: bool = True
     final: bool = True  # False: a notice only, the task stays open
     rule: str = ""  # name of the rule behind the mistake (AI replies only)
+    natural: str = ""  # a more natural wording (AI replies only)
+    word_results: list[dict] | None = None  # per target form: word, ok, note (AI replies only)
 
 
 def build_items(kind: str, pairs: list[tuple[UserWord, Entry]], rng: random.Random,
@@ -132,7 +136,8 @@ def graded_from_ai(check: SentenceCheck, required: list[str], sentence: str) -> 
         verdict, note = "almost", "Zielform richtig, aber der Satz hat Fehler."
     else:
         verdict, note = "correct", "Richtig."
-    return Graded(verdict, " … ".join(required), note, check.corrected or sentence, remarks, [], rule=check.rule)
+    return Graded(verdict, " … ".join(required), note, check.corrected or sentence, remarks, [], rule=check.rule,
+                  natural=check.natural, word_results=[r.model_dump() for r in check.word_results])
 
 
 def grade_free_answer(item: dict, entry: Entry, answer: str, prompt: str, ai: AiService | None, user_id: int,
@@ -157,7 +162,7 @@ def grade_free_answer(item: dict, entry: Entry, answer: str, prompt: str, ai: Ai
 
 def grade_item(item: dict, entry: Entry, answer: str, checker, ai: AiService | None = None,
                user_id: int = 0, notes: list[str] | None = None) -> Graded:
-    answer = " ".join(answer.split())[:MAX_ANSWER]
+    answer = sanitize.text(answer, MAX_ANSWER)
     prompt, _, _, ex, required = rebuild(item, entry)
     if item["kind"] in AI_ANSWER_KINDS:
         return grade_free_answer(item, entry, answer, prompt, ai, user_id, notes)
@@ -225,7 +230,7 @@ def register(app, ctx) -> None:
             except AiUnavailable:
                 pass  # the local task wording stays
         if not items:
-            return RedirectResponse("/?message=" + ctx.quote("Für diese Wörter gibt es keine Übungen."), status_code=303)
+            return ctx.redirect("/", "Für diese Wörter gibt es keine Übungen.")
         return RedirectResponse(f"/ueben/s/{store.create_practice(user.id, kind, items)}", status_code=303)
 
     @app.get("/ueben/s/{sid}", response_class=HTMLResponse)
@@ -269,7 +274,7 @@ def register(app, ctx) -> None:
             raise HTTPException(404, "word is gone")
         notes: list[str] = []
         graded = grade_item(item, entry, text, ctx.checker, ai, user.id, notes)
-        cleaned = " ".join(text.split())[:MAX_ANSWER]
+        cleaned = sanitize.text(text, MAX_ANSWER)
         if graded.final:
             delta = attempt_id = None  # an ungraded answer (grammar not checked) changes no score
             if graded.verdict is not None:
@@ -315,7 +320,7 @@ def register(app, ctx) -> None:
         items, pos = sess["items"], sess["pos"]
         item = items[pos] if pos < len(items) else None
         res = item.get("result") if item else None
-        objection = " ".join(objection.split())[:MAX_OBJECTION]
+        objection = sanitize.text(objection, MAX_OBJECTION)
         if (not res or item["kind"] != "sentence" or item.get("rechecked") or res.get("verdict") not in ("wrong", "almost")
                 or not objection):
             return RedirectResponse(f"/ueben/s/{sid}", status_code=303)

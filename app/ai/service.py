@@ -8,10 +8,31 @@ from datetime import datetime
 from app.ai.config import AiConfig
 from app.ai.limits import DailyLimit, LimitReached
 from app.ai.provider import AiError, Provider
+from wort import sanitize
+
 from app.ai.schemas import AiInvalid, SentenceCheck
 from app.db import WebStore
 
 log = logging.getLogger("wort.ai")
+
+
+_MULTILINE = {"explanation", "explanation_uk"}
+
+
+def clean_reply(obj):
+    """Every string of a validated reply must be plain text; markup, links or hidden characters reject it."""
+    def walk(value, key=""):
+        if isinstance(value, str):
+            return sanitize.model_text(value, 1200, multiline=key in _MULTILINE)
+        if isinstance(value, list):
+            return [walk(v, key) for v in value]
+        if isinstance(value, dict):
+            return {k: walk(v, k) for k, v in value.items()}
+        return value
+    try:
+        return type(obj).model_validate(walk(obj.model_dump()))
+    except (sanitize.Unsafe, ValueError):
+        raise AiInvalid("unsafe reply") from None
 
 
 class AiUnavailable(RuntimeError):
@@ -66,7 +87,7 @@ class AiService:
         except LimitReached:
             raise AiUnavailable("Das Tageslimit für KI-Anfragen ist erreicht.") from None
         try:
-            result = call(self.provider)
+            result = clean_reply(call(self.provider))
         except AiInvalid:
             log.warning("ai %s: invalid reply", name)  # counts only; never log user text or replies
             raise AiUnavailable("Die KI-Antwort war ungültig. Es wurde nichts bewertet.") from None

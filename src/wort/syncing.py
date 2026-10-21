@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from wort import paths
+from wort import paths, sanitize
 
 CONFIG_NAME = "sync.json"
 MAX_RESPONSE = 64 * 1024
@@ -106,8 +106,10 @@ def push(payload: bytes, config: SyncConfig, token: str, connection=None) -> dic
         data = json.loads(body)
     except ValueError:
         data = {}
+    if not isinstance(data, dict):
+        data = {}
     if status == 401:
         raise SyncError("the server rejected the token (revoked or wrong)")
     if status != 200:
-        raise SyncError(f"the server refused the upload ({status}): {str(data.get('error', ''))[:120]}")
+        raise SyncError(f"the server refused the upload ({status}): {sanitize.terminal(data.get('error', ''), 120)}")
     return data

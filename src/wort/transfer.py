@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from wort import sanitize
 from wort.store import Store
 
 FORMAT_VERSION = 2
@@ -55,16 +56,25 @@ def export_words(store: Store, now: datetime | None = None) -> dict:
     }
 
 
-def _text(item: dict, key: str, index: int, label: str = "words") -> str:
+def _text(item: dict, key: str, index: int, label: str = "words", token: bool = True) -> str:
+    """A cleaned string field. `token` fields (lemma, pos) also refuse markup/template characters.
+
+    Cleaning must leave something: a value that is only control or zero-width characters is rejected."""
     value = item.get(key)
-    if not isinstance(value, str) or not value.strip() or len(value) > MAX_FIELD:
+    if not isinstance(value, str) or len(value) > MAX_FIELD * 4:  # a hard cap before any work is done
         raise ValueError(f"{label}[{index}].{key}: expected a non-empty string of at most {MAX_FIELD} characters")
-    return value.strip()
+    try:
+        cleaned = sanitize.word(value, MAX_FIELD * 4) if token else sanitize.text(value, MAX_FIELD * 4)
+    except sanitize.Unsafe:
+        cleaned = ""
+    if not cleaned or len(cleaned) > MAX_FIELD:
+        raise ValueError(f"{label}[{index}].{key}: expected a non-empty string of at most {MAX_FIELD} characters")
+    return cleaned
 
 
 def _timestamp(item: dict, key: str, label: str, index: int) -> datetime:
     try:
-        return datetime.fromisoformat(_text(item, key, index, label))
+        return datetime.fromisoformat(_text(item, key, index, label, token=False))
     except ValueError as e:
         raise ValueError(f"{label}[{index}].{key}: not an ISO timestamp") from e
 
@@ -93,6 +103,6 @@ def parse_export(data: object) -> ExportDoc:
         if not isinstance(item.get("found"), bool):
             raise ValueError(f"queries[{i}].found: expected true or false")
         out_queries.append(
-            ExportedQuery(_text(item, "query", i, "queries"), item["found"], _timestamp(item, "queried_at", "queries", i))
+            ExportedQuery(_text(item, "query", i, "queries", token=False), item["found"], _timestamp(item, "queried_at", "queries", i))
         )
     return ExportDoc(out_words, out_queries)

@@ -28,6 +28,9 @@ web = [
 mt = [
     "argostranslate>=1.9",
 ]
+ai = [
+    "anthropic>=1",
+]
 
 [build-system]
 requires = ["hatchling"]

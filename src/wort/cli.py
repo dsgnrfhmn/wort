@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from wort import netguard, paths, picker, syncing
+from wort import netguard, paths, picker, sanitize, syncing
 from wort import history_view, sentence
 from wort.header import Header
 from wort.dictionary.grammar import GENDER_ARTICLE
@@ -108,7 +108,7 @@ def resolve(dictionary: Dictionary, query: str) -> tuple[list[Entry], str, str]:
 
 def find(dictionary: Dictionary, store: Store, query: str) -> tuple[list[Entry], Text, str]:
     """Look `query` up, log it as typed, and return (entries, one-line summary '• query — translation', note)."""
-    query = " ".join(query.split())
+    query = sanitize.text(query, 200)
     entries, meaning, note = resolve(dictionary, query)
     if note and len(query.split()) >= MIN_SENTENCE_WORDS:
         note = f"{sentence.describe(dictionary, query)}\n{note}"
