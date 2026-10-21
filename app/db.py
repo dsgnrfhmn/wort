@@ -6,6 +6,7 @@ Every per-user query takes a user_id and filters on it.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
@@ -69,6 +70,14 @@ CREATE TABLE IF NOT EXISTS attempts (
     answer TEXT NOT NULL,
     verdict TEXT NOT NULL CHECK (verdict IN ('correct', 'almost', 'wrong')),
     delta INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS practice_sessions (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('saetze', 'abfrage')),
+    items TEXT NOT NULL,
+    pos INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS ai_usage (
@@ -351,6 +360,29 @@ class WebStore:
                 (user_id, word_id),
             )
         ]
+
+    # --- practice sessions --------------------------------------------------
+
+    def create_practice(self, user_id: int, kind: str, items: list[dict], now: datetime | None = None) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO practice_sessions (user_id, kind, items, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, kind, json.dumps(items), _ts(now or datetime.now())),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def practice(self, user_id: int, session_id: int) -> dict | None:
+        r = self.conn.execute(
+            "SELECT * FROM practice_sessions WHERE user_id = ? AND id = ?", (user_id, session_id)
+        ).fetchone()
+        return {"id": r["id"], "kind": r["kind"], "items": json.loads(r["items"]), "pos": r["pos"]} if r else None
+
+    def save_practice(self, user_id: int, session_id: int, items: list[dict], pos: int) -> None:
+        self.conn.execute(
+            "UPDATE practice_sessions SET items = ?, pos = ? WHERE user_id = ? AND id = ?",
+            (json.dumps(items), pos, user_id, session_id),
+        )
+        self.conn.commit()
 
     # --- AI usage -----------------------------------------------------------
 

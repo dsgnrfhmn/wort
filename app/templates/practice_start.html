@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Üben · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title='Üben', info=count ~ ' Wörter' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% if count %}
+  {% with message='Wähle auf der Seite „Wörter“ die Wörter aus, oder starte mit deinen schwächsten Wörtern.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  <form class="wort-row" method="post" action="/ueben/saetze">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="preset" value="weakest">
+    {% with priority='primary', underline='dotted', label='Sätze bilden mit den 5 schwächsten', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+  <form class="wort-row" method="post" action="/ueben/abfrage">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="preset" value="weakest">
+    {% with priority='secondary', underline='dotted', label='Abfrage mit den 5 schwächsten', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+  <div class="wort-row">
+    {% with priority='secondary', underline='solid', label='Wörter auswählen', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
+  {% else %}
+  {% with message='Noch keine Wörter zum Üben. Importiere zuerst Wörter.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with priority='primary', underline='solid', label='Zu den Wörtern', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+  {% endif %}
+</section>
+{% endblock %}

@@ -39,13 +39,13 @@ def users(store):
     store.create_user("ben", auth.hash_password(PASSWORD))
 
 
-@pytest.mark.parametrize("path", ["/", "/history", "/favorites", "/exercise/Haus", "/words/1"])
+@pytest.mark.parametrize("path", ["/", "/history", "/favorites", "/exercise/Haus", "/words/1", "/ueben", "/ueben/s/1", "/texte"])
 def test_pages_redirect_to_login_when_anonymous(client, path):
     r = client.get(path)
     assert r.status_code == 303 and r.headers["location"] == "/login"
 
 
-@pytest.mark.parametrize("path", ["/import", "/favorites/toggle", "/logout"])
+@pytest.mark.parametrize("path", ["/import", "/favorites/toggle", "/logout", "/ueben/saetze", "/ueben/s/1/answer", "/ueben/s/1/next", "/words/1/translation", "/words/1/delete"])
 def test_post_routes_need_login(client, path):
     r = client.post(path, data={"csrf": "x"})
     assert r.status_code == 303 and r.headers["location"] == "/login"

@@ -19,7 +19,7 @@ from wort.dictionary.lookup import Dictionary
 from wort.exercises import grammar_check
 from wort.exercises.sentence import targets
 
-from app import auth, ds, lexicon, words
+from app import auth, ds, lexicon, practice, words
 from types import SimpleNamespace
 from app.checking import Checker, check_sentence
 from app.db import User, WebStore
@@ -113,9 +113,16 @@ def create_app(
         response.delete_cookie(auth.SESSION_COOKIE)
         return response
 
-    words.register(app, SimpleNamespace(
+    shared = SimpleNamespace(
         store=store, render=render, verify_csrf=verify_csrf, current_user=current_user, dict_path=dictionary_path,
-    ))
+        quote=quote, facts=lexicon.summary, checker=check,
+    )
+    @app.get("/texte", response_class=HTMLResponse)
+    def texts(request: Request, user: User = Depends(current_user)):
+        return render(request, "texts.html", user=user, page="texts")
+
+    words.register(app, shared)
+    practice.register(app, shared)
 
     @app.get("/history", response_class=HTMLResponse)
     def history(request: Request, message: str = "", user: User = Depends(current_user)):
