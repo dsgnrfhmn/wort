@@ -7,8 +7,13 @@ from textual.containers import Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Button, Input, Label, Static
 
+from wort import sentence
 from wort.dictionary.lookup import Entry
 from wort.render.card import render_card
+
+
+MAX_PHRASE_WORDS = 30  # same limits as the CLI session
+MIN_SENTENCE_WORDS = 3
 
 
 class WordAdded(Message):
@@ -56,8 +61,15 @@ class TranslatePane(Vertical):
     async def search(self, query: str) -> None:
         results = self.query_one("#results", VerticalScroll)
         await results.remove_children()
+        query = " ".join(query.split())
         german, english = self.app.dictionary.lookup(query)
         widgets = []
+        if not (german or english) and " " in query:  # a phrase or sentence: whole translation, then one card per word
+            german, _ = self.app.dictionary.lookup_words(query, MAX_PHRASE_WORDS)
+            if german:
+                if len(query.split()) >= MIN_SENTENCE_WORDS:
+                    widgets.append(Label(sentence.describe(self.app.dictionary, query)))
+                widgets.append(Label("One result per word", classes="muted"))
         if not german and not english:
             widgets.append(Label("Nothing found.", classes="muted"))
         for title, entries in (("In German", german), ("From English", english)):
