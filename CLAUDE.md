@@ -4,6 +4,11 @@
 > English; MVP = Steps 0-3 and 5 of `PLAN.md`. Sections marked
 > **[post-MVP]** describe features that are planned but not in the MVP.
 
+> **Proposed 2026-10-21, NOT in force:** DECISIONS.md D0r would allow Haiku for sentence feedback.
+> Until the maintainer confirms it, everything below stays as written. `app/ai/` exists but is off
+> by default (`WORT_AI_ENABLED`); if D0r is confirmed, update this file first (architecture table,
+> "No outbound network", "No API keys exist").
+
 `wort` is the project, package and command name.
 (The current code in this repo is the `wort` CLI/TUI prototype. It
 **stays** as a fully local tool; the web app (`app/`) is added beside it and
@@ -134,6 +139,8 @@ Keep README and this file in sync after each session.
 
 - `src/wort/` — CLI + TUI (stays; fully local; command `wort`; Python package `wort`)
 - `app/` — FastAPI app, routes, templates
+- `app/auth.py`, `app/words.py`, `app/practice.py`, `app/scoring.py` — login, word list, practice, score formula
+- `app/ai/` — disabled provider layer (interface, schemas, daily cap, fake, draft Anthropic provider)
 - `app/ds.py` — Jinja environment that includes `vendor/dis-system` templates + asset lists; `app/static/` — layout.css (layout only), app.js (theme + toast glue)
 - `app/ocr.py` — image validation + Tesseract **[post-MVP]**
 - `app/lexicon.py` — lemmatize, lookup, inflection, translation cache

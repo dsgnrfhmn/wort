@@ -18,6 +18,29 @@ Confirmed by maintainer (date)*.
   measured in Step 0 entries below).
 - **Confirmed by maintainer:** 2026-10-04
 
+## D0r — Revisit D0: Haiku for sentence feedback (PROPOSED, not confirmed)
+
+> **Status: proposed 2026-10-21. Not in force.** D0 stays the rule until the maintainer confirms
+> this entry. The code (`app/ai/`) is behind `WORT_AI_ENABLED`, off by default.
+
+- **Question:** allow a hosted model (Haiku) for the checks the local stack cannot do well:
+  sentence feedback (corrections, "Natürlicher", per-word results, rule name), "Fehler erklären",
+  "Doch richtig?", more tasks for one rule, free-answer grading in Abfrage.
+- **Proposed:** `claude-haiku-5-5` for all of them. `claude-sonnet-5-5` only for the sentence check,
+  and only if Haiku misses errors on 20-30 real learner mistakes (`spikes/ai_eval.md`, run by the
+  maintainer; record the numbers here).
+- **Rules if confirmed:** backend only, browser never calls the API; one key in a separate workspace
+  with a spend limit, in the server env file only; only the sentence/answer, target forms and task are
+  sent (never photos or whole Texte); structured JSON validated by the backend, invalid reply = no score
+  change; per-user daily cap; fallback to the local check; explanations only on click.
+- **What it costs us (security):** the host gets a spend-capable key and an outbound path to
+  `api.anthropic.com`, so `IPAddressDeny=any` / "no outbound network" in CLAUDE.md no longer hold as
+  written; learner text leaves the network. Blast radius if the service is compromised: spend on the
+  key (capped by the workspace limit) and every sentence sent. Needs the egress design in DEPLOY.md §6.
+- **Still local:** translation and forms (Wiktionary), OCR (Tesseract), tooltips (dictionary + spaCy),
+  scores and filters.
+- **Confirmed by maintainer:** _
+
 ## D00 — Scope and note language
 
 - **Decision (2026-10-04):** notes and translations are in **English**
