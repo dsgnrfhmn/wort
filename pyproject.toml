@@ -23,6 +23,7 @@ web = [
     "jinja2>=3.1",
     "uvicorn>=0.29",
     "python-multipart>=0.0.9",
+    "argon2-cffi>=25.1.0",
 ]
 
 [build-system]

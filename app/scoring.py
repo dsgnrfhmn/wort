@@ -59,9 +59,8 @@ def apply_verdict(state: WordState, skill: str, verdict: str) -> WordState:
 
 
 def score_delta(before: WordState, after: WordState) -> int:
-    """Change of the displayed word score (0 when it was or became None)."""
-    a, b = word_score(before), word_score(after)
-    return 0 if a is None or b is None else b - a
+    """Change of the displayed word score; a word without a score counts as 0."""
+    return (word_score(after) or 0) - (word_score(before) or 0)
 
 
 def next_due(state: WordState, verdict: str, now: datetime) -> datetime:

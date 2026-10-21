@@ -7,3 +7,4 @@ body { margin: 0; background-color: var(--ds-color-bg-surface-pressed); }
 .wort-table { display: grid; width: 100%; overflow-x: auto; background-color: var(--ds-color-bg-surface); }
 .wort-table .ds-table-row { display: contents; }
 .wort-forms { display: none; }
+.wort-form { display: grid; gap: var(--ds-spacing-3); max-width: calc(var(--ds-spacing-9) * 6); }

@@ -11,10 +11,12 @@
   <link rel="stylesheet" href="/static/layout.css">
 </head>
 <body>
+  {% if user %}
   {% with workspace_label='wort', nav_links=[
     {'label': 'History', 'href': '/', 'current': page == 'history'},
     {'label': 'Favorites', 'href': '/favorites', 'current': page == 'favorites'}
   ] %}{% include "components/nav-bar/template.html" %}{% endwith %}
+  {% endif %}
   <main class="wort-main">
     {% block content %}{% endblock %}
   </main>

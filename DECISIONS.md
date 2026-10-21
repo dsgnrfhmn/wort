@@ -66,8 +66,8 @@ Confirmed by maintainer (date)*.
     dis-system branch `<user>/form-props`, **not yet merged to its `main`**.
     Gaps still without a component: file input (native control used),
     textarea-free sentence result block (empty-state used for text lines).
-- **dis-system commit in use:** `a8ec059` (2026-10-21; branch `dsgnrfhmn/form-props` = `b85e517` main
-  + form props: input name/id/label/disabled/required, text-button/table-cell submit; pushed, **not yet
+- **dis-system commit in use:** `1e1d505` (2026-10-21; branch `dsgnrfhmn/form-props` = `b85e517` main
+  + form props: input name/id/label/disabled/required/autocomplete/password, text-button/table-cell submit; pushed, **not yet
   merged to dis-system `main`**). Replaces the unpublished `6d58745`. Switch the submodule to `main`
   after the maintainer merges. _(record at each bump)_
 - **Confirmed by maintainer:** 2026-10-04

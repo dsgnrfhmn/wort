@@ -19,6 +19,11 @@ def web(tmp_path) -> WebStore:
     return WebStore(tmp_path / "web.db")
 
 
+@pytest.fixture
+def uid(web) -> int:
+    return web.create_user("anna", "hash").id
+
+
 def export_bytes(queries):
     return json.dumps({
         "format_version": FORMAT_VERSION,
@@ -28,28 +33,28 @@ def export_bytes(queries):
     }).encode()
 
 
-def test_import_is_idempotent(web):
+def test_import_is_idempotent(web, uid):
     raw = export_bytes([("Haus", True, "2026-10-01T10:00:00"), ("haus", True, "2026-10-02T10:00:00")])
-    assert import_export(web, raw).queries_new == 2
-    assert import_export(web, raw).queries_new == 0
-    rows = web.history()
+    assert import_export(web, uid, raw).queries_new == 2
+    assert import_export(web, uid, raw).queries_new == 0
+    rows = web.history(uid)
     assert len(rows) == 1 and rows[0].count == 2 and rows[0].query == "haus"
 
 
 @pytest.mark.parametrize("raw", [b"not json", b"[]", json.dumps({"format_version": 99}).encode()])
-def test_import_rejects_malformed_and_writes_nothing(web, raw):
+def test_import_rejects_malformed_and_writes_nothing(web, uid, raw):
     with pytest.raises(ValueError):
-        import_export(web, raw)
-    assert web.history() == []
+        import_export(web, uid, raw)
+    assert web.history(uid) == []
 
 
-def test_favorites_toggle_and_history_flag(web):
-    import_export(web, export_bytes([("Haus", True, "2026-10-01T10:00:00")]))
-    assert web.toggle_favorite("Haus") is True
-    assert web.history()[0].favorite is True
-    assert [f.lemma for f in web.favorites()] == ["Haus"]
-    assert web.toggle_favorite("Haus") is False
-    assert web.favorites() == []
+def test_favorites_toggle_and_history_flag(web, uid):
+    import_export(web, uid, export_bytes([("Haus", True, "2026-10-01T10:00:00")]))
+    assert web.toggle_favorite(uid, "Haus") is True
+    assert web.history(uid)[0].favorite is True
+    assert [f.lemma for f in web.favorites(uid)] == ["Haus"]
+    assert web.toggle_favorite(uid, "Haus") is False
+    assert web.favorites(uid) == []
 
 
 def test_apply_corrections_right_to_left():

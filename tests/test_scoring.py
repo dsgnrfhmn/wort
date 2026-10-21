@@ -45,6 +45,12 @@ def test_score_delta_matches_displayed_change():
     assert s.score_delta(before, after) == -1
 
 
+def test_first_answer_on_a_new_word_counts_from_zero():
+    new = s.WordState()
+    assert s.score_delta(new, s.apply_verdict(new, "usage", "correct")) == 1
+    assert s.score_delta(new, s.apply_verdict(new, "usage", "wrong")) == 0
+
+
 def test_streak_resets_on_wrong():
     st = s.apply_verdict(s.WordState(form=3, streak=3), "form", "wrong")
     assert st.streak == 0

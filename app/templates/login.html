@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Sign in · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title='Sign in', info='wort' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% if error %}{% with message=error %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+  <form class="wort-form" method="post" action="/login">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% with name='name', label='Name', autocomplete='username', required=true, placeholder='Name', fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+    {% with type='password', name='password', label='Password', autocomplete='current-password', required=true, placeholder='Password', fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+    {% with priority='primary', underline='dotted', label='Sign in', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+</section>
+{% endblock %}
