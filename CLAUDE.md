@@ -68,10 +68,10 @@ explanations.
 
 - The web UI is built **only** from `dis-system` (the CLI/TUI uses
   Textual/Rich). It is vendored as a git submodule — never copy-pasted CSS.
-  Normally pinned to a tag/commit. **Temporary exception (2026-10-04): it
-  follows the `dev-isolated` branch until the maintainer decides between a
-  pinned tag and `main`**; record the commit hash in `DECISIONS.md` at every
-  bump.
+  Normally pinned to a tag/commit. **Temporary exception (2026-10-18): it
+  follows `main` (branch `dev-isolated` no longer exists) until the
+  maintainer decides between a pinned tag and `main`**; record the commit
+  hash in `DECISIONS.md` at every bump.
 - App-local CSS may contain **layout only** (grid, page regions, spacing via
   dis-system tokens). No new colors, type styles, or component styles in
   this repo.
@@ -134,6 +134,7 @@ Keep README and this file in sync after each session.
 
 - `src/wort/` — CLI + TUI (stays; fully local; command `wort`; Python package `wort`)
 - `app/` — FastAPI app, routes, templates
+- `app/ds.py` — Jinja environment that includes `vendor/dis-system` templates + asset lists; `app/static/` — layout.css (layout only), app.js (theme + toast glue)
 - `app/ocr.py` — image validation + Tesseract **[post-MVP]**
 - `app/lexicon.py` — lemmatize, lookup, inflection, translation cache
   (ported from `src/wort/dictionary/*`)

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}wort{% endblock %}</title>
+  <link rel="stylesheet" href="/ds/tokens/output.css">
+  {% for href in ds_css %}
+  <link rel="stylesheet" href="{{ href }}">
+  {% endfor %}
+  <link rel="stylesheet" href="/static/layout.css">
+</head>
+<body>
+  {% with workspace_label='wort', nav_links=[
+    {'label': 'History', 'href': '/', 'current': page == 'history'},
+    {'label': 'Favorites', 'href': '/favorites', 'current': page == 'favorites'}
+  ] %}{% include "components/nav-bar/template.html" %}{% endwith %}
+  <main class="wort-main">
+    {% block content %}{% endblock %}
+  </main>
+  {% if message %}<div hidden data-flash="{{ message_status | default('default') }}">{{ message }}</div>{% endif %}
+  {% for src in ds_js %}
+  <script src="{{ src }}"></script>
+  {% endfor %}
+  <script src="/static/app.js"></script>
+</body>
+</html>

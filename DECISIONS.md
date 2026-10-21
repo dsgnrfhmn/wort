@@ -55,9 +55,19 @@ Confirmed by maintainer (date)*.
   - Link CLI → web is **export/import** (versioned JSON, format_version 2:
     queries + practice words). No network path from the dev machine.
   - CLI/TUI and web keep separate practice progress (scores do not sync).
-  - dis-system is taken from branch **`dev-isolated`** for now. To be
-    revisited: pinned tag vs `main`.
-- **dis-system commit in use:** _(record at each bump)_
+  - dis-system follows **`main`** (2026-10-18: the `dev-isolated` branch does
+    not exist on GitHub; the maintainer's updates are on `main`). Pinned tag
+    vs `main` is still open.
+  - Web app: own SQLite DB (`web.db`, history + favorites), UI composed from
+    dis-system Jinja templates (`app/ds.py` adds the `vendor/dis-system` root to
+    the template loader and serves its tokens/components/icons under `/ds`).
+    Forms need dis-system props that were missing (`input` `name`/`label`,
+    `text-button` `submit`, `table-cell` `1-action` `submit`): drafted on
+    dis-system branch `<user>/form-props`, **not yet merged to its `main`**.
+    Gaps still without a component: file input (native control used),
+    textarea-free sentence result block (empty-state used for text lines).
+- **dis-system commit in use:** `6d58745` (local branch `<user>/form-props` = `b85e517` main
+  + form props, 2026-10-18; not pushed, not yet merged to dis-system `main`). _(record at each bump)_
 - **Confirmed by maintainer:** 2026-10-04
 
 ## Step 0 spikes (MVP)
