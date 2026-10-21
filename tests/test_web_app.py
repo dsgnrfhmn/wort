@@ -39,7 +39,7 @@ def users(store):
     store.create_user("ben", auth.hash_password(PASSWORD))
 
 
-@pytest.mark.parametrize("path", ["/", "/favorites", "/exercise/Haus"])
+@pytest.mark.parametrize("path", ["/", "/history", "/favorites", "/exercise/Haus", "/words/1"])
 def test_pages_redirect_to_login_when_anonymous(client, path):
     r = client.get(path)
     assert r.status_code == 303 and r.headers["location"] == "/login"
@@ -102,5 +102,5 @@ def test_users_do_not_see_each_others_history(app, store, users):
     login(ana, "anna"); login(ben, "ben")
     from datetime import datetime
     store.add_history(store.user_by_name("anna")[0].id, [("Geheimwort", True, datetime(2026, 10, 1))])
-    assert "Geheimwort" in ana.get("/").text
-    assert "Geheimwort" not in ben.get("/").text
+    assert "Geheimwort" in ana.get("/history").text
+    assert "Geheimwort" not in ben.get("/history").text

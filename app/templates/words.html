@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Wörter · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title='Wörter', info=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche' %}{% include "components/table-header/template.html" %}{% endwith %}
+  <div class="wort-row">
+    {% with priority='secondary', underline='solid', label='Importieren', href='/history' %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
+  {% with layout='bulk', search=true, search_placeholder='Wort oder Übersetzung', actions=[
+    {'label': 'Sätze bilden', 'priority': 'primary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/saetze" data-needs-selection'},
+    {'label': 'Abfrage', 'priority': 'secondary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/abfrage" data-needs-selection'},
+    {'label': 'Auswahl aufheben', 'priority': 'secondary', 'status': 'active' if selected else 'disabled', 'extra_attrs': 'data-clear-selection data-needs-selection'}
+  ], more_actions=[
+    {'label': '10 schwächste', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="weakest"'},
+    {'label': 'Letzte 20', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="latest"'}
+  ] %}{% include "components/header-block/template.html" %}{% endwith %}
+  <form id="preset-form" method="get" action="/" hidden></form>
+  <form id="practice-form" method="post" action="/ueben/saetze" hidden>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+  </form>
+
+  {% if rows %}
+  <div class="wort-table wort-words" role="table" aria-label="Wörter" data-checkbox-group data-sort-group data-word-table>
+    {% with type='checkbox-cell', checkbox_role='select-all' %}{% include "components/table-cell/template.html" %}{% endwith %}
+    {% with label='Wort', sortable=true, sort_dir=(dir if sort == 'word' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Übersetzung' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Erstellt', sortable=true, sort_dir=(dir if sort == 'added' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Score', sortable=true, sort_dir=(dir if sort == 'score' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% for r in rows %}
+    {% with selected=(r.id in selected), extra_attrs='data-word-id="' ~ r.id ~ '"', cells=[
+      {'type': 'checkbox-cell'},
+      {'type': 'link', 'content': r.label, 'href': '/words/' ~ r.id},
+      {'type': 'text-active-cell', 'content': r.translation},
+      {'type': 'date', 'content': r.word.added_at.strftime('%d.%m.%Y')},
+      {'type': 'text-active-cell', 'content': (r.word.score | string) if r.word.score is not none else '–'}
+    ] %}{% include "components/table-row/template.html" %}{% endwith %}
+    {% endfor %}
+  </div>
+  {% if total > rows | length %}
+  <div class="wort-row">
+    {% with priority='secondary', underline='dotted', label='20 weitere laden', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ (limit + 20) %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='dotted', label='Alle ' ~ total ~ ' laden', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ total %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
+  {% endif %}
+  {% else %}
+  {% with message='Noch keine Wörter. Exportiere sie mit `wort export` und importiere die Datei über „Importieren“.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% endif %}
+</section>
+{% endblock %}

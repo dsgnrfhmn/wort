@@ -18,11 +18,12 @@ DS_ROOT = ROOT / "vendor" / "dis-system"
 # Components the pages use (directly or through other components), in stylesheet order.
 COMPONENTS = [
     "dropdown-menu", "text-button", "input-dropdown", "input", "tag", "empty-state",
-    "table-cell", "table-header-cell", "table-row", "table-header", "nav-bar", "toast",
+    "table-cell", "table-header-cell", "table-row", "table-header", "table-header-actions", "table-footer",
+    "divider", "header-block", "header-tab", "pane", "tooltip", "nav-bar", "toast",
 ]
 SCRIPTS = [
     "dropdown-menu", "text-button", "input-dropdown", "empty-state",
-    "table-cell", "table-header-cell", "table-row", "nav-bar", "toast",
+    "table-cell", "table-header-cell", "table-row", "header-tab", "pane", "tooltip", "nav-bar", "toast",
 ]
 
 _SCHEME = re.compile(r"^(?:[a-z][a-z0-9+.-]*:)", re.IGNORECASE)

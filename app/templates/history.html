@@ -35,7 +35,7 @@
     <form id="fav-{{ loop.index }}" method="post" action="/favorites/toggle">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="lemma" value="{{ r.query }}">
-      <input type="hidden" name="next" value="/">
+      <input type="hidden" name="next" value="/history">
     </form>
     {% endfor %}
   </div>

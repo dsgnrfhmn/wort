@@ -19,7 +19,8 @@ from wort.dictionary.lookup import Dictionary
 from wort.exercises import grammar_check
 from wort.exercises.sentence import targets
 
-from app import auth, ds, lexicon
+from app import auth, ds, lexicon, words
+from types import SimpleNamespace
 from app.checking import Checker, check_sentence
 from app.db import User, WebStore
 from app.importer import import_export
@@ -112,7 +113,11 @@ def create_app(
         response.delete_cookie(auth.SESSION_COOKIE)
         return response
 
-    @app.get("/", response_class=HTMLResponse)
+    words.register(app, SimpleNamespace(
+        store=store, render=render, verify_csrf=verify_csrf, current_user=current_user, dict_path=dictionary_path,
+    ))
+
+    @app.get("/history", response_class=HTMLResponse)
     def history(request: Request, message: str = "", user: User = Depends(current_user)):
         return render(request, "history.html", rows=store.history(user.id), message=message, user=user)
 
@@ -128,17 +133,17 @@ def create_app(
                           message=f"Import failed: {e}", message_status="error")
         msg = (f"Imported {result.queries_new} new of {result.queries_total} queries, "
                f"{result.words_new} new of {result.words_total} words.")
-        return RedirectResponse(f"/?message={quote(msg)}", status_code=303)
+        return RedirectResponse(f"/history?message={quote(msg)}", status_code=303)
 
     @app.post("/favorites/toggle")
-    def toggle(request: Request, csrf: str = Form(...), lemma: str = Form(...), pos: str = Form(""), next: str = Form("/"),
+    def toggle(request: Request, csrf: str = Form(...), lemma: str = Form(...), pos: str = Form(""), next: str = Form("/history"),
                user: User = Depends(current_user)):
         verify_csrf(request, csrf)
         lemma, pos = lemma.strip(), pos.strip()
         if not lemma or len(lemma) > 100 or len(pos) > 100:
             raise HTTPException(400, "invalid word")
         store.toggle_favorite(user.id, lemma, pos)
-        return RedirectResponse(next if next in ("/", "/favorites") else "/", status_code=303)
+        return RedirectResponse(next if next in ("/history", "/favorites") else "/history", status_code=303)
 
     @app.get("/favorites", response_class=HTMLResponse)
     def favorites(request: Request, user: User = Depends(current_user)):

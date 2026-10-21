@@ -116,6 +116,16 @@ class Favorite:
 
 
 @dataclass
+class Attempt:
+    kind: str
+    prompt: str
+    answer: str
+    verdict: str
+    delta: int
+    created_at: datetime
+
+
+@dataclass
 class UserWord:
     id: int
     lemma: str
@@ -330,6 +340,17 @@ class WebStore:
         )
         self.conn.commit()
         return delta
+
+    def attempts(self, user_id: int, word_id: int) -> list[Attempt]:
+        """The user's answers for one word, newest first."""
+        return [
+            Attempt(r["kind"], r["prompt"], r["answer"], r["verdict"], r["delta"],
+                    datetime.fromisoformat(r["created_at"]))
+            for r in self.conn.execute(
+                "SELECT * FROM attempts WHERE user_id = ? AND word_id = ? ORDER BY created_at DESC, id DESC",
+                (user_id, word_id),
+            )
+        ]
 
     # --- AI usage -----------------------------------------------------------
 
