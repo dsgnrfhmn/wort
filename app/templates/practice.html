@@ -11,6 +11,7 @@
 
 <section class="wort-section">
   {% with type='title-info', title='Aufgabe ' ~ (pos + 1), info=prompt %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with message='Prüfung: ' ~ ('KI' if ai_on and item.kind == 'sentence' else 'lokal') %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% if hint %}{% with message='Hinweis: ' ~ hint %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
   {% if choices %}
     {% with message='Antworte mit einer Nummer oder dem Wort: ' ~ (choices | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}
@@ -30,6 +31,18 @@
   {% endfor %}
   {% if result.verdict != 'correct' %}
     {% for line in facts %}{% with message=line %}{% include "components/empty-state/template.html" %}{% endwith %}{% endfor %}
+  {% endif %}
+  {% if ai_note %}{% with message=ai_note ~ ' Lokale Prüfung wurde verwendet.' %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+  {% if explanation %}
+    {% with type='title-info', title='Erklärung', info=explanation.rule %}{% include "components/table-header/template.html" %}{% endwith %}
+    {% with message=explanation.explanation %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% with message='Merke: ' ~ explanation.merke %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% with message=explanation.explanation_uk %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% elif ai_on and result.verdict in ('wrong', 'almost') and item.kind == 'sentence' %}
+  <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/explain">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% with priority='secondary', underline='dotted', label='Fehler erklären (' ~ ai_left ~ ' KI-Anfragen heute übrig)', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
   {% endif %}
   <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/next">
     <input type="hidden" name="csrf" value="{{ csrf }}">

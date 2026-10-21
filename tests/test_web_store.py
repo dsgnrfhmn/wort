@@ -120,3 +120,14 @@ def test_ai_usage_counter_is_per_user_and_day(web, two):
     assert web.ai_count_call(a, "2026-10-21") == 2
     assert web.ai_calls_today(b, "2026-10-21") == 0
     assert web.ai_calls_today(a, "2026-10-22") == 0
+
+
+def test_no_write_lock_is_left_open_between_calls(tmp_path):
+    """A second connection (the admin script) must be able to write while the app is idle."""
+    path = tmp_path / "w.db"
+    app_store, admin = WebStore(path), WebStore(path)
+    u = app_store.create_user("anna", "h")
+    app_store.create_session(u.id, "t", NOW, NOW + timedelta(days=1))
+    assert app_store.user_for_session("t", NOW) is not None
+    admin.create_user("ben", "h")  # raises "database is locked" if the app left a transaction open
+    assert app_store.user_by_name("ben") is not None

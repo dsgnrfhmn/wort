@@ -165,6 +165,8 @@ class WebStore:
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
+        self.conn.execute("PRAGMA journal_mode = WAL")  # readers never block the admin script's writes
+        self.conn.execute("PRAGMA busy_timeout = 5000")
         self._migrate()
 
     def _migrate(self) -> None:
@@ -210,6 +212,7 @@ class WebStore:
 
     def user_for_session(self, token_hash: str, now: datetime) -> User | None:
         self.conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (_ts(now),))
+        self.conn.commit()  # an open implicit transaction would keep the write lock between requests
         r = self.conn.execute(
             "SELECT u.id, u.name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
             (token_hash,),

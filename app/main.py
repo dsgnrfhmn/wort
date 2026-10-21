@@ -20,6 +20,8 @@ from wort.exercises import grammar_check
 from wort.exercises.sentence import targets
 
 from app import auth, ds, lexicon, practice, words
+from app.ai import config as ai_config
+from app.ai import service as ai_service
 from types import SimpleNamespace
 from app.checking import Checker, check_sentence
 from app.db import User, WebStore
@@ -39,6 +41,7 @@ def create_app(
     checker: Checker | None = None,
     secure_cookies: bool | None = None,
     throttle: auth.LoginThrottle | None = None,
+    ai: ai_service.AiService | None = None,
 ) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     db_file = db_path or paths.data_dir() / "web.db"
@@ -116,6 +119,7 @@ def create_app(
     shared = SimpleNamespace(
         store=store, render=render, verify_csrf=verify_csrf, current_user=current_user, dict_path=dictionary_path,
         quote=quote, facts=lexicon.summary, checker=check,
+        ai=ai or ai_service.build(ai_config.load(), store),
     )
     @app.get("/texte", response_class=HTMLResponse)
     def texts(request: Request, user: User = Depends(current_user)):
