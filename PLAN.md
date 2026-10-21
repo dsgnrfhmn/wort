@@ -44,10 +44,30 @@ Post-MVP (details at the end of the file):
 - Step 6 — Local sentence practice (LanguageTool)
 - Step 7 — Operations: backups, logs, limits
 
+## Web UI status (2026-10-21, branch `wip/web-view`)
+
+Built from the design canvas (Wörter, Üben; Texte is a placeholder) on dis-system `dsgnrfhmn/form-props`.
+
+Done: accounts (argon2, sessions, CSRF, throttle, `scripts/adduser.py`), per-user word list with
+score (`app/scoring.py`), Wörter list + detail, Üben (Sätze bilden, Abfrage; local grading), CLI
+import of words and history, disabled AI layer (`app/ai/`, D0r proposed).
+
+Design vs. built (components dis-system lacks; **not** patched locally, per CLAUDE.md):
+- article colors on words (der/die/das), score chip with state colors (plain number shown instead);
+- chat-style task/answer bubbles, inline correction marks (strike/highlight) in feedback (shown as text lines);
+- word tooltip with translations in feedback ("Sätze-Tooltip"; dis-system `tooltip` is attribute-only; also AI-dependent);
+- `pane` takes only string content, no block slot (the detail page uses raw `ds-pane` markup);
+- row checkbox has no keyboard handler (known gap in dis-system `table-row`).
+- Not built: Texte (OCR, post-MVP), DE→UK language-pair switch, "Doch richtig?", "Diese Regel üben" and
+  free-answer grading in Abfrage (provider methods exist and are tested, no routes yet), Ukrainian glosses
+  (dictionary is English; Ukrainian is only the learner's own translation).
+- dis-system props added on branch `dsgnrfhmn/form-props` (needs maintainer PR/merge, no Figma source for them):
+  input name/id/label/disabled/required/autocomplete/password, text-button submit/href,
+  table-cell submit, table-header-actions submit, table-row extra_attrs.
+
 ## Current blockers
 
-- **dis-system repo not attached** to this workspace → Step 1 UI (and every
-  later UI item) cannot start. Logic and spikes can.
+- ~~dis-system repo not attached~~ (resolved 2026-10-21: submodule on `dsgnrfhmn/form-props`, pending merge to `main`).
 - **No access to the server** from development sessions (by design). Step 0
   scripts are written here and **run by the maintainer on the server**; numbers go into
   `DECISIONS.md`.

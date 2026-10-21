@@ -39,7 +39,7 @@ Exist in the code (`wort tui`, `wort add`, `wort list`) but are not part of the 
   - Translation, article, correct case/form
   - Grammar multiple choice
   - Sentence writing with local LanguageTool check
-- **Web view** (FastAPI + Jinja2, SQLite, vanilla JS; UI only from `dis-system`)
+- **Web view** (FastAPI + Jinja2, SQLite, vanilla JS; UI only from `dis-system`): login, word list with scores, practice (sentences, quiz). Users are created with `scripts/adduser.py`. AI feedback is off by default (see `DECISIONS.md` D0r, proposed)
   - Progress management: word list, scores, review queue
   - Reading texts: add a text, every word clickable (lemma, translation, grammar note, "learn this word")
   - Text from photo via local OCR (Tesseract)
