@@ -10,7 +10,15 @@ FIXTURE = Path(__file__).parent / "fixtures" / "german_sample.jsonl"
 
 
 @pytest.fixture(autouse=True)
+def _netguard_off_between_tests():
+    yield
+    from wort import netguard
+    netguard.uninstall()  # cli.main() installs it process-wide; tests must not leak it
+
+
+@pytest.fixture(autouse=True)
 def _isolated_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("WORT_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("WORT_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("WORT_LT_DISABLE", "1")
 

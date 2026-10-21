@@ -14,6 +14,13 @@ def data_dir() -> Path:
     return path
 
 
+def config_dir() -> Path:
+    """Settings (sync endpoint) and, by convention, the token file; never inside the data dir's database."""
+    if override := os.environ.get("WORT_CONFIG_HOME"):
+        return Path(override)
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "wort"
+
+
 def dictionary_db() -> Path:
     return data_dir() / "dictionary.db"
 

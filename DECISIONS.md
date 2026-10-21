@@ -24,7 +24,7 @@ Confirmed by maintainer (date)*.
   as a whole) shows a whole-sentence translation as text (de→en, or en→de when more words are English-only than German), then one card
   per word (picker in the session, cards in the TUI). Engine: Argos Translate,
   offline, two models (de→en, en→de), optional dependency group `mt`, model installed once by hand with
-  `wort install-translation` (~100 MB, the only network use). **CLI/TUI only;
+  `wort install-translation` (~100 MB, the only network use). *Superseded by D00d (2026-10-21): the CLI no longer downloads; `scripts/fetch_data.py models` fetches the files and `wort install-translation FILE...` installs them.* **CLI/TUI only;
   not in the web app** (RAM on the shared Pi not measured).
 - **Why:** D0 forbids an LLM API, not local models; the dictionary only has
   word glosses. No model or no package → a visible "No sentence translation"
@@ -63,6 +63,31 @@ Confirmed by maintainer (date)*.
 - **Still local:** translation and forms (Wiktionary), OCR (Tesseract), tooltips (dictionary + spaCy),
   scores and filters.
 - **Confirmed by maintainer:** _
+
+## D00d — Network model: CLI offline except one write-only sync port
+
+- **Decision (2026-10-21, requested by the maintainer):** only the web side may have outbound network
+  access (the AI API host, and only after D0r is confirmed). The CLI has none except loopback and one
+  HTTPS endpoint that receives its words JSON.
+- **Mechanism:** `wort sync` → `POST https://<server-ip>:8456/sync` with `Authorization: Bearer <token>`.
+  The token is created on the server (`scripts/synctoken.py`), stored hashed, scoped to one user, can only
+  push words/history, is revocable, and lives in a mode-600 file on the CLI machine. The server side is a
+  separate process/port with exactly one route (`app/sync_app.py`), rate-limited per user and in nginx,
+  size-capped (20 MiB), per-user word cap 20 000, TLS with the server's own certificate pinned on the client.
+- **CLI side:** no downloads (`import --download` and the model download are gone; `scripts/fetch_data.py`
+  does them, separately). `scripts/wort-offline` cuts the network at the OS level (Linux: systemd
+  `IPAddressDeny`, by IP; optional nftables for the port; macOS: sandbox profile, IP and port);
+  `src/wort/netguard.py` also blocks it inside the process. Loopback stays open for a local LanguageTool.
+- **Access and blast radius:** the token bridges the CLI machine to one user's word list on the server:
+  if it leaks, someone on the LAN can add junk words/history to that user (capped, rate-limited, revocable);
+  they cannot read or sign in. The CLI initiates the connection; nothing on the server can reach the CLI
+  machine. The in-process guard is bypassable by code in the same process; the OS rule is the boundary and
+  was **not run in the dev container** (no user systemd/macOS): run `scripts/wort-offline --check` on the
+  real machine.
+- **Open:** the server-side egress rule for the AI API (DEPLOY.md §6). nginx.conf/compose changes are not
+  run here either.
+- **Confirmed by maintainer:** 2026-10-21 (requested in session; variant: HTTPS push + write-only token,
+  OS rule + in-code guard, downloads moved out of the CLI)
 
 ## D00 — Scope and note language
 

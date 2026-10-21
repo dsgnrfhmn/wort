@@ -105,7 +105,7 @@ def test_legacy_v0_db_is_migrated_and_adopted_by_first_user(tmp_path):
     """)
     old.commit(); old.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 3
     u = web.create_user("anna", "h")
     assert [r.query for r in web.history(u.id)] == ["Haus"]
     assert [f.lemma for f in web.favorites(u.id)] == ["Haus"]
@@ -162,7 +162,7 @@ def test_revise_only_the_latest_attempt_and_only_own(web, two):
     assert web.revise_attempt(b, latest, "correct") is None  # not the owner
 
 
-def test_v1_database_is_migrated_to_v2(tmp_path):
+def test_v1_database_is_migrated_to_current(tmp_path):
     path = tmp_path / "v1.db"
     con = sqlite3.connect(path)
     con.executescript("""
@@ -176,7 +176,27 @@ def test_v1_database_is_migrated_to_v2(tmp_path):
     """)
     con.commit(); con.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 3
     assert web.practice(1, 1)["kind"] == "saetze"
     assert web.create_practice(1, "regel", []) > 0  # new kind accepted
     assert "state_before" in {r["name"] for r in web.conn.execute("PRAGMA table_info(attempts)")}
+
+
+def test_v2_database_gets_the_sync_tokens_table(tmp_path):
+    path = tmp_path / "v2.db"
+    WebStore(path)  # current schema
+    con = sqlite3.connect(path)
+    con.executescript("DROP TABLE sync_tokens; PRAGMA user_version = 2;")
+    con.commit(); con.close()
+    web = WebStore(path)
+    u = web.create_user("anna", "h")
+    tid = web.create_sync_token(u.id, "hash", "laptop")
+    assert web.user_for_sync_token("hash").id == u.id and web.user_for_sync_token("other") is None
+    assert web.revoke_sync_token(u.id, tid) and web.user_for_sync_token("hash") is None
+
+
+def test_sync_tokens_are_scoped_to_their_owner(web, two):
+    a, b = two
+    tid = web.create_sync_token(a, "h")
+    assert web.revoke_sync_token(b, tid) is False  # another user cannot revoke it
+    assert web.sync_tokens(b) == [] and web.user_for_sync_token("h").id == a

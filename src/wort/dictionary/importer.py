@@ -15,14 +15,12 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import urllib.request
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
 from wort.text import normalize
 
 MAX_EXAMPLES = 10  # example sentences kept per entry
-KAIKKI_URL = "https://kaikki.org/dictionary/German/kaikki.org-dictionary-German.jsonl"
 
 POS_KEPT = {"noun", "verb", "adj", "adv", "prep", "conj", "pron", "num", "intj", "phrase", "particle"}
 
@@ -290,17 +288,3 @@ def import_entries(raws: Iterable[dict], db_path: Path, progress: Callable[[int]
 def import_file(jsonl_path: Path, db_path: Path, progress: Callable[[int], None] | None = None) -> int:
     with open(jsonl_path, encoding="utf-8") as fh:
         return import_entries(iter_jsonl(fh), db_path, progress)
-
-
-def download(dest: Path, url: str = KAIKKI_URL, progress: Callable[[int], None] | None = None) -> Path:
-    """Stream the kaikki dump to disk (one-time, ~1 GB)."""
-    tmp = dest.with_suffix(".part")
-    with urllib.request.urlopen(url) as resp, open(tmp, "wb") as out:
-        done = 0
-        while chunk := resp.read(1 << 20):
-            out.write(chunk)
-            done += len(chunk)
-            if progress:
-                progress(done)
-    tmp.replace(dest)
-    return dest

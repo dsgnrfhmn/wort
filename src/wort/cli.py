@@ -2,7 +2,7 @@
 
 `wort`            interactive session: type words, `quit` to leave
 `wort WORD`       look a word up once (every lookup is logged in user.db)
-`wort tui|import|add|list|history|export|t WORD`   other commands
+`wort tui|import|add|list|history|export|sync|t WORD`   other commands (`sync` is the only one that uses the network)
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from wort import paths, picker
+from wort import netguard, paths, picker, syncing
 from wort import history_view, sentence
 from wort.header import Header
 from wort.dictionary.grammar import GENDER_ARTICLE
@@ -49,7 +49,7 @@ BANNER = """
 █   █  ███  █      ██
 """.strip("\n")  # solid block letters
 
-COMMANDS = {"tui", "import", "t", "add", "list", "history", "export", "install-translation"}
+COMMANDS = {"tui", "import", "t", "add", "list", "history", "export", "install-translation", "sync"}
 FOOTER = "/history . /clear-history . clear . quit"
 PROMPT = "translate> "
 QUIT_WORDS = {"quit"}
@@ -69,8 +69,8 @@ def _open_dictionary() -> Dictionary:
     except FileNotFoundError:
         _print(
             "The dictionary has not been imported yet.\n"
-            "Run `wort import --download` (≈1 GB from kaikki.org, once)\n"
-            "or `wort import --file kaikki.org-dictionary-German.jsonl`."
+            "Fetch the dump once with scripts/fetch_data.py (the CLI never downloads),\n"
+            "then `wort import --file kaikki.org-dictionary-German.jsonl`."
         )
         sys.exit(1)
 
@@ -78,19 +78,13 @@ def _open_dictionary() -> Dictionary:
 def cmd_import(args: argparse.Namespace) -> None:
     from wort.dictionary import importer
 
-    if args.file:
-        source = Path(args.file)
-    else:
-        source = paths.data_dir() / "kaikki-german.jsonl"
-        if not source.exists() or args.download:
-            _print(f"Downloading {importer.KAIKKI_URL}")
-            with console.status("", spinner_style="none") as status:
-                importer.download(source, progress=lambda n: status.update(f"{n / 1e6:.0f} MB"))
+    source = Path(args.file)
+    if not source.is_file():
+        _print(f"No such file: {source}. Fetch the dump with scripts/fetch_data.py first.")
+        sys.exit(1)
     with console.status("Importing…", spinner_style="none") as status:
         count = importer.import_file(source, paths.dictionary_db(), progress=lambda n: status.update(f"Importing… {n} entries"))
     _print(f"Done: {count} entries → {paths.dictionary_db()}")
-    if not args.file and not args.keep:
-        source.unlink(missing_ok=True)
 
 
 MAX_PHRASE_WORDS = 30  # a sentence fits; each word is one picker entry
@@ -450,11 +444,26 @@ def cmd_export(args: argparse.Namespace) -> None:
 
 def cmd_install_translation(args: argparse.Namespace) -> None:
     try:
-        sentence.install()
+        count = sentence.install([Path(f) for f in args.files])
     except (sentence.TranslationUnavailable, RuntimeError) as exc:
         _print(str(exc))
         sys.exit(1)
-    _print("Sentence translation models installed (de→en, en→de).")
+    _print(f"Installed {count} sentence translation model(s).")
+
+
+def cmd_sync(args: argparse.Namespace) -> None:
+    try:
+        config = syncing.load_config()
+        if config is None:
+            raise syncing.SyncError(f"sync is not configured: create {syncing.config_path()} (see DEPLOY.md, CLI network)")
+        token = syncing.read_token(config.token_file)
+        payload = json.dumps(export_words(Store(paths.user_db())), ensure_ascii=False).encode("utf-8")
+        result = syncing.push(payload, config, token)
+    except syncing.SyncError as exc:
+        _print(f"Sync failed: {exc}")
+        sys.exit(1)
+    _print(f"Synced: {result.get('words_new', 0)} new of {result.get('words_total', 0)} words, "
+           f"{result.get('queries_new', 0)} new of {result.get('queries_total', 0)} queries.")
 
 
 def cmd_tui(args: argparse.Namespace) -> None:
@@ -473,14 +482,16 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("tui", help="full-screen interface (translate, practice, overview)")
     p.set_defaults(func=cmd_tui)
 
-    p = sub.add_parser("install-translation", help="download the offline sentence-translation models de↔en (needs network once)")
+    p = sub.add_parser("install-translation", help="install offline sentence-translation models from .argosmodel files")
+    p.add_argument("files", nargs="+", help="model files fetched with scripts/fetch_data.py")
     p.set_defaults(func=cmd_install_translation)
 
-    p = sub.add_parser("import", help="import the Wiktionary dictionary (kaikki.org)")
-    p.add_argument("--file", help="ready-made JSONL from kaikki.org")
-    p.add_argument("--download", action="store_true", help="download the dump again")
-    p.add_argument("--keep", action="store_true", help="keep the downloaded JSONL after import")
+    p = sub.add_parser("import", help="import the Wiktionary dictionary from a kaikki.org JSONL file")
+    p.add_argument("--file", required=True, help="JSONL fetched with scripts/fetch_data.py")
     p.set_defaults(func=cmd_import)
+
+    p = sub.add_parser("sync", help="push words and history to the web app (the only network use; see DEPLOY.md)")
+    p.set_defaults(func=cmd_sync)
 
     p = sub.add_parser("t", help="look a word up explicitly (needed for words like `list` or `add`)")
     p.add_argument("word", nargs="+")
@@ -505,7 +516,17 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _install_netguard() -> None:
+    """From here on the process may only reach loopback and the configured sync endpoint."""
+    try:
+        config = syncing.load_config()
+    except syncing.SyncError:
+        config = None  # an invalid config allows nothing; `wort sync` reports the problem
+    netguard.install({config.endpoint} if config else set())
+
+
 def main(argv: list[str] | None = None) -> None:
+    _install_netguard()
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
         return cmd_session()

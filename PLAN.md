@@ -67,6 +67,10 @@ Design vs. built (components dis-system lacks; **not** patched locally, per CLAU
   input name/id/label/disabled/required/autocomplete/password, text-button submit/href,
   table-cell submit, table-header-actions submit, table-row extra_attrs.
 
+Network model (2026-10-21, DECISIONS D00d): CLI offline except `wort sync` → `POST /sync` (write-only token,
+own port/process); downloads moved to `scripts/fetch_data.py`; OS rule `scripts/wort-offline` + in-process
+`netguard`. Not verified in the dev container: the OS-level rule, nginx.conf and compose changes.
+
 ## Current blockers
 
 - ~~dis-system repo not attached~~ (resolved 2026-10-21: submodule on `dsgnrfhmn/form-props`, pending merge to `main`).

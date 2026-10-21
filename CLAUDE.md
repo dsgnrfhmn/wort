@@ -30,8 +30,8 @@ MVP features:
   line, which takes the word class color (noun: its article's color, verb:
   the terminal's own text color, i.e. black on a light theme, adj/adv: dark purple). Every query is logged automatically to the user DB (query history,
   separate from the practice word list). History and words reach the web app
-  by **export/import** (`wort export` → JSON → import on the word list page);
-  there is no network path from the CLI to the server. The TUI stays (`wort tui`).
+  by **export/import** (`wort export` → JSON → import on the word list page) or by
+  `wort sync` (the CLI's only network use, see Security boundaries). The TUI stays (`wort tui`).
 - **Lookup**: type any word → translation, grammar (declension for nouns /
   adjectives, conjugation incl. Präteritum, Perfekt, Futur I for verbs),
   example sentences from the dataset.
@@ -108,8 +108,20 @@ explanations.
   wort user, never committed, never on the dev machine; mocked client + separate
   spend-limited dev key on the dev machine) — and this file is updated first.
 - **The development machine does not deploy.** No SSH path from it to the
-  server. The maintainer deploys. The only CLI → web path is the exported
-  JSON file, which the web import treats as untrusted user data.
+  server. The maintainer deploys.
+- **CLI network (maintainer decision 2026-10-21, DECISIONS D00d):** the `wort`
+  CLI/TUI has **no network access** except loopback (a local LanguageTool) and
+  **one endpoint**: `wort sync` pushes the export JSON over HTTPS to
+  `POST /sync` on a dedicated server port, with a per-user **write-only** token
+  (cannot read, cannot sign in; stored hashed, revocable, file mode 600 on the CLI
+  machine). The CLI never downloads anything: big files come from
+  `scripts/fetch_data.py`, run separately. Enforced at the OS level
+  (`scripts/wort-offline`) with an in-process guard (`src/wort/netguard.py`) as a
+  second layer. The exported JSON file (browser import) remains an equal path.
+  Both paths treat the JSON as untrusted user data (size, schema, length caps).
+- **Web network:** the sync service (`app/sync_app.py`, own process and port)
+  has no outbound access. The web app's only permitted outbound destination is
+  the AI API host, and only after D0r is confirmed; until then it has none.
 - **All user-sourced text is data**: user input and dictionary content are
   only ever passed to local parsers as plain data, length-capped, with
   timeouts; a failed or malformed check → fail loud, no score change, never

@@ -36,9 +36,28 @@ The first user created adopts the history and favorites that existed before acco
 cookies (HttpOnly, SameSite=Strict, Secure); the app is meant to be reached over the TLS front only.
 For plain-http local development set `WORT_INSECURE_COOKIES=1` (never on the server).
 
+## 3b. CLI sync (port 8456, write-only token)
+
+The CLI pushes its words/history to `POST https://<LAN-IP>:8456/sync` (compose publishes the port on the
+same LAN IP as 8455; nginx serves only that route there). Per user:
+
+    podman exec -it wort-web python scripts/synctoken.py create NAME "laptop"   # prints the token ONCE
+    podman exec -it wort-web python scripts/synctoken.py list NAME
+    podman exec -it wort-web python scripts/synctoken.py revoke NAME TOKEN_ID
+
+On the CLI machine: put the token in a file (`chmod 600`), copy the server certificate (`wort.crt`) next to
+it, and create `~/.config/wort/sync.json`:
+
+    {"url": "https://<LAN-IP>:8456/sync", "token_file": "/home/me/.config/wort/sync.token",
+     "ca_file": "/home/me/.config/wort/wort.crt"}
+
+The url must use the IP address and an explicit port. Then `wort sync`. The token can only add words and
+history to that one user; it cannot read data or sign in.
+
 ## 4. Firewall (ufw): allow the LAN to reach this socket only
 
     sudo ufw allow from <LAN-SUBNET> to <LAN-IP> port 8455 proto tcp comment 'wort https'
+    sudo ufw allow from <CLI-MACHINE-IP> to <LAN-IP> port 8456 proto tcp comment 'wort cli sync'  # only the CLI machine
     sudo ufw status numbered
 
 ## 5. Verify
@@ -68,3 +87,24 @@ later, the maintainer does all of this on the server; the dev machine never hold
   or Texte. The daily cap is enforced on the server before the request; failures count as calls.
 - **Failure behaviour**: invalid or failed replies change no score; sentence checks fall back to the
   local check and say so.
+
+## 7. CLI network (the CLI has no network except the sync port)
+
+The CLI never downloads. Fetch big files separately, on a machine where that is fine:
+
+    python scripts/fetch_data.py dictionary downloads/      # ~1 GB; then: wort import --file downloads/kaikki.org-dictionary-German.jsonl
+    python scripts/fetch_data.py models downloads/          # needs `uv sync --group mt`; then: wort install-translation downloads/*.argosmodel
+
+Cut the CLI's network at the OS level and prove it:
+
+    scripts/wort-offline --check        # PASS: a public address is not reachable
+    alias wort=/path/to/wort/scripts/wort-offline
+
+- Linux: `systemd-run --user` with `IPAddressDeny=any`, allowing loopback and the sync server's IP (by IP,
+  not port). For a port-level rule use `deploy/cli/wort-cli.nft` with a dedicated user (root, once).
+- macOS: `sandbox-exec` with `deploy/cli/wort.sb`: loopback and `IP:port` only.
+- The in-process guard (`src/wort/netguard.py`) blocks everything else inside the CLI as a second layer;
+  it does not replace the OS rule. Neither was run in the development container: run `--check` on the real
+  machine and read its result.
+- Web side: the sync service has no outbound access; the web app's only outbound destination is the AI API,
+  once D0r is confirmed (section 6).

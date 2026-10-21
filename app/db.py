@@ -14,7 +14,7 @@ from pathlib import Path
 
 from app import scoring
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -28,6 +28,15 @@ CREATE TABLE IF NOT EXISTS sessions (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sync_tokens (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    last_used TEXT,
+    revoked_at TEXT
 );
 CREATE TABLE IF NOT EXISTS history (
     id INTEGER PRIMARY KEY,
@@ -197,7 +206,7 @@ class WebStore:
         if legacy:
             self.conn.executescript(_COPY_V0)
         if version == 1:
-            self._migrate_v1()
+            self._migrate_v1()  # v2 -> v3 needs no step: SCHEMA adds sync_tokens
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 
@@ -241,6 +250,42 @@ class WebStore:
     def delete_session(self, token_hash: str) -> None:
         self.conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
         self.conn.commit()
+
+    # --- sync tokens (write-only credentials for the CLI's word push) ---------
+
+    def create_sync_token(self, user_id: int, token_hash: str, label: str = "", now: datetime | None = None) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO sync_tokens (user_id, token_hash, label, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, token_hash, label[:60], _ts(now or datetime.now())),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def user_for_sync_token(self, token_hash: str, now: datetime | None = None) -> User | None:
+        r = self.conn.execute(
+            "SELECT u.id, u.name, t.id AS tid FROM sync_tokens t JOIN users u ON u.id = t.user_id "
+            "WHERE t.token_hash = ? AND t.revoked_at IS NULL", (token_hash,),
+        ).fetchone()
+        if r is None:
+            return None
+        self.conn.execute("UPDATE sync_tokens SET last_used = ? WHERE id = ?", (_ts(now or datetime.now()), r["tid"]))
+        self.conn.commit()
+        return User(r["id"], r["name"])
+
+    def sync_tokens(self, user_id: int) -> list[dict]:
+        return [dict(r) for r in self.conn.execute(
+            "SELECT id, label, created_at, last_used, revoked_at FROM sync_tokens WHERE user_id = ? ORDER BY id",
+            (user_id,))]
+
+    def revoke_sync_token(self, user_id: int, token_id: int, now: datetime | None = None) -> bool:
+        cur = self.conn.execute(
+            "UPDATE sync_tokens SET revoked_at = ? WHERE user_id = ? AND id = ? AND revoked_at IS NULL",
+            (_ts(now or datetime.now()), user_id, token_id))
+        self.conn.commit()
+        return cur.rowcount == 1
+
+    def word_count(self, user_id: int) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM user_words WHERE user_id = ?", (user_id,)).fetchone()[0]
 
     # --- history and favorites ----------------------------------------------
 

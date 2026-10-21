@@ -1,0 +1,12 @@
+# Linux, optional, needs root once: a PORT-level rule for the CLI machine, when IP-level is not enough.
+# Run wort as a dedicated unix user (here `wortcli`: `sudo -u wortcli wort ...`); replace the values:
+#   SERVER = the server's LAN IP, PORT = 8456
+# Load with:  sudo nft -f deploy/cli/wort-cli.nft     Remove with:  sudo nft delete table inet wort_cli
+table inet wort_cli {
+  chain out {
+    type filter hook output priority 0; policy accept;
+    meta skuid "wortcli" oif "lo" accept
+    meta skuid "wortcli" ip daddr SERVER tcp dport PORT accept
+    meta skuid "wortcli" counter drop
+  }
+}

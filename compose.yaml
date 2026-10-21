@@ -5,6 +5,8 @@ services:
     container_name: wort-tls
     ports:
       - "${WORT_BIND_IP:?set WORT_BIND_IP to the server LAN IP}:8455:443"
+      # The CLI's word push (POST /sync, write-only token). Same LAN IP only; see DEPLOY.md "CLI network".
+      - "${WORT_BIND_IP}:8456:8456"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       # TLS cert and key live outside the repository (never in git). See DEPLOY.md.
@@ -32,6 +34,33 @@ services:
       - wort-data:/data
       # The dictionary is built by the CLI importer on the host; the web app only reads it.
       - ${HOME}/.local/share/wort/dictionary.db:/data/dictionary.db:ro
+    tmpfs:
+      - /tmp
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # The CLI sync endpoint: one route, no dictionary, no session cookies. Own process so that the CLI's
+  # token can never reach a page; it shares web.db (WAL) with wort-web. Same namespace/hardening as wort-web.
+  wort-sync:
+    build: ./deploy/web
+    image: localhost/wort-web:local
+    container_name: wort-sync
+    network_mode: "service:wort-tls"
+    depends_on:
+      - wort-tls
+    working_dir: /app
+    command: ["uvicorn", "app.sync_app:create_sync_app", "--factory", "--host", "127.0.0.1", "--port", "8001"]
+    environment:
+      WORT_HOME: /data
+      PYTHONPATH: /app/src:/app
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ./:/app:ro
+      - wort-data:/data
     tmpfs:
       - /tmp
     read_only: true
