@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from wort import cli, paths
+from wort import cli, paths, sentence
 from wort.dictionary import grammar as g
 from wort.dictionary.importer import MAX_EXAMPLES, import_file
 from wort.dictionary.lookup import Dictionary
@@ -633,12 +633,57 @@ def test_phrase_with_nothing_known_is_not_found(home, capsys):
     assert _queries() == [("xyzzy qwertz", False)]
 
 
-def test_phrase_longer_than_five_words_is_refused(home, monkeypatch, capsys):
-    _interactive(monkeypatch, "Haus gehen Katze schön Gebäude Haus\nquit\n")
+def test_phrase_longer_than_thirty_words_is_refused(home, monkeypatch, capsys):
+    long_query = " ".join(["Haus"] * 31)
+    _interactive(monkeypatch, f"{long_query}\nquit\n")
     _keys(monkeypatch)  # no picker
     cli.main([])
     assert "Too many words" in _plain(capsys.readouterr().out)
-    assert _queries() == [("Haus gehen Katze schön Gebäude Haus", False)]
+    assert _queries() == [(long_query, False)]
+
+
+def test_sentence_shows_translation_then_word_cards(home, monkeypatch, capsys):
+    monkeypatch.setattr(sentence, "translate", lambda text, source="de", target="en": "the house goes")
+    cli.main(["Haus.", "gehen,", "Haus"])
+    out = capsys.readouterr().out
+    assert "Translation (de→en): the house goes" in out and "One result per word" in out
+    assert "Präsens" in out  # the word cards are still there
+
+
+def test_sentence_without_model_says_so(home, monkeypatch, capsys):
+    def missing(text, source="de", target="en"):
+        raise sentence.TranslationUnavailable(sentence.MISSING_MODEL.format(src=source, dst=target))
+
+    monkeypatch.setattr(sentence, "translate", missing)
+    cli.main(["Haus", "gehen", "Haus"])
+    out = " ".join(capsys.readouterr().out.split())  # the console wraps long lines
+    assert "No sentence translation: " + sentence.MISSING_MODEL.format(src="de", dst="en") in out and "Präsens" in out
+
+
+def test_two_word_phrase_is_not_sent_to_the_translator(home, monkeypatch, capsys):
+    monkeypatch.setattr(sentence, "translate", lambda *a: pytest.fail("must not translate"))
+    cli.main(["gehen", "Haus"])
+    assert "Translation:" not in capsys.readouterr().out
+
+
+def test_english_sentence_is_translated_to_german(home, monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(sentence, "translate", lambda text, source="de", target="en": calls.append((source, target)) or "Was denkst du darüber?")
+    cli.main(["house", "go", "house."])
+    out = capsys.readouterr().out
+    assert calls == [("en", "de")] and "Translation (en→de): Was denkst du darüber?" in out
+    assert "Haus" in out  # the word cards give the German equivalents
+
+
+def test_direction_is_detected_from_the_words(home):
+    d = Dictionary(paths.dictionary_db())
+    assert sentence.detect(d, "Haus gehen Haus") == ("de", "en")
+    assert sentence.detect(d, "house go house") == ("en", "de")
+
+
+def test_sentence_length_is_capped():
+    with pytest.raises(ValueError):
+        sentence.translate("a " * sentence.MAX_CHARS)
 
 
 def test_single_tall_result_opens_as_a_scrollable_card(home, monkeypatch, capsys):
