@@ -100,3 +100,5 @@ tests/fixtures/german_sample.jsonl
 ```
 
 Dictionary data: [Wiktionary](https://en.wiktionary.org) (CC BY-SA) via [kaikki.org / wiktextract](https://kaikki.org).
+
+Session state and next steps: `HANDOFF.md`.

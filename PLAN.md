@@ -44,6 +44,8 @@ Post-MVP (details at the end of the file):
 - Step 6 — Local sentence practice (LanguageTool)
 - Step 7 — Operations: backups, logs, limits
 
+> **Where we stopped and what to do next: see `HANDOFF.md`.**
+
 ## Web UI status (2026-10-21, branch `wip/web-view`)
 
 Built from the design canvas (Wörter, Üben; Texte is a placeholder) on dis-system `dsgnrfhmn/form-props`.
