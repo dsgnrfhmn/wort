@@ -19,7 +19,7 @@ from rich.table import Table
 from rich.text import Text
 
 from wort import paths, picker
-from wort import history_view
+from wort import history_view, sentence
 from wort.header import Header
 from wort.dictionary.grammar import GENDER_ARTICLE
 from wort.dictionary.lookup import Dictionary, Entry
@@ -49,7 +49,7 @@ BANNER = """
 █   █  ███  █      ██
 """.strip("\n")  # solid block letters
 
-COMMANDS = {"tui", "import", "t", "add", "list", "history", "export"}
+COMMANDS = {"tui", "import", "t", "add", "list", "history", "export", "install-translation"}
 FOOTER = "/history . /clear-history . clear . quit"
 PROMPT = "translate> "
 QUIT_WORDS = {"quit"}
@@ -93,7 +93,8 @@ def cmd_import(args: argparse.Namespace) -> None:
         source.unlink(missing_ok=True)
 
 
-MAX_PHRASE_WORDS = 5
+MAX_PHRASE_WORDS = 30  # a sentence fits; each word is one picker entry
+MIN_SENTENCE_WORDS = 3  # shorter phrases are only looked up word by word
 
 
 def resolve(dictionary: Dictionary, query: str) -> tuple[list[Entry], str, str]:
@@ -115,6 +116,8 @@ def find(dictionary: Dictionary, store: Store, query: str) -> tuple[list[Entry],
     """Look `query` up, log it as typed, and return (entries, one-line summary '• query — translation', note)."""
     query = " ".join(query.split())
     entries, meaning, note = resolve(dictionary, query)
+    if note and len(query.split()) >= MIN_SENTENCE_WORDS:
+        note = f"{sentence.describe(dictionary, query)}\n{note}"
     store.log_query(query, bool(entries))
     line = Text("• ")  # the query as typed in the normal foreground, the translation in muted grey
     line.append(query)
@@ -169,7 +172,7 @@ def _interactive() -> bool:
 
 def _screen_lines(text: str) -> int:
     """Terminal lines a typed line occupies (long input wraps)."""
-    return max(1, -(-len(text) // max(console.width, 1)))
+    return sum(max(1, -(-len(part) // max(console.width, 1))) for part in text.split("\n"))
 
 
 def _fit(text: Text) -> Text:
@@ -445,6 +448,15 @@ def cmd_export(args: argparse.Namespace) -> None:
     _print(f"Exported: {args.file}")
 
 
+def cmd_install_translation(args: argparse.Namespace) -> None:
+    try:
+        sentence.install()
+    except (sentence.TranslationUnavailable, RuntimeError) as exc:
+        _print(str(exc))
+        sys.exit(1)
+    _print("Sentence translation models installed (de→en, en→de).")
+
+
 def cmd_tui(args: argparse.Namespace) -> None:
     from wort.tui.app import WortApp
 
@@ -460,6 +472,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("tui", help="full-screen interface (translate, practice, overview)")
     p.set_defaults(func=cmd_tui)
+
+    p = sub.add_parser("install-translation", help="download the offline sentence-translation models de↔en (needs network once)")
+    p.set_defaults(func=cmd_install_translation)
 
     p = sub.add_parser("import", help="import the Wiktionary dictionary (kaikki.org)")
     p.add_argument("--file", help="ready-made JSONL from kaikki.org")

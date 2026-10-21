@@ -18,6 +18,21 @@ Confirmed by maintainer (date)*.
   measured in Step 0 entries below).
 - **Confirmed by maintainer:** 2026-10-04
 
+## D00c — Offline sentence translation in CLI/TUI (Argos Translate)
+
+- **Decision (2026-10-21):** a sentence (3+ words that is not in the dictionary
+  as a whole) shows a whole-sentence translation as text (de→en, or en→de when more words are English-only than German), then one card
+  per word (picker in the session, cards in the TUI). Engine: Argos Translate,
+  offline, two models (de→en, en→de), optional dependency group `mt`, model installed once by hand with
+  `wort install-translation` (~100 MB, the only network use). **CLI/TUI only;
+  not in the web app** (RAM on the shared Pi not measured).
+- **Why:** D0 forbids an LLM API, not local models; the dictionary only has
+  word glosses. No model or no package → a visible "No sentence translation"
+  line, never a silent skip. Input is length-capped (500 chars).
+- **Limits:** phrase word limit 5 → 30; translation quality is not measured yet.
+- **Open:** quality check on real sentences once the model is installed.
+- **Confirmed by maintainer:** 2026-10-21 (variant A, CLI/TUI only)
+
 ## D00 — Scope and note language
 
 - **Decision (2026-10-04):** notes and translations are in **English**

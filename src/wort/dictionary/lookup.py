@@ -9,6 +9,8 @@ from pathlib import Path
 
 from wort.text import damerau_levenshtein, normalize
 
+PUNCTUATION = '.,;:!?()"„“”…«»'
+
 Form = tuple[str, tuple[str, ...]]
 
 
@@ -105,7 +107,7 @@ class Dictionary:
         A word without a match is replaced by its closest typo suggestion; those replacements are
         returned as (typed, corrected) pairs. More than `max_words` words, or one word: nothing.
         """
-        words = query.split()
+        words = [w for w in (w.strip(PUNCTUATION) for w in query.split()) if w]
         if not 2 <= len(words) <= max_words:
             return [], []
         found: dict[int, Entry] = {}
