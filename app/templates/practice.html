@@ -10,7 +10,9 @@
 </section>
 
 <section class="wort-section">
-  {% with type='title-info', title='Aufgabe ' ~ (pos + 1), info=prompt %}{% include "components/table-header/template.html" %}{% endwith %}
+  <div class="wort-messages">
+    {% with variant='prompt', label='Aufgabe ' ~ (pos + 1), text=prompt %}{% include "components/message/template.html" %}{% endwith %}
+  </div>
   {% with message='Prüfung: ' ~ ('KI' if ai_check or item.kind in ('bedeutung', 'erklaere') and ai_on else 'lokal') %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% if hint %}{% with message='Hinweis: ' ~ hint %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
   {% if choices %}
@@ -21,7 +23,10 @@
 
 {% if result %}
 <section class="wort-section" aria-live="polite">
-  {% with type='title-info', title='Deine Antwort', info=answer %}{% include "components/table-header/template.html" %}{% endwith %}
+  <div class="wort-messages">
+    {% with variant='answer', label='Deine Antwort', text=answer %}{% include "components/message/template.html" %}{% endwith %}
+    {% if segments %}{% with variant='prompt', label='Korrigiert', segments=segments %}{% include "components/message/template.html" %}{% endwith %}{% endif %}
+  </div>
   {% set vlabel = {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch'}.get(result.verdict, 'nicht bewertet') %}
   {% set delta_text = (' · Score ' ~ ('%+d' | format(result.delta))) if result.delta is not none else '' %}
   {% set fb = [] %}
@@ -50,7 +55,7 @@
       {% if result.natural and result.natural != result.corrected %}{% with message='Natürlicher: ' ~ result.natural %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
       {% for r in fb %}
       {% with selected=false, cells=[
-        {'type': 'status-label', 'content': r.status},
+        {'type': 'tag', 'content': r.status, 'tag_type': {'richtig': 'success', 'fast richtig': 'warning', 'falsch': 'danger'}.get(r.status, 'neutral'), 'tag_subtype': 'passive'},
         {'type': 'text-active-cell', 'content': r.word},
         {'type': 'text-passive-cell', 'content': r.note},
         {'type': 'text-active-cell', 'content': r.score}

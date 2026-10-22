@@ -48,18 +48,19 @@ Post-MVP (details at the end of the file):
 
 ## Web UI status (2026-10-21, branch `wip/web-view`)
 
-Built from the design canvas (Wörter, Üben; Texte is a placeholder) on dis-system `main` (`bc4e8de`).
+Built from the design canvas (Wörter, Üben; Texte is a placeholder) on dis-system `main` (hash in DECISIONS D00b).
 
 Done: accounts (argon2, sessions, CSRF, throttle, `scripts/adduser.py`), per-user word list with
 score (`app/scoring.py`), Wörter list + detail, Üben (Sätze bilden, Abfrage; local grading), CLI
 import of words and history, disabled AI layer (`app/ai/`, D0r proposed).
 
-Design vs. built (components dis-system lacks; **not** patched locally, per CLAUDE.md):
-- article colors on words (der/die/das), score chip with state colors (plain number shown instead);
-- chat-style task/answer bubbles, inline correction marks (strike/highlight) in feedback (shown as text lines);
-- word tooltip with translations in feedback ("Sätze-Tooltip"; dis-system `tooltip` is attribute-only; also AI-dependent);
+Design vs. built: the gaps from the first audit are closed with the dis-system components of PR #3 (and
+the table-row/disclosure follow-up): article colors, score chip (tag cell), page-head with the stats text,
+tabs as links on the Üben start page, task/answer messages, inline correction marks, collapsible Beispiele /
+Deine Fehler. Still open (not patched locally, per CLAUDE.md):
+- word tooltip with translations in feedback (needs the lexicon per word; the tooltip itself now takes several lines);
 - `pane` takes only string content, no block slot (the detail page uses raw `ds-pane` markup);
-- row checkbox has no keyboard handler (known gap in dis-system `table-row`).
+- row checkbox has no keyboard handler (known gap in dis-system `table-row`) and is hover-only by design.
 - AI call sites wired, all off by default and falling back locally: sentence check, "Fehler erklären",
   task wording (`tasks`), "Doch richtig?" (`recheck`), "Diese Regel üben" (`rule`), Abfrage free answers
   (`answer`). Tested with the fake provider and a mock transport; **never run against the live API from this

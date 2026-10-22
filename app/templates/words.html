@@ -2,10 +2,7 @@
 {% block title %}Wörter · wort{% endblock %}
 {% block content %}
 <section class="wort-section">
-  {% with type='title-info', title='Wörter', info=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche' %}{% include "components/table-header/template.html" %}{% endwith %}
-  <div class="wort-row">
-    {% with priority='secondary', underline='solid', label='Importieren', href='/history' %}{% include "components/text-button/template.html" %}{% endwith %}
-  </div>
+  {% with title='Wörter', actions_left=[{'label': 'Importieren', 'href': '/history', 'underline': 'solid'}], meta_text=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche', actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
   {% with layout='bulk', search=true, search_placeholder='Wort oder Übersetzung', actions=[
     {'label': 'Sätze bilden', 'priority': 'primary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/saetze" data-needs-selection'},
     {'label': 'Abfrage', 'priority': 'secondary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/abfrage" data-needs-selection'},
@@ -29,10 +26,10 @@
     {% for r in rows %}
     {% with selected=(r.id in selected), extra_attrs='data-word-id="' ~ r.id ~ '"', cells=[
       {'type': 'checkbox-cell'},
-      {'type': 'link', 'content': r.label, 'href': '/words/' ~ r.id},
+      {'type': 'link', 'content': r.label, 'href': '/words/' ~ r.id, 'article': r.article},
       {'type': 'text-active-cell', 'content': r.translation},
       {'type': 'date', 'content': r.word.added_at.strftime('%d.%m.%Y')},
-      {'type': 'text-active-cell', 'content': (r.word.score | string) if r.word.score is not none else '–'}
+      {'type': 'tag', 'content': (r.word.score | string) if r.word.score is not none else '–', 'tag_type': r.score_type, 'tag_subtype': 'passive'}
     ] %}{% include "components/table-row/template.html" %}{% endwith %}
     {% endfor %}
   </div>

@@ -110,6 +110,40 @@ def rebuild(item: dict, entry: Entry):
     return ex.prompt, ex.hint, ex.choices, ex, []
 
 
+def correction_segments(answer: str, remarks: list[dict] | None) -> list[dict] | None:
+    """Split the learner's sentence into plain / remove / add runs from the checker's remarks.
+
+    Each remark's fragment must occur exactly once in the answer and the fragments must not overlap;
+    otherwise None (the caller shows the corrected sentence as plain text, never partial marks).
+    """
+    spans = []
+    for r in remarks or []:
+        frag = (r.get("fragment") or "").strip()
+        if not frag or answer.count(frag) != 1:
+            return None
+        start = answer.index(frag)
+        spans.append((start, start + len(frag), r))
+    if not spans:
+        return None
+    spans.sort(key=lambda t: t[0])
+    if any(a[1] > b[0] for a, b in zip(spans, spans[1:])):
+        return None
+    out, at = [], 0
+    for start, end, r in spans:
+        if start > at:
+            out.append({"text": answer[at:start]})
+        reps = [x for x in (r.get("replacements") or []) if x]
+        tip = "\n".join(x for x in (r.get("message") or "", " / ".join(reps)) if x)
+        out.append({"text": answer[start:end], "kind": "remove"})
+        if reps:
+            out.append({"text": " "})
+            out.append({"text": reps[0], "kind": "add", "tooltip": tip})
+        at = end
+    if at < len(answer):
+        out.append({"text": answer[at:]})
+    return out
+
+
 def grade_sentence(sentence: str, required: list[str], checker) -> Graded:
     r: CheckResult = check_sentence(sentence, required, checker)
     remarks = [{"fragment": x.fragment, "message": x.message, "replacements": x.replacements} for x in r.remarks]
@@ -205,8 +239,10 @@ def register(app, ctx) -> None:
         return sess
 
     @app.get("/ueben", response_class=HTMLResponse)
-    def start(request: Request, user: User = Depends(current_user)):
-        return ctx.render(request, "practice_start.html", user=user, page="practice", count=len(store.words(user.id)))
+    def start(request: Request, modus: str = "saetze", user: User = Depends(current_user)):
+        modus = modus if modus in CREATABLE else "saetze"
+        return ctx.render(request, "practice_start.html", user=user, page="practice", modus=modus, kinds=KINDS,
+                          count=len(store.words(user.id)))
 
     @app.post("/ueben/{kind}")
     def create(request: Request, kind: str, csrf: str = Form(...), ids: list[int] = Form(default=[]),
@@ -256,6 +292,7 @@ def register(app, ctx) -> None:
             can_recheck=ai.uses("recheck") and item["kind"] == "sentence" and not item.get("rechecked"),
             can_rule=ai.uses("rule") and item["kind"] == "sentence" and bool((item.get("result") or {}).get("rule")),
             translations=[t for t in (item.get("tr_uk"), item.get("tr_en")) if t],
+            segments=correction_segments(item.get("answer", ""), (item.get("result") or {}).get("remarks")),
             explanation=item.get("explanation"), ai_note=item.get("ai_note", ""), answer=item.get("answer", ""),
             tags=[store.word(user.id, i["word_id"]).lemma for i in items if store.word(user.id, i["word_id"])][:12],
         )

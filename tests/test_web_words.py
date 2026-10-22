@@ -173,3 +173,32 @@ def test_empty_word_list_points_to_the_history(env):
     app, *_ = env
     page = client_for(app, "anna").get("/").text
     assert "Aus Verlauf hinzufügen" in page and 'href="/history"' in page
+
+
+def test_list_uses_article_color_and_score_chip(env):
+    app, store, a, _ = env
+    store.add_word(a, "Haus", "noun", now=NOW)
+    wid = store.words(a)[0].id
+    store.record_attempt(a, wid, "form", "article", "p", "das", "correct", now=NOW)
+    html = client_for(app, "anna").get("/").text
+    assert 'data-article="das"' in html
+    from app.scoring import level
+    from app import words
+    chip = words.SCORE_TAG[level(store.words(a)[0].score)]
+    assert f'class="ds-tag" data-type="{chip}" data-subtype="passive">' in html
+    assert "ds-page-head" in html and "1 Wörter · 1 diese Woche" in html
+
+
+def test_score_tag_types_follow_the_level():
+    from app import words
+    from app.scoring import level
+    assert {level(s): words.SCORE_TAG[level(s)] for s in (None, 0, 5, 9)} == {
+        "new": "neutral", "weak": "danger", "medium": "warning", "strong": "success"}
+
+
+def test_detail_examples_and_mistakes_are_disclosures(env):
+    app, store, a, _ = env
+    store.add_word(a, "Haus", "noun", now=NOW)
+    wid = store.words(a)[0].id
+    html = client_for(app, "anna").get(f"/words/{wid}").text
+    assert html.count('<details class="ds-disclosure"') == 2 and "Noch keine Fehler." in html

@@ -126,3 +126,37 @@ def test_csrf_and_input_limits(env):
     r = c.post(f"/ueben/s/{sid}/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": "x" * 5000})
     assert r.status_code == 303  # capped, not an error
     assert len(store.conn.execute("SELECT answer FROM attempts").fetchall()) <= 1
+
+
+def test_correction_segments_marks_each_unique_fragment():
+    segs = practice.correction_segments(
+        "Ich gehe gestern in die Schule.",
+        [{"fragment": "gehe", "message": "Präteritum", "replacements": ["ging"]}])
+    assert [s.get("kind") for s in segs] == [None, "remove", None, "add", None]
+    assert segs[3]["text"] == "ging" and segs[3]["tooltip"] == "Präteritum\nging"
+
+
+@pytest.mark.parametrize("answer,remarks", [
+    ("Ich gehe gehe.", [{"fragment": "gehe", "message": "m", "replacements": ["ging"]}]),  # twice
+    ("Ich gehe.", [{"fragment": "xyz", "message": "m", "replacements": []}]),  # absent
+    ("Ich gehe.", [{"fragment": "", "message": "m", "replacements": []}]),
+    ("Ich gehe heim.", [{"fragment": "gehe heim", "message": "m", "replacements": []},
+                        {"fragment": "heim", "message": "m", "replacements": []}]),  # overlap
+    ("Ich gehe.", []), ("Ich gehe.", None)])
+def test_correction_segments_falls_back_to_none(answer, remarks):
+    assert practice.correction_segments(answer, remarks) is None
+
+
+def test_start_page_tabs_are_links_and_modus_is_whitelisted(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    html = c.get("/ueben?modus=abfrage").text
+    assert 'href="/ueben?modus=saetze"' in html and 'action="/ueben/abfrage"' in html
+    html = c.get("/ueben?modus=evil\"><x").text
+    assert 'action="/ueben/saetze"' in html and "evil" not in html
+
+
+def test_start_tabs_do_not_show_the_word_count(env):
+    app, store, a, _ = env
+    html = login(app, "anna").get("/ueben").text
+    assert "ds-header-tab__count" not in html

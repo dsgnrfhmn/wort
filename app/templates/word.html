@@ -12,8 +12,8 @@
     <div class="ds-pane__body"><div class="ds-pane__scroll">
       {% for r in sidebar %}
       <div class="ds-table-row" data-selected="{{ 'true' if r.id == v.id else 'false' }}">
-        {% with type='link', content=r.label, href='/words/' ~ r.id %}{% include "components/table-cell/template.html" %}{% endwith %}
-        {% with type='text-active-cell', content=(r.word.score | string) if r.word.score is not none else '–' %}{% include "components/table-cell/template.html" %}{% endwith %}
+        {% with type='link', content=r.label, href='/words/' ~ r.id, article=r.article %}{% include "components/table-cell/template.html" %}{% endwith %}
+        {% with type='tag', content=(r.word.score | string) if r.word.score is not none else '–', tag_type=r.score_type, tag_subtype='passive' %}{% include "components/table-cell/template.html" %}{% endwith %}
       </div>
       {% endfor %}
     </div></div>
@@ -59,22 +59,13 @@
       </section>
       {% endif %}
 
+      {% set ex_items = [] %}
+      {% for de, en in examples %}{% set _ = ex_items.append(de ~ ' — ' ~ en if en else de) %}{% endfor %}
+      {% set err_items = [] %}
+      {% for a in mistakes %}{% set _ = err_items.append(a.prompt ~ ' → ' ~ a.answer ~ ' · ' ~ german_date(a.created_at)) %}{% endfor %}
       <section class="wort-section">
-        {% with type='title-info', title='Beispiele', info=(examples | length) ~ ' von ' ~ (v.examples | length) %}{% include "components/table-header/template.html" %}{% endwith %}
-        {% for de, en in examples %}
-          {% with message=de ~ ' — ' ~ en if en else de %}{% include "components/empty-state/template.html" %}{% endwith %}
-        {% else %}
-          {% with message='Keine Beispielsätze im Wörterbuch.' %}{% include "components/empty-state/template.html" %}{% endwith %}
-        {% endfor %}
-      </section>
-
-      <section class="wort-section">
-        {% with type='title-info', title='Deine Fehler', info='✓' ~ right ~ ' ✗' ~ wrong %}{% include "components/table-header/template.html" %}{% endwith %}
-        {% for a in mistakes %}
-          {% with message=a.prompt ~ ' → ' ~ a.answer ~ ' · ' ~ german_date(a.created_at) %}{% include "components/empty-state/template.html" %}{% endwith %}
-        {% else %}
-          {% with message='Noch keine Fehler.' %}{% include "components/empty-state/template.html" %}{% endwith %}
-        {% endfor %}
+        {% with title='Beispiele', caption=(examples | length) ~ ' von ' ~ (v.examples | length), items=ex_items if ex_items else ['Keine Beispielsätze im Wörterbuch.'], open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
+        {% with title='Deine Fehler', caption='✓' ~ right ~ ' ✗' ~ wrong, items=err_items if err_items else ['Noch keine Fehler.'], open=err_items | length > 0 %}{% include "components/disclosure/template.html" %}{% endwith %}
       </section>
 
       <section class="wort-section">

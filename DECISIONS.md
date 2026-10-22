@@ -140,7 +140,12 @@ Confirmed by maintainer (date)*.
     dis-system PR #2 (`form-props`), merged to its `main` on 2026-10-21.
     Gaps still without a component: file input (native control used),
     textarea-free sentence result block (empty-state used for text lines).
-- **dis-system commit in use:** `bc4e8de` (2026-10-22: `main` after the merge of dis-system PR #2,
+- **dis-system commit in use (2026-10-22, TEMPORARY):** `c607675`, the head of dis-system branch
+  `dsgnrfhmn/table-row-cell-props` (on top of `main` @ `da34370`, which has PR #3: tag cell, `article`, page-head
+  props, header-tab `href`, `inline-mark`, `message`, `disclosure`, multi-line tooltip). The branch adds table-row
+  forwarding of `tag_type`/`tag_subtype`/`article`, `disclosure` `items`, and dark-theme article link colors; wort
+  needs all three. **Bump the submodule to `main` once that PR is merged** (the exception to "follows `main`" ends then).
+  Previous: `bc4e8de` (2026-10-22: `main` after the merge of dis-system PR #2,
   `dsgnrfhmn/form-props`). The form props (input name/id/label/disabled/required/autocomplete/password,
   text-button submit/href, table-cell and table-header-actions submit, table-row extra_attrs) are now in `main`;
   `d8811df` (the branch head wort used until now) is its ancestor, so no component file changed. Earlier hashes:

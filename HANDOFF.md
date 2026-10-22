@@ -12,8 +12,8 @@ run against the live Anthropic API, the OS-level CLI network rule, nginx or comp
 tools in the dev container).
 
 - Branch `wip/web-view` (see `git log`), PR **#5** into `wip/dev-testing` (no `main` branch exists in the repo).
-- 394 tests pass: `PYTHONPATH=.:src uv run pytest` (web deps: `uv sync --group web`; AI tests need `--group ai`, they skip otherwise).
-- dis-system submodule follows dis-system `main` @ `bc4e8de` (the form-props PR #2 is merged; recorded in `DECISIONS.md` D00b).
+- 411 tests pass: `PYTHONPATH=.:src uv run pytest` (web deps: `uv sync --group web`; AI tests need `--group ai`, they skip otherwise).
+- dis-system submodule is **temporarily** on branch `dsgnrfhmn/table-row-cell-props` @ `c607675` (needs its PR merged, then bump to `main`; see `DECISIONS.md` D00b).
 
 ## What is built
 
@@ -45,19 +45,16 @@ tools in the dev container).
 4. Quality of AI verdicts on real mistakes: `spikes/ai_eval.md` is a spec, not run.
 5. Both-theme check was done on Wörter/Üben screenshots only, not on every state.
 
-## Design audit (2026-10-22): still different from the canvas
+## Design audit (2026-10-22): what changed
 
-Fixed after the first review: the word list was unreachable from the history (the old "Add" toggled a favorite
-Üben never used). Now `/history` has "Lernen" (adds the looked-up word to the learning list), an import with words
-lands on Wörter, and the Feedback block is a pane with per-word rows (status, word, comment, Score ±).
-Still different, each blocked by a missing dis-system component or an open decision (do not patch locally):
-- Wörter: no `page-head` with "Synchronisieren" and the stats text (its template has fixed buttons: needs props);
-  score is plain text (no chip); word colors by article; row checkboxes are hover-only by dis-system design.
-- Üben: no header-tabs between Sätze bilden / Abfrage (the tab component is a button, not a link); task/answer
-  bubbles, inline correction marks (strike/underline) and word tooltips don't exist; "falsch" renders in the
-  status-label's green (needs a tag cell type or colored status).
-- Wort-Detail: Beispiele / Deine Fehler are plain sections, not collapsible; no "saved" icon column.
-- Texte: placeholder only (post-MVP).
+Done with the new dis-system components (PR #3 and the follow-up): Wörter has `page-head` with the stats text, word colors by
+article and a score chip (tag cell by `scoring.level`); Üben start has tabs as links (`?modus=`); the task and the
+answer are `message` blocks and a corrected sentence shows `inline-mark` runs (built from the checker's remarks by
+`practice.correction_segments`, plain text when the fragments are ambiguous); "falsch/richtig" are tags; Beispiele and
+Deine Fehler are `disclosure` sections.
+Still different from the canvas: no word tooltips with translations in the feedback, no "saved" icon column, row checkboxes
+are hover-only (dis-system design), Texte is a placeholder (post-MVP). The dark theme greys row links until hover in
+dis-system; article links are exempt from that rule.
 
 ## Next steps (suggested order)
 
@@ -69,7 +66,7 @@ Still different, each blocked by a missing dis-system component or an open decis
 
 **Mine, one piece at a time:**
 1. **Lookup page in the web (PLAN Step 2)** — missing today; words only arrive via CLI import. Search, forms, own translation on a miss, "Learn this word".
-2. **dis-system components for the design gaps** (on a dis-system branch, never `main`): article colors, score chip, task/answer bubbles, inline correction marks, word tooltip.
+2. Word tooltips with translations in the feedback (the tooltip now supports several lines).
 3. **Step 1 evidence:** systemd unit with the sandbox, D6 proofs (other services' files unreadable, no outbound).
 4. **Step 7:** nightly `.backup` of the SQLite DB, structured logs, admin usage view (AI calls per user per day).
 5. **Texte (post-MVP):** Tesseract spike (D3) first, then uploads with the CLAUDE.md rules, spaCy tooltips.

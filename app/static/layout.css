@@ -17,3 +17,6 @@ body { margin: 0; background-color: var(--ds-color-bg-surface-pressed); }
 .wort-answer { max-width: none; }
 .wort-history { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content max-content max-content; }
 .wort-feedback, .wort-feedback .ds-pane__body { flex: none; }
+
+.wort-tabs { display: flex; width: 100%; }
+.wort-messages { display: grid; gap: var(--ds-spacing-5); }

@@ -13,12 +13,14 @@ from wort.dictionary.lookup import Dictionary, Entry
 from wort import sanitize
 
 from app.db import User, UserWord, WebStore
+from app.scoring import level
 
 PAGE = 20
 MAX_LIMIT = 1000
 MAX_OWN = 200
 SORTS = ("added", "word", "score")
 POS_LABEL = {"noun": "Nomen", "verb": "Verb", "adj": "Adjektiv", "adv": "Adverb"}
+SCORE_TAG = {"new": "neutral", "weak": "danger", "medium": "warning", "strong": "success"}
 GENDER_LABEL = {"m": "maskulin", "f": "feminin", "n": "neutral"}
 MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
           "November", "Dezember"]
@@ -40,6 +42,19 @@ class WordView:
     @property
     def id(self) -> int:
         return self.word.id
+
+    @property
+    def article(self) -> str:
+        """der / die / das for a noun with a known gender, else empty (drives the word color)."""
+        e = self.entry
+        if e and e.pos == "noun" and e.gender in g.ARTICLES:
+            return g.ARTICLES[e.gender]["nominative"]
+        return ""
+
+    @property
+    def score_type(self) -> str:
+        """Tag type of the score chip, by scoring.level()."""
+        return SCORE_TAG[level(self.word.score)]
 
     @property
     def translation(self) -> str:
