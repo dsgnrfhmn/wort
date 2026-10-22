@@ -24,6 +24,7 @@ from app.ai.service import AiService, AiUnavailable
 from app.checking import CheckResult, check_sentence
 from wort.text import normalize
 from app.db import User, UserWord, WebStore
+from app.words import v_label
 
 KINDS = {"saetze": "Sätze bilden", "abfrage": "Abfrage", "regel": "Regel üben"}
 CREATABLE = ("saetze", "abfrage")  # "regel" sessions only come from "Diese Regel üben"
@@ -248,7 +249,7 @@ def register(app, ctx) -> None:
         prompt, hint, choices, _, required = rebuild(item, entry)
         return ctx.render(
             request, "practice.html", user=user, page="practice", sess=sess, item=item, pos=pos,
-            total=len(items), prompt=prompt, hint=hint, choices=choices, word=word, kinds=KINDS,
+            total=len(items), prompt=prompt, hint=hint, choices=choices, word=word, word_label=v_label(entry), kinds=KINDS,
             result=item.get("result"), facts=ctx.facts(entry), ai_on=ai.available, ai_left=ai.remaining(user.id),
             ai_check=ai.uses("check") and item["kind"] == "sentence",
             can_explain=ai.uses("explain") and item["kind"] == "sentence",

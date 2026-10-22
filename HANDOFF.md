@@ -45,6 +45,20 @@ tools in the dev container).
 4. Quality of AI verdicts on real mistakes: `spikes/ai_eval.md` is a spec, not run.
 5. Both-theme check was done on Wörter/Üben screenshots only, not on every state.
 
+## Design audit (2026-10-22): still different from the canvas
+
+Fixed after the first review: the word list was unreachable from the history (the old "Add" toggled a favorite
+Üben never used). Now `/history` has "Lernen" (adds the looked-up word to the learning list), an import with words
+lands on Wörter, and the Feedback block is a pane with per-word rows (status, word, comment, Score ±).
+Still different, each blocked by a missing dis-system component or an open decision (do not patch locally):
+- Wörter: no `page-head` with "Synchronisieren" and the stats text (its template has fixed buttons: needs props);
+  score is plain text (no chip); word colors by article; row checkboxes are hover-only by dis-system design.
+- Üben: no header-tabs between Sätze bilden / Abfrage (the tab component is a button, not a link); task/answer
+  bubbles, inline correction marks (strike/underline) and word tooltips don't exist; "falsch" renders in the
+  status-label's green (needs a tag cell type or colored status).
+- Wort-Detail: Beispiele / Deine Fehler are plain sections, not collapsible; no "saved" icon column.
+- Texte: placeholder only (post-MVP).
+
 ## Next steps (suggested order)
 
 **Yours (blockers for merging / enabling):**
