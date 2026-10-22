@@ -13,7 +13,7 @@ tools in the dev container).
 
 - Branch `wip/web-view` (see `git log`), PR **#5** into `wip/dev-testing` (no `main` branch exists in the repo).
 - 411 tests pass: `PYTHONPATH=.:src uv run pytest` (web deps: `uv sync --group web`; AI tests need `--group ai`, they skip otherwise).
-- dis-system submodule is **temporarily** on branch `dsgnrfhmn/table-row-cell-props` @ `c607675` (needs its PR merged, then bump to `main`; see `DECISIONS.md` D00b).
+- dis-system submodule follows dis-system `main` @ `a2404a4` (PRs #3 and #4 merged; recorded in `DECISIONS.md` D00b).
 
 ## What is built
 
