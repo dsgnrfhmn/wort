@@ -47,6 +47,12 @@ class WordView:
         return " · ".join(p for p in parts if p) or "–"
 
 
+def v_label(entry: Entry) -> str:
+    if entry.pos == "noun" and entry.gender in g.ARTICLES:
+        return f"{g.ARTICLES[entry.gender]['nominative']} {entry.lemma}"
+    return entry.lemma
+
+
 def view(word: UserWord, dictionary: Dictionary | None) -> WordView:
     entry = dictionary.find_lemma(word.lemma, word.pos or None) if dictionary else None
     label = word.lemma
@@ -74,6 +80,12 @@ def preset_ids(words: list[UserWord], preset: str) -> set[int]:
     if preset == "latest":
         return {w.id for w in order(words, "added", True)[:20]}
     return set()
+
+
+def resolve_query(dictionary: Dictionary, query: str) -> Entry | None:
+    """The dictionary entry a history query stands for (a German word first, else an English one)."""
+    german, english = dictionary.lookup(query, limit=3)
+    return (german or english or [None])[0]
 
 
 def register(app, ctx) -> None:
@@ -132,6 +144,21 @@ def register(app, ctx) -> None:
             mistakes=mistakes, searches=queries[0].count if queries else 0,
             sidebar=[view(w, dic) for w in recent], german_date=german_date, examples=v.examples[:10],
         )
+
+    @app.post("/words/learn")
+    def learn(request: Request, csrf: str = Form(...), query: str = Form(...), user: User = Depends(current_user)):
+        """Add the word behind a history query to the learning list (what Üben uses)."""
+        ctx.verify_csrf(request, csrf)
+        query = sanitize.text(query, 200)
+        dic = dictionary_or_none()
+        if dic is None:
+            return ctx.redirect("/history", "Kein Wörterbuch gefunden: importiere zuerst das Wörterbuch.")
+        entry = resolve_query(dic, query) if query else None
+        if entry is None:
+            return ctx.redirect("/history", "Dieses Wort steht nicht im Wörterbuch.")
+        added = store.add_word(user.id, entry.lemma, entry.pos, added_from="lookup")
+        label = v_label(entry)
+        return ctx.redirect("/history", f"„{label}“ ist jetzt in deinen Wörtern." if added else f"„{label}“ ist schon in deinen Wörtern.")
 
     @app.post("/words/{word_id}/translation")
     def set_translation(request: Request, word_id: int, csrf: str = Form(...), text: str = Form(""),

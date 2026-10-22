@@ -1,46 +1,59 @@
 {% extends "base.html" %}
 {% set page = 'history' %}
-{% block title %}History · wort{% endblock %}
+{% block title %}Verlauf · wort{% endblock %}
 {% block content %}
 <section class="wort-section">
-  {% with type='title-info', title='Import', info='wort export file' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with type='title-info', title='Importieren', info='Export-Datei von „wort export“' %}{% include "components/table-header/template.html" %}{% endwith %}
   <form id="import-form" class="wort-row" method="post" action="/import" enctype="multipart/form-data">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input type="file" name="file" accept="application/json,.json" aria-label="wort export file" required>
-    {% with priority='primary', underline='dotted', label='Import', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+    <input type="file" name="file" accept="application/json,.json" aria-label="Export-Datei" required>
+    {% with priority='primary', underline='dotted', label='Importieren', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
   </form>
 </section>
 
 <section class="wort-section">
-  {% with type='title-info', title='History', info=(rows | length) ~ ' words' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with type='title-info', title='Verlauf', info=total ~ ' Wörter nachgeschlagen' %}{% include "components/table-header/template.html" %}{% endwith %}
+  <div class="wort-row">
+    {% with priority='secondary', underline='solid', label='Zu den Wörtern', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
+  {% if not has_dictionary %}
+  {% with message='Das Wörterbuch ist nicht importiert: „Lernen“ ist erst danach möglich (wort import --file …).' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% endif %}
   {% if rows %}
-  <div class="wort-table" role="table" aria-label="History" style="grid-template-columns: max-content 1fr max-content max-content max-content;">
-    {% with label='Favorite' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Word' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Found' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Count' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Last' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% for r in rows %}
+  <div class="wort-table wort-history" role="table" aria-label="Verlauf">
+    {% with label='Wort' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Übersetzung' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Anzahl' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Zuletzt' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label='Lernen' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% for item in rows %}
+    {% set r = item.row %}
     {% with selected=false, cells=[
-      {'type': '1-action', 'content': 'Remove' if r.favorite else 'Add', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="fav-' ~ loop.index ~ '"'},
       {'type': 'text-active-cell', 'content': r.query},
-      {'type': 'status-label', 'content': 'found' if r.found else 'not found'},
-      {'type': 'text-passive-cell', 'content': r.count},
-      {'type': 'date', 'content': r.last_at.strftime('%Y-%m-%d %H:%M')}
+      {'type': 'text-active-cell', 'content': ((item.entry.glosses[:2] | join(', ')) if item.entry else ('nicht gefunden' if not r.found else '–'))},
+      {'type': 'text-passive-cell', 'content': r.count | string},
+      {'type': 'date', 'content': r.last_at.strftime('%d.%m.%Y %H:%M')},
+      ({'type': 'text-passive-cell', 'content': 'in Wörtern'} if item.learned else
+       {'type': '1-action', 'content': 'Lernen', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="learn-' ~ loop.index ~ '"'} if item.entry else
+       {'type': 'text-passive-cell', 'content': '–'})
     ] %}{% include "components/table-row/template.html" %}{% endwith %}
     {% endfor %}
   </div>
   <div class="wort-forms">
-    {% for r in rows %}
-    <form id="fav-{{ loop.index }}" method="post" action="/favorites/toggle">
+    {% for item in rows if item.entry and not item.learned %}
+    <form id="learn-{{ loop.index }}" method="post" action="/words/learn">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="lemma" value="{{ r.query }}">
-      <input type="hidden" name="next" value="/history">
+      <input type="hidden" name="query" value="{{ item.row.query }}">
     </form>
     {% endfor %}
   </div>
+  {% if total > rows | length %}
+  <div class="wort-row">
+    {% with priority='secondary', underline='dotted', label='Mehr laden', href='/history?limit=' ~ (limit + 100) %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
+  {% endif %}
   {% else %}
-  {% with message='No history yet. Run `wort export` and import the file above.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with message='Noch kein Verlauf. Importiere die Export-Datei von „wort export“.' %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% endif %}
 </section>
 {% endblock %}

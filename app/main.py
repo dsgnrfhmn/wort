@@ -145,8 +145,21 @@ def create_app(
     practice.register(app, shared)
 
     @app.get("/history", response_class=HTMLResponse)
-    def history(request: Request, user: User = Depends(current_user)):
-        return render(request, "history.html", rows=store.history(user.id), user=user)
+    def history(request: Request, limit: int = 100, user: User = Depends(current_user)):
+        limit = max(1, min(limit, 1000))
+        all_rows = store.history(user.id)
+        try:
+            dic = Dictionary(dictionary_path)
+        except FileNotFoundError:
+            dic = None
+        owned = {(w.lemma.casefold(), w.pos) for w in store.words(user.id)}
+        rows = []
+        for r in all_rows[:limit]:
+            entry = words.resolve_query(dic, r.query) if dic and r.found else None
+            rows.append({"row": r, "entry": entry,
+                         "learned": bool(entry) and (entry.lemma.casefold(), entry.pos) in owned})
+        return render(request, "history.html", rows=rows, total=len(all_rows), limit=limit, user=user,
+                      has_dictionary=dic is not None)
 
     @app.post("/import")
     async def import_history(request: Request, csrf: str = Form(...), file: UploadFile = File(...),
@@ -160,7 +173,9 @@ def create_app(
                           message=f"Import failed: {sanitize.text(str(e), 150)}", message_status="error")
         msg = (f"Imported {result.queries_new} new of {result.queries_total} queries, "
                f"{result.words_new} new of {result.words_total} words.")
-        return redirect("/history", msg)
+        if result.words_total == 0:
+            return redirect("/history", msg + " Der Export enthält nur den Verlauf: füge Wörter hier mit „Lernen“ hinzu.")
+        return redirect("/", msg)
 
     @app.post("/favorites/toggle")
     def toggle(request: Request, csrf: str = Form(...), lemma: str = Form(...), pos: str = Form(""), next: str = Form("/history"),

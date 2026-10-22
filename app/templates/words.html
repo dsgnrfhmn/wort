@@ -43,7 +43,10 @@
   </div>
   {% endif %}
   {% else %}
-  {% with message='Noch keine Wörter. Exportiere sie mit `wort export` und importiere die Datei über „Importieren“.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with message='Noch keine Wörter. Füge Wörter aus deinem Verlauf hinzu („Lernen“) oder importiere eine Export-Datei.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  <div class="wort-row">
+    {% with priority='primary', underline='solid', label='Aus Verlauf hinzufügen', href='/history' %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
   {% endif %}
 </section>
 {% endblock %}
