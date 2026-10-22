@@ -7,3 +7,16 @@ body { margin: 0; background-color: var(--ds-color-bg-surface-pressed); }
 .wort-table { display: grid; width: 100%; overflow-x: auto; background-color: var(--ds-color-bg-surface); }
 .wort-table .ds-table-row { display: contents; }
 .wort-forms { display: none; }
+.wort-form { display: grid; gap: var(--ds-spacing-3); max-width: calc(var(--ds-spacing-9) * 6); }
+.wort-words { grid-template-columns: max-content minmax(0, 1.2fr) minmax(0, 2fr) max-content max-content; }
+.wort-declension { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wort-split { height: calc(100vh - var(--ds-spacing-9) * 4); }
+.wort-detail { display: grid; gap: var(--ds-spacing-7); align-content: start; }
+.wort-logout { max-width: calc(var(--ds-spacing-9) * 24); margin: 0 auto; padding: 0 var(--ds-spacing-5) var(--ds-spacing-7); display: flex; justify-content: flex-end; }
+.wort-results { grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); }
+.wort-answer { max-width: none; }
+.wort-history { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content max-content max-content; }
+.wort-feedback, .wort-feedback .ds-pane__body { flex: none; }
+
+.wort-tabs { display: flex; width: 100%; }
+.wort-messages { display: grid; gap: var(--ds-spacing-5); }

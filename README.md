@@ -39,7 +39,7 @@ Exist in the code (`wort tui`, `wort add`, `wort list`) but are not part of the 
   - Translation, article, correct case/form
   - Grammar multiple choice
   - Sentence writing with local LanguageTool check
-- **Web view** (FastAPI + Jinja2, SQLite, vanilla JS; UI only from `dis-system`)
+- **Web view** (FastAPI + Jinja2, SQLite, vanilla JS; UI only from `dis-system`): login, word list with scores, practice (sentences, quiz). Users are created with `scripts/adduser.py`. AI feedback (Haiku, backend only) is off until a key is installed, see `DECISIONS.md` D0r and `DEPLOY.md` §6. All input and output passes `src/wort/sanitize.py`
   - Progress management: word list, scores, review queue
   - Reading texts: add a text, every word clickable (lemma, translation, grammar note, "learn this word")
   - Text from photo via local OCR (Tesseract)
@@ -53,11 +53,11 @@ Requires Python ≥ 3.11 and [uv](https://docs.astral.sh/uv/).
 ```bash
 git clone <repo> && cd wort
 uv sync
-uv run wort import --download     # once: ~1 GB JSONL from kaikki.org → dictionary.db
+python scripts/fetch_data.py dictionary downloads/   # once, separate from the CLI: ~1 GB JSONL from kaikki.org
+uv run wort import --file downloads/kaikki.org-dictionary-German.jsonl   # → dictionary.db
 uv run wort gehen                 # look one word up
 ```
 
-Already have the dump: `uv run wort import --file kaikki.org-dictionary-German.jsonl`.
 Global install: `uv tool install .`
 
 ## Commands
@@ -69,7 +69,8 @@ Global install: `uv tool install .`
 | `wort t WORD` | explicit lookup for words that are also commands (`list`, `add`, …) |
 | `wort history [--limit N]` | queries you typed |
 | `wort export [FILE]` | history + practice words as JSON |
-| `wort import [--file F] [--download] [--keep]` | (re)import the dictionary |
+| `wort import --file F` | (re)import the dictionary from a kaikki.org JSONL (the CLI never downloads) |
+| `wort sync` | push words and history to the web app (the only network use; see DEPLOY.md §3b, §7) |
 | `wort add WORD [--pos verb]` | *(prototype)* add to practice list |
 | `wort list` | *(prototype)* mastery of practice words |
 | `wort tui` | *(prototype)* full-screen interface |
@@ -77,7 +78,7 @@ Global install: `uv tool install .`
 ## Data and privacy
 
 - Data lives in `~/.local/share/wort/` (or `$XDG_DATA_HOME/wort`, or `$WORT_HOME`): `dictionary.db` (read-only), `user.db` (history, words, SRS state).
-- The only network use: `wort import --download` fetches the dump from `kaikki.org`. No API keys, no cloud services.
+- The only network use is `wort sync` (one HTTPS endpoint, write-only token); downloads live in `scripts/fetch_data.py`. No API keys, no cloud services. Run it through `scripts/wort-offline` to cut the network at the OS level.
 - Optional LanguageTool client accepts loopback addresses only (`WORT_LT_URL`; remote needs `WORT_LT_ALLOW_REMOTE=1`).
 
 ## Development
@@ -99,3 +100,5 @@ tests/fixtures/german_sample.jsonl
 ```
 
 Dictionary data: [Wiktionary](https://en.wiktionary.org) (CC BY-SA) via [kaikki.org / wiktextract](https://kaikki.org).
+
+Session state and next steps: `HANDOFF.md`.

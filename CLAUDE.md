@@ -4,6 +4,12 @@
 > English; MVP = Steps 0-3 and 5 of `PLAN.md`. Sections marked
 > **[post-MVP]** describe features that are planned but not in the MVP.
 
+> **Confirmed 2026-10-21 (maintainer, DECISIONS D0r):** the **web app's backend** may call the
+> Anthropic API (Haiku) for sentence feedback and the other exercise blocks, from the server only. The
+> CLI/TUI and the sync service stay fully offline. Everything else below stays as written unless
+> marked. The API is still off until the key is installed (`WORT_AI_ENABLED`), and Sonnet is used only if
+> the `spikes/ai_eval.md` test shows Haiku misses errors.
+
 `wort` is the project, package and command name.
 (The current code in this repo is the `wort` CLI/TUI prototype. It
 **stays** as a fully local tool; the web app (`app/`) is added beside it and
@@ -25,8 +31,8 @@ MVP features:
   line, which takes the word class color (noun: its article's color, verb:
   the terminal's own text color, i.e. black on a light theme, adj/adv: dark purple). Every query is logged automatically to the user DB (query history,
   separate from the practice word list). History and words reach the web app
-  by **export/import** (`wort export` → JSON → import on the word list page);
-  there is no network path from the CLI to the server. The TUI stays (`wort tui`).
+  by **export/import** (`wort export` → JSON → import on the word list page) or by
+  `wort sync` (the CLI's only network use, see Security boundaries). The TUI stays (`wort tui`).
 - **Lookup**: type any word → translation, grammar (declension for nouns /
   adjectives, conjugation incl. Präteritum, Perfekt, Futur I for verbs),
   example sentences from the dataset.
@@ -43,9 +49,10 @@ Post-MVP:
 - **[post-MVP] Sentence practice**: write own sentence → required-form check +
   LanguageTool feedback.
 
-## Architecture: local only
+## Architecture: local first
 
-Everything runs on the server. No LLM API, no outbound network.
+Everything runs on the server. Translation, forms, OCR and scoring are local. The only outbound
+call is the web backend's AI request (below); the CLI/TUI never use the network except `wort sync`.
 
 | Concern | Where it runs |
 |---|---|
@@ -54,7 +61,7 @@ Everything runs on the server. No LLM API, no outbound network.
 | Inflection tables, examples | local — Wiktionary-derived data in SQLite |
 | Translation | local dictionary (English glosses); on miss → "no translation" state + user's own translation (per user, `source = user`) |
 | Deterministic exercises (form/case drills, flashcards, article, multiple choice) | local grading |
-| Free sentence writing, error explanation **[post-MVP]** | local — LanguageTool server on `127.0.0.1` (variant decided in its spike) + required-form check from the lexicon |
+| Free sentence writing, error explanation | web backend → Anthropic API (Haiku), per exercise block, off until the key is set; fallback: local LanguageTool on `127.0.0.1` **[post-MVP]** + required-form check from the lexicon |
 
 Stack: Python (FastAPI + Jinja2), SQLite, vanilla JS/HTML. No frontend
 framework.
@@ -88,25 +95,39 @@ explanations.
   as a sandboxed systemd service (`ProtectHome`, `ProtectSystem=strict`,
   `NoNewPrivileges`, `PrivateTmp`, writable path limited to its data dir).
   It must not be able to read the other services' files. Verify, don't assume (see PLAN Step 1).
-- **No outbound network**: the service unit sets
-  `IPAddressDeny=any` with `IPAddressAllow=` only for localhost and the
-  LAN/VPN subnets, and `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`.
-  *(Open: the maintainer may relax this to a simpler rule; see `PLAN.md`
-  open questions.)* **[post-MVP]** LanguageTool runs under the same rules,
-  listening on `127.0.0.1` only; the app's LanguageTool client refuses
-  non-loopback URLs.
+- **Outbound network (web app only)**: the web backend may reach **one host, `api.anthropic.com:443`**,
+  and only for the AI blocks (D0r). Everything else is denied: the unit/container allows localhost and the
+  LAN/VPN subnets plus that one destination (egress proxy or firewall by name, see DEPLOY.md §6);
+  `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`. The sync service and the CLI have no outbound
+  access at all. The LanguageTool client refuses non-loopback URLs. `base_url` for the API is fixed in
+  code, never taken from the environment.
 - **Access**: only over private network (LAN / VPN). No port forwarding, no public
   exposure.
-- **No API keys exist for this project**: nothing to
-  store on the server or on the dev machine. If an API is ever reintroduced, the original
-  rules apply again (key only on the server, env file mode `600` owned by the
-  wort user, never committed, never on the dev machine; mocked client + separate
-  spend-limited dev key on the dev machine) — and this file is updated first.
+- **API key**: exactly one (separate Anthropic workspace with a spend limit), only in an env file on
+  the server (mode `600`, owned by the wort user), never committed, never in the image, never on the
+  dev machine, the CLI machine or any agent host; tests use the fake provider and mocked transport. Never
+  logged: logs and error pages are redacted (`wort.sanitize.redact`). Per-user daily call cap.
+- **Sanitization at every boundary** (`src/wort/sanitize.py`): all input (forms, query strings, imported
+  and synced JSON, the dictionary dump, AI replies) and all output (HTML, logs, error details, terminal,
+  the AI request) passes the matching sanitizer; a value that cannot be made safe is rejected, not
+  partially used.
 - **The development machine does not deploy.** No SSH path from it to the
-  server. The maintainer deploys. The only CLI → web path is the exported
-  JSON file, which the web import treats as untrusted user data.
+  server. The maintainer deploys.
+- **CLI network (maintainer decision 2026-10-21, DECISIONS D00d):** the `wort`
+  CLI/TUI has **no network access** except loopback (a local LanguageTool) and
+  **one endpoint**: `wort sync` pushes the export JSON over HTTPS to
+  `POST /sync` on a dedicated server port, with a per-user **write-only** token
+  (cannot read, cannot sign in; stored hashed, revocable, file mode 600 on the CLI
+  machine). The CLI never downloads anything: big files come from
+  `scripts/fetch_data.py`, run separately. Enforced at the OS level
+  (`scripts/wort-offline`) with an in-process guard (`src/wort/netguard.py`) as a
+  second layer. The exported JSON file (browser import) remains an equal path.
+  Both paths treat the JSON as untrusted user data (size, schema, length caps).
+- **Web network:** the sync service (`app/sync_app.py`, own process and port)
+  has no outbound access. The web app's only permitted outbound destination is
+  the AI API host (D0r, confirmed 2026-10-21); while the AI is off (no key) it has none.
 - **All user-sourced text is data**: user input and dictionary content are
-  only ever passed to local parsers as plain data, length-capped, with
+  only ever passed to local parsers (and, in the AI blocks, to the model as JSON data, never as instructions) as plain data, length-capped, with
   timeouts; a failed or malformed check → fail loud, no score change, never
   render partial output.
 - **Rendering**: anything from users or the dictionary is inserted with
@@ -134,6 +155,9 @@ Keep README and this file in sync after each session.
 
 - `src/wort/` — CLI + TUI (stays; fully local; command `wort`; Python package `wort`)
 - `app/` — FastAPI app, routes, templates
+- `app/auth.py`, `app/words.py`, `app/practice.py`, `app/scoring.py` — login, word list, practice, score formula
+- `app/ai/` — AI layer (interface, schemas, daily cap, fake provider, Anthropic provider; off until the key is set)
+- `src/wort/sanitize.py` — the sanitizers used by the CLI and the web app
 - `app/ds.py` — Jinja environment that includes `vendor/dis-system` templates + asset lists; `app/static/` — layout.css (layout only), app.js (theme + toast glue)
 - `app/ocr.py` — image validation + Tesseract **[post-MVP]**
 - `app/lexicon.py` — lemmatize, lookup, inflection, translation cache

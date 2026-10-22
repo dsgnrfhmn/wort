@@ -1,0 +1,8 @@
+;; macOS sandbox profile for scripts/wort-offline: allow everything except the network, then allow
+;; loopback and the one sync endpoint. @SYNC_IP@ and @SYNC_PORT@ are filled in from sync.json.
+(version 1)
+(allow default)
+(deny network*)
+(allow network* (local ip "localhost:*"))
+(allow network-outbound (remote ip "localhost:*"))
+(allow network-outbound (remote tcp "@SYNC_IP@:@SYNC_PORT@"))

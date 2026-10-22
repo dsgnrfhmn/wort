@@ -1,11 +1,13 @@
 """Whole-sentence translation, German ↔ English, fully offline (Argos Translate).
 
-Optional: `uv sync --group mt`, then `wort install-translation` once (downloads the models, ~100 MB
-each; the only network use, run by hand). Translating never touches the network.
+Optional: `uv sync --group mt`, fetch the model files once with `scripts/fetch_data.py` (a separate
+script, not part of the CLI), then `wort install-translation FILE...`. The CLI never downloads anything.
 The direction follows the words: mostly German words → de→en, otherwise en→de.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from wort.dictionary.lookup import PUNCTUATION, Dictionary
 
@@ -13,7 +15,7 @@ DIRECTIONS = (("de", "en"), ("en", "de"))
 MAX_CHARS = 500  # user text is data: length-capped before it reaches the model
 
 MISSING_PACKAGE = "Sentence translation needs the 'mt' group: uv sync --group mt"
-MISSING_MODEL = "Sentence translation model {src}→{dst} not installed: run `wort install-translation`"
+MISSING_MODEL = "Sentence translation model {src}→{dst} not installed: fetch the model files with scripts/fetch_data.py, then run `wort install-translation FILE...`"
 
 
 class TranslationUnavailable(RuntimeError):
@@ -66,13 +68,13 @@ def describe(dictionary: Dictionary, text: str) -> str:
         return f"No sentence translation: {exc}"
 
 
-def install() -> None:
-    """Download and install the de→en and en→de models (needs network, run once by the user)."""
+def install(files: list[Path]) -> int:
+    """Install Argos model files (.argosmodel) that were fetched separately. Returns how many were installed."""
     package, _ = _argos()
-    package.update_package_index()
-    available = package.get_available_packages()
-    for source, target in DIRECTIONS:
-        wanted = next((p for p in available if p.from_code == source and p.to_code == target), None)
-        if wanted is None:
-            raise RuntimeError(f"No {source}→{target} model in the Argos package index.")
-        package.install_from_path(wanted.download())
+    if not files:
+        raise RuntimeError("Give the .argosmodel files, e.g. the de→en and en→de models from scripts/fetch_data.py.")
+    for path in files:
+        if not path.is_file() or path.suffix != ".argosmodel":
+            raise RuntimeError(f"Not an .argosmodel file: {path}")
+        package.install_from_path(path)
+    return len(files)

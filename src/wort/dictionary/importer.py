@@ -15,14 +15,13 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
-import urllib.request
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
+from wort import sanitize
 from wort.text import normalize
 
 MAX_EXAMPLES = 10  # example sentences kept per entry
-KAIKKI_URL = "https://kaikki.org/dictionary/German/kaikki.org-dictionary-German.jsonl"
 
 POS_KEPT = {"noun", "verb", "adj", "adv", "prep", "conj", "pron", "num", "intj", "phrase", "particle"}
 
@@ -174,7 +173,28 @@ def gloss_keys(gloss: str) -> Iterator[str]:
             yield part
 
 
+def _safe_entry(entry: dict) -> dict | None:
+    """The dump is untrusted: clean every string; an entry whose lemma is unsafe is skipped."""
+    try:
+        entry["lemma"] = sanitize.word(entry["lemma"], 100)
+    except sanitize.Unsafe:
+        return None
+    for key in ("ipa", "gender", "aux", "conj"):
+        if entry.get(key):
+            entry[key] = sanitize.text(entry[key], 80)
+    entry["glosses"] = [g for g in (sanitize.text(g, 300) for g in entry["glosses"]) if g]
+    entry["examples"] = [(a, b) for a, b in ((sanitize.text(t, 120), sanitize.text(e, 300)) for t, e in entry["examples"]) if a]
+    entry["forms"] = [(f, [t for t in (sanitize.text(t, 40) for t in tags) if t])
+                      for f, tags in ((sanitize.text(f, 100), tags) for f, tags in entry["forms"]) if f]
+    return entry if entry["glosses"] else None
+
+
 def parse_entry(raw: dict) -> dict | None:
+    entry = _parse_entry(raw)
+    return _safe_entry(entry) if entry else None
+
+
+def _parse_entry(raw: dict) -> dict | None:
     if raw.get("lang_code", "de") != "de" or raw.get("pos") not in POS_KEPT:
         return None
     glosses, examples, only_form_of = _glosses_and_examples(raw)
@@ -290,17 +310,3 @@ def import_entries(raws: Iterable[dict], db_path: Path, progress: Callable[[int]
 def import_file(jsonl_path: Path, db_path: Path, progress: Callable[[int], None] | None = None) -> int:
     with open(jsonl_path, encoding="utf-8") as fh:
         return import_entries(iter_jsonl(fh), db_path, progress)
-
-
-def download(dest: Path, url: str = KAIKKI_URL, progress: Callable[[int], None] | None = None) -> Path:
-    """Stream the kaikki dump to disk (one-time, ~1 GB)."""
-    tmp = dest.with_suffix(".part")
-    with urllib.request.urlopen(url) as resp, open(tmp, "wb") as out:
-        done = 0
-        while chunk := resp.read(1 << 20):
-            out.write(chunk)
-            done += len(chunk)
-            if progress:
-                progress(done)
-    tmp.replace(dest)
-    return dest

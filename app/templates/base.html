@@ -11,13 +11,22 @@
   <link rel="stylesheet" href="/static/layout.css">
 </head>
 <body>
+  {% if user %}
   {% with workspace_label='wort', nav_links=[
-    {'label': 'History', 'href': '/', 'current': page == 'history'},
-    {'label': 'Favorites', 'href': '/favorites', 'current': page == 'favorites'}
+    {'label': 'Wörter', 'href': '/', 'current': page in ('words', 'history', 'favorites')},
+    {'label': 'Üben', 'href': '/ueben', 'current': page == 'practice'},
+    {'label': 'Texte', 'href': '/texte', 'current': page == 'texts'}
   ] %}{% include "components/nav-bar/template.html" %}{% endwith %}
+  {% endif %}
   <main class="wort-main">
     {% block content %}{% endblock %}
   </main>
+  {% if user %}
+  <form class="wort-logout" method="post" action="/logout">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% with priority='secondary', underline='dotted', label='Abmelden (' ~ user.name ~ ')', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+  {% endif %}
   {% if message %}<div hidden data-flash="{{ message_status | default('default') }}">{{ message }}</div>{% endif %}
   {% for src in ds_js %}
   <script src="{{ src }}"></script>

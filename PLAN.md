@@ -44,10 +44,41 @@ Post-MVP (details at the end of the file):
 - Step 6 — Local sentence practice (LanguageTool)
 - Step 7 — Operations: backups, logs, limits
 
+> **Where we stopped and what to do next: see `HANDOFF.md`.**
+
+## Web UI status (2026-10-21, branch `wip/web-view`)
+
+Built from the design canvas (Wörter, Üben; Texte is a placeholder) on dis-system `main` (hash in DECISIONS D00b).
+
+Done: accounts (argon2, sessions, CSRF, throttle, `scripts/adduser.py`), per-user word list with
+score (`app/scoring.py`), Wörter list + detail, Üben (Sätze bilden, Abfrage; local grading), CLI
+import of words and history, disabled AI layer (`app/ai/`, D0r proposed).
+
+Design vs. built: the gaps from the first audit are closed with the dis-system components of PR #3 (and
+the table-row/disclosure follow-up): article colors, score chip (tag cell), page-head with the stats text,
+tabs as links on the Üben start page, task/answer messages, inline correction marks, collapsible Beispiele /
+Deine Fehler. Still open (not patched locally, per CLAUDE.md):
+- word tooltip with translations in feedback (needs the lexicon per word; the tooltip itself now takes several lines);
+- `pane` takes only string content, no block slot (the detail page uses raw `ds-pane` markup);
+- row checkbox has no keyboard handler (known gap in dis-system `table-row`) and is hover-only by design.
+- AI call sites wired, all off by default and falling back locally: sentence check, "Fehler erklären",
+  task wording (`tasks`), "Doch richtig?" (`recheck`), "Diese Regel üben" (`rule`), Abfrage free answers
+  (`answer`). Tested with the fake provider and a mock transport; **never run against the live API from this
+  repo**: run `scripts/ai_smoke.py` on the server. Sanitization: `src/wort/sanitize.py` at every boundary
+  (forms, flash, imported/synced JSON, dictionary dump, AI request and reply, logs, error details, terminal).
+- Not built: Texte (OCR, post-MVP), DE→UK language-pair switch, Ukrainian glosses (the dictionary is
+  English; Ukrainian is only the learner's own translation and the AI task translations).
+- dis-system props added in PR #2, merged to dis-system `main` (no Figma source for them):
+  input name/id/label/disabled/required/autocomplete/password, text-button submit/href,
+  table-cell submit, table-header-actions submit, table-row extra_attrs.
+
+Network model (2026-10-21, DECISIONS D00d): CLI offline except `wort sync` → `POST /sync` (write-only token,
+own port/process); downloads moved to `scripts/fetch_data.py`; OS rule `scripts/wort-offline` + in-process
+`netguard`. Not verified in the dev container: the OS-level rule, nginx.conf and compose changes.
+
 ## Current blockers
 
-- **dis-system repo not attached** to this workspace → Step 1 UI (and every
-  later UI item) cannot start. Logic and spikes can.
+- ~~dis-system repo not attached~~ (resolved 2026-10-22: submodule on dis-system `main`, form-props merged).
 - **No access to the server** from development sessions (by design). Step 0
   scripts are written here and **run by the maintainer on the server**; numbers go into
   `DECISIONS.md`.

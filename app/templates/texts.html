@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Texte · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title='Texte', info='noch nicht verfügbar' %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with message='Text aus Foto (OCR) und Wort-Tooltips kommen später. Für diese Funktion werden Fotos nie an eine API gesendet.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with priority='secondary', underline='solid', label='Zu den Wörtern', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+</section>
+{% endblock %}
