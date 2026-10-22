@@ -11,9 +11,9 @@ scores, word detail, practice (Sätze bilden, Abfrage), Texte placeholder. The A
 run against the live Anthropic API, the OS-level CLI network rule, nginx or compose** (no key / no such
 tools in the dev container).
 
-- Branch `wip/web-view` @ `805b518`, PR **#5** into `wip/dev-testing` (no `main` branch exists in the repo).
+- Branch `wip/web-view` (see `git log`), PR **#5** into `wip/dev-testing` (no `main` branch exists in the repo).
 - 394 tests pass: `PYTHONPATH=.:src uv run pytest` (web deps: `uv sync --group web`; AI tests need `--group ai`, they skip otherwise).
-- dis-system submodule is on branch `dsgnrfhmn/form-props` @ `d8811df`, **not merged to dis-system `main`**.
+- dis-system submodule follows dis-system `main` @ `bc4e8de` (the form-props PR #2 is merged; recorded in `DECISIONS.md` D00b).
 
 ## What is built
 
@@ -48,8 +48,7 @@ tools in the dev container).
 ## Next steps (suggested order)
 
 **Yours (blockers for merging / enabling):**
-1. Open the dis-system PR for `dsgnrfhmn/form-props` and merge it; then switch the submodule to `main`
-   (record the hash in `DECISIONS.md` D00b). Merge PR #5 afterwards.
+1. Merge PR #5 (`wip/web-view` into `wip/dev-testing`). The dis-system side is done (PR #2 merged, submodule on `main`).
 2. On the server: key in `~/.config/wort/ai.env`, egress to `api.anthropic.com:443` only (DEPLOY §6), smoke test, then `spikes/ai_eval.md`.
 3. Verify items 2-3 of "Not verified" above.
 4. Step 0 spikes (dictionary coverage, lemmatizer) on the server; numbers into `DECISIONS.md` D1/D2.

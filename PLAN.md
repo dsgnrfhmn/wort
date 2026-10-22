@@ -48,7 +48,7 @@ Post-MVP (details at the end of the file):
 
 ## Web UI status (2026-10-21, branch `wip/web-view`)
 
-Built from the design canvas (Wörter, Üben; Texte is a placeholder) on dis-system `dsgnrfhmn/form-props`.
+Built from the design canvas (Wörter, Üben; Texte is a placeholder) on dis-system `main` (`bc4e8de`).
 
 Done: accounts (argon2, sessions, CSRF, throttle, `scripts/adduser.py`), per-user word list with
 score (`app/scoring.py`), Wörter list + detail, Üben (Sätze bilden, Abfrage; local grading), CLI
@@ -67,7 +67,7 @@ Design vs. built (components dis-system lacks; **not** patched locally, per CLAU
   (forms, flash, imported/synced JSON, dictionary dump, AI request and reply, logs, error details, terminal).
 - Not built: Texte (OCR, post-MVP), DE→UK language-pair switch, Ukrainian glosses (the dictionary is
   English; Ukrainian is only the learner's own translation and the AI task translations).
-- dis-system props added on branch `dsgnrfhmn/form-props` (needs maintainer PR/merge, no Figma source for them):
+- dis-system props added in PR #2, merged to dis-system `main` (no Figma source for them):
   input name/id/label/disabled/required/autocomplete/password, text-button submit/href,
   table-cell submit, table-header-actions submit, table-row extra_attrs.
 
@@ -77,7 +77,7 @@ own port/process); downloads moved to `scripts/fetch_data.py`; OS rule `scripts/
 
 ## Current blockers
 
-- ~~dis-system repo not attached~~ (resolved 2026-10-21: submodule on `dsgnrfhmn/form-props`, pending merge to `main`).
+- ~~dis-system repo not attached~~ (resolved 2026-10-22: submodule on dis-system `main`, form-props merged).
 - **No access to the server** from development sessions (by design). Step 0
   scripts are written here and **run by the maintainer on the server**; numbers go into
   `DECISIONS.md`.

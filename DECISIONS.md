@@ -136,14 +136,16 @@ Confirmed by maintainer (date)*.
     dis-system Jinja templates (`app/ds.py` adds the `vendor/dis-system` root to
     the template loader and serves its tokens/components/icons under `/ds`).
     Forms need dis-system props that were missing (`input` `name`/`label`,
-    `text-button` `submit`, `table-cell` `1-action` `submit`): drafted on
-    dis-system branch `<user>/form-props`, **not yet merged to its `main`**.
+    `text-button` `submit`, `table-cell` `1-action` `submit`): added in
+    dis-system PR #2 (`form-props`), merged to its `main` on 2026-10-21.
     Gaps still without a component: file input (native control used),
     textarea-free sentence result block (empty-state used for text lines).
-- **dis-system commit in use:** `1e1d505` (2026-10-21; branch `dsgnrfhmn/form-props` = `b85e517` main
-  + form props: input name/id/label/disabled/required/autocomplete/password, text-button/table-cell submit; pushed, **not yet
-  merged to dis-system `main`**). Replaces the unpublished `6d58745`. Switch the submodule to `main`
-  after the maintainer merges. _(record at each bump)_
+- **dis-system commit in use:** `bc4e8de` (2026-10-22: `main` after the merge of dis-system PR #2,
+  `dsgnrfhmn/form-props`). The form props (input name/id/label/disabled/required/autocomplete/password,
+  text-button submit/href, table-cell and table-header-actions submit, table-row extra_attrs) are now in `main`;
+  `d8811df` (the branch head wort used until now) is its ancestor, so no component file changed. Earlier hashes:
+  `6d58745` (unpublished), `1e1d505`, `d8811df`. The submodule follows `main` (`.gitmodules` branch = main).
+  _(record at each bump)_
 - **Confirmed by maintainer:** 2026-10-04
 
 ## Step 0 spikes (MVP)
