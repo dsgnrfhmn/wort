@@ -2,7 +2,7 @@
 
 ![preview-image](cli-and-web-preview.png)
 
-Self-hosted tool for learning German (EN↔DE), local first, on Wiktionary data: a CLI tool for your own machine and a web view for a home server.
+Self-hosted tool for learning German, built on Wiktionary data, with translations into English and Ukrainian. It has two parts: a CLI tool that runs offline on your own machine, and a web view for a home server, reachable only on your LAN or VPN, with invite-only accounts. Everything runs locally by default. AI feedback on practice exercises (Anthropic API, called from the web server only) is optional and off until a key is installed.
 
 **Status: work in progress.**
 
