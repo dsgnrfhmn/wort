@@ -1,6 +1,6 @@
 # wort
 
-![preview-image](preview.png)
+![preview-image](cli-and-web-preview.png)
 
 Self-hosted tool for learning German (EN↔DE), local first, on Wiktionary data: a CLI tool for your own machine and a web view for a home server.
 
