@@ -1,8 +1,74 @@
 {% extends "base.html" %}
 {% block title %}Wörter · wort{% endblock %}
+{% block body_attrs %} data-layout="full"{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="/ds/fonts/libre-bodoni.css">
+<link rel="stylesheet" href="/ds/local-components/hero-block/style.css">
+{% endblock %}
 {% block content %}
+{# Hero: the title and the lookup field only. dis-system's staged local-components/hero-block markup, sized to its
+   content (data-fit). #}
+<section class="ds-hero-block" data-fit="content" aria-labelledby="hero-title">
+  <h1 class="ds-hero-block__title" id="hero-title"><span class="ds-hero-block__title-strong">wort</span></h1>
+  <form class="ds-hero-block__search" method="get" action="/" role="search">
+    <input type="hidden" name="s" value="1">
+    {% with name='q', label='Wort oder Satz nachschlagen', value=query, placeholder='Wort oder Satz nachschlagen: Deutsch oder Englisch …', fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+  </form>
+</section>
+
+{% if query %}
+<section class="wort-lookup" aria-live="polite" aria-labelledby="results-title">
+  <div class="wort-row">
+    <h2 class="ds-table-header__title" id="results-title">„{{ query }}“</h2>
+    {% if note %}<span>{{ note }}</span>{% endif %}
+    {% with priority='secondary', underline='solid', label='Suche schließen', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
+  {% if not has_dictionary %}
+  {% with message='Das Wörterbuch ist nicht importiert (wort import --file …).' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% elif not results %}
+  {% with message='Nichts gefunden für „' ~ query ~ '“.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% endif %}
+  <div class="wort-lookup__list">
+  {% for r in results %}
+  <article class="wort-lookup__item" aria-labelledby="result-{{ loop.index }}">
+    <div class="wort-row">
+      <span class="wort-tip-wrap"{% if r.tooltip %} data-tooltip="{{ r.tooltip }}"{% endif %}>{% with priority='secondary', underline='solid', label=r.label, article=r.article, extra_attrs='id="result-' ~ loop.index ~ '" tabindex="-1"' %}{% include "components/text-button/template.html" %}{% endwith %}</span>
+      <span>{{ r.caption }}</span>
+      <span>{{ r.translation }}</span>
+      {% if r.owned %}
+      {% with type='success', subtype='passive', label='in deinen Wörtern' %}{% include "components/tag/template.html" %}{% endwith %}
+      {% else %}
+      <form method="post" action="/words/add">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="lemma" value="{{ r.entry.lemma }}">
+        <input type="hidden" name="pos" value="{{ r.entry.pos }}">
+        <input type="hidden" name="q" value="{{ query }}">
+        {% with priority='primary', underline='dotted', label='Zu Wörtern hinzufügen', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+      </form>
+      {% endif %}
+    </div>
+    {% if r.table %}
+    <div class="wort-table {{ 'wort-conjugation' if r.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ r.table.title }} {{ r.label }}">
+      {% for h in r.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+      {% for row in r.table.rows %}
+      {% set cells = [{'type': 'text-passive-cell', 'content': row[0]}] %}
+      {% for c in row[1:] %}{% set _ = cells.append({'type': 'text-active-cell', 'content': c}) %}{% endfor %}
+      {% with cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if r.examples %}
+    {% set ex = [] %}{% for de, en in r.examples %}{% set _ = ex.append(de ~ ' — ' ~ en if en else de) %}{% endfor %}
+    {% with title='Beispiele', caption=(r.examples | length) ~ '', items=ex, open=false %}{% include "components/disclosure/template.html" %}{% endwith %}
+    {% endif %}
+  </article>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <section class="wort-section">
-  {% with title='Wörter', actions_left=[{'label': 'Importieren', 'href': '/history', 'underline': 'solid'}], meta_text=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche', actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
+  {% with title='Wörter', actions_left=[{'label': 'Importieren', 'href': '/history', 'underline': 'solid'}], meta_text=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche' ~ (' · zuletzt ' ~ last_added if last_added else ''), actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
   {% with layout='bulk', search=true, search_placeholder='Wort oder Übersetzung', actions=[
     {'label': 'Sätze bilden', 'priority': 'primary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/saetze" data-needs-selection'},
     {'label': 'Abfrage', 'priority': 'secondary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/abfrage" data-needs-selection'},
@@ -17,28 +83,38 @@
   </form>
 
   {% if rows %}
-  <div class="wort-table wort-words" role="table" aria-label="Wörter" data-checkbox-group data-sort-group data-word-table>
+  {# The table block; an open word splits it into two equal halves (table | word), a border between.
+     The "Erstellt" column is always rendered and hidden by CSS while a word is open, so app.js can open, switch
+     and close the word in place (no reload). #}
+  <div class="wort-split-list" id="wort-table"{% if detail %} data-open="true"{% endif %}>
+  <div class="wort-split-list__table">
+  <div class="wort-table wort-words wort-word-table" role="table" aria-label="Wörter" data-checkbox-group data-sort-group data-word-table>
     {% with type='checkbox-cell', checkbox_role='select-all' %}{% include "components/table-cell/template.html" %}{% endwith %}
     {% with label='Wort', sortable=true, sort_dir=(dir if sort == 'word' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
     {% with label='Übersetzung' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
     {% with label='Erstellt', sortable=true, sort_dir=(dir if sort == 'added' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
     {% with label='Score', sortable=true, sort_dir=(dir if sort == 'score' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
     {% for r in rows %}
-    {% with selected=(r.id in selected), extra_attrs='data-word-id="' ~ r.id ~ '"', cells=[
+    {% set href = '/words/' ~ r.id ~ '?' ~ list_params ~ '#detail' %}
+    {% set cells = [
       {'type': 'checkbox-cell'},
-      {'type': 'link', 'content': r.label, 'href': '/words/' ~ r.id, 'article': r.article},
-      {'type': 'text-active-cell', 'content': r.translation},
-      {'type': 'date', 'content': r.word.added_at.strftime('%d.%m.%Y')},
-      {'type': 'tag', 'content': (r.word.score | string) if r.word.score is not none else '–', 'tag_type': r.score_type, 'tag_subtype': 'passive'}
-    ] %}{% include "components/table-row/template.html" %}{% endwith %}
+      {'type': 'link', 'content': r.label, 'href': href, 'article': r.article, 'plain': true},
+      {'type': 'text-active-cell', 'content': r.translation}
+    ] %}
+    {% set _ = cells.append({'type': 'date', 'content': german_date(r.word.added_at)}) %}
+    {% set _ = cells.append({'type': 'tag', 'content': (r.word.score | string) if r.word.score is not none else '–', 'tag_type': r.score_type, 'tag_subtype': 'passive'}) %}
+    {% with selected=(r.id in selected), href=href, extra_attrs='data-word-id="' ~ r.id ~ '"' ~ (' aria-current="true"' if detail and detail.v.id == r.id else ''), cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
     {% endfor %}
   </div>
   {% if total > rows | length %}
-  <div class="wort-row">
+  <div class="ds-table-footer">
     {% with priority='secondary', underline='dotted', label='20 weitere laden', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ (limit + 20) %}{% include "components/text-button/template.html" %}{% endwith %}
     {% with priority='secondary', underline='dotted', label='Alle ' ~ total ~ ' laden', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ total %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
   {% endif %}
+  </div>
+  <div class="wort-split-list__side" id="wort-side">{% if detail %}{% with d=detail %}{% include "_word_detail.html" %}{% endwith %}{% endif %}</div>
+  </div>
   {% else %}
   {% with message='Noch keine Wörter. Füge Wörter aus deinem Verlauf hinzu („Lernen“) oder importiere eine Export-Datei.' %}{% include "components/empty-state/template.html" %}{% endwith %}
   <div class="wort-row">

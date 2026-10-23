@@ -1,36 +1,35 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-tooltip-mode="layer" data-tooltip-delay="500">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}wort{% endblock %}</title>
+  <script src="/static/theme-init.js"></script>
   <link rel="stylesheet" href="/ds/tokens/output.css">
   {% for href in ds_css %}
   <link rel="stylesheet" href="{{ href }}">
   {% endfor %}
+  {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="/static/layout.css">
 </head>
-<body>
+<body{% block body_attrs %}{% endblock %}>
   {% if user %}
-  {% with workspace_label='wort', nav_links=[
+  {% with workspace_label='DE → UK', nav_links=[
     {'label': 'Wörter', 'href': '/', 'current': page in ('words', 'history', 'favorites')},
     {'label': 'Üben', 'href': '/ueben', 'current': page == 'practice'},
     {'label': 'Texte', 'href': '/texte', 'current': page == 'texts'}
+  ], right_actions=[
+    {'label': 'Abmelden (' ~ user.name ~ ')', 'form_action': '/logout', 'hidden': {'csrf': csrf}}
   ] %}{% include "components/nav-bar/template.html" %}{% endwith %}
   {% endif %}
   <main class="wort-main">
     {% block content %}{% endblock %}
   </main>
-  {% if user %}
-  <form class="wort-logout" method="post" action="/logout">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% with priority='secondary', underline='dotted', label='Abmelden (' ~ user.name ~ ')', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-  </form>
-  {% endif %}
   {% if message %}<div hidden data-flash="{{ message_status | default('default') }}">{{ message }}</div>{% endif %}
   {% for src in ds_js %}
   <script src="{{ src }}"></script>
   {% endfor %}
+  <script type="application/json" id="wort-glossary">{{ ui_glossary | tojson }}</script>
   <script src="/static/app.js"></script>
 </body>
 </html>

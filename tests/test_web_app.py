@@ -21,7 +21,7 @@ def store(app):
 
 @pytest.fixture
 def client(app):
-    return TestClient(app, follow_redirects=False)
+    return TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
 
 
 def csrf(client) -> str:
@@ -84,7 +84,7 @@ def test_login_is_throttled(tmp_path):
                      throttle=auth.LoginThrottle(limit=2, window=60))
     from app.db import WebStore
     WebStore(tmp_path / "w.db").create_user("anna", auth.hash_password(PASSWORD))
-    c = TestClient(app, follow_redirects=False)
+    c = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     for _ in range(2):
         assert login(c, "anna", "wrong password here").status_code == 401
     assert login(c, "anna", PASSWORD).status_code == 429
@@ -98,9 +98,35 @@ def test_logout_ends_the_session(client, users):
 
 
 def test_users_do_not_see_each_others_history(app, store, users):
-    ana, ben = TestClient(app, follow_redirects=False), TestClient(app, follow_redirects=False)
+    ana, ben = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000)), TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     login(ana, "anna"); login(ben, "ben")
     from datetime import datetime
     store.add_history(store.user_by_name("anna")[0].id, [("Geheimwort", True, datetime(2026, 10, 1))])
     assert "Geheimwort" in ana.get("/history").text
     assert "Geheimwort" not in ben.get("/history").text
+
+
+@pytest.mark.parametrize("host", ["192.168.1.20", "10.0.0.5", "testclient", "::ffff:192.168.1.20"])
+def test_insecure_cookies_serve_loopback_only(app, host):
+    # Plain-http dev (no Secure cookies) must never answer a LAN client: the password would travel in clear.
+    c = TestClient(app, follow_redirects=False, client=(host, 50000))
+    for path in ("/login", "/", "/static/app.js"):
+        r = c.get(path)
+        assert r.status_code == 403 and "127.0.0.1" in r.text
+        assert "set-cookie" not in r.headers
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "127.8.9.10", "::1", "::ffff:127.0.0.1"])
+def test_insecure_cookies_allow_loopback(app, host):
+    assert TestClient(app, follow_redirects=False, client=(host, 50000)).get("/login").status_code == 200
+
+
+def test_secure_cookies_have_no_loopback_guard(tmp_path):
+    # Behind the TLS front the app sees nginx (loopback) anyway; the guard is only for the plain-http mode.
+    secure = create_app(db_path=tmp_path / "s.db", dict_path=tmp_path / "n.db", secure_cookies=True)
+    assert TestClient(secure, follow_redirects=False, client=("192.168.1.20", 50000)).get("/login").status_code == 200
+
+
+def test_is_loopback():
+    assert auth.is_loopback("127.0.0.1") and auth.is_loopback("::1") and auth.is_loopback("::ffff:127.0.0.1")
+    assert not any(auth.is_loopback(h) for h in ["0.0.0.0", "192.168.0.1", "::", "localhost", "", "testclient"])

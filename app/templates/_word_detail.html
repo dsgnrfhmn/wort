@@ -1,0 +1,88 @@
+{# The open word beside the table on the Wörter page. Expects `d` (words.word_detail's detail dict),
+   `list_params` (the table's sort/dir/limit, kept by "Schließen") and `csrf`. #}
+{% set v = d.v %}
+<section class="ds-pane wort-word" id="detail" aria-labelledby="detail-title">
+  <form id="practice-one" method="post" action="/ueben/saetze" hidden>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="ids" value="{{ v.id }}">
+  </form>
+  <div class="ds-pane__head">
+    <div class="ds-pane__heading">
+      <span class="ds-pane__title" data-emphasis="true" id="detail-title">{{ v.label }}</span>
+      <span class="ds-pane__caption">{{ v.pos_label }}{% if v.entry and v.entry.gender in ('m', 'f', 'n') %} · {{ {'m': 'maskulin', 'f': 'feminin', 'n': 'neutral'}[v.entry.gender] }}{% endif %}</span>
+    </div>
+    <div class="wort-row">
+      {% with priority='primary', underline='dotted', label='Üben', submit=true, extra_attrs='form="practice-one"' %}{% include "components/text-button/template.html" %}{% endwith %}
+      {% with priority='secondary', underline='solid', label='Schließen', href='/?' ~ list_params ~ '#wort-table' %}{% include "components/text-button/template.html" %}{% endwith %}
+    </div>
+  </div>
+  <div class="ds-pane__body"><div class="wort-detail">
+
+    <section class="wort-section">
+      {% with type='title-info', title=v.label, info=v.translation %}{% include "components/table-header/template.html" %}{% endwith %}
+      <div class="wort-row">
+        {% with type=v.score_type, subtype='passive', label='Score ' ~ ((v.word.score | string) if v.word.score is not none else '–') %}{% include "components/tag/template.html" %}{% endwith %}
+        <span>✓{{ d.right }} ✗{{ d.wrong }}</span>
+        <span>letzte Übung {{ german_date(v.word.last_seen) }} · erstellt {{ german_date(v.word.added_at) }}</span>
+      </div>
+    </section>
+
+    {# Only what the word has: a section without content (no forms table, no examples, no mistakes, never
+       searched) is left out, e.g. for a verb the dictionary knows little about. #}
+    {% if d.table and d.table.rows %}
+    <section class="wort-section" aria-labelledby="forms-title">
+      {% with type='title-info', title=d.table.title, info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+      <div class="wort-table {{ 'wort-conjugation' if d.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ d.table.title }}">
+        {% for h in d.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+        {% for row in d.table.rows %}
+        {% set cells = [{'type': 'text-passive-cell', 'content': row[0]}] %}
+        {% for c in row[1:] %}{% set _ = cells.append({'type': 'text-active-cell', 'content': c}) %}{% endfor %}
+        {% with cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if d.examples or d.mistakes %}
+    <section>
+      {% if d.examples %}
+      {% set ex_items = [] %}
+      {% for de, en in d.examples %}{% set _ = ex_items.append(de ~ ' — ' ~ en if en else de) %}{% endfor %}
+      {% with title='Beispiele', caption=(d.examples | length) ~ ' von ' ~ (v.examples | length), items=ex_items, open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
+      {% endif %}
+      {% if d.mistakes %}
+      {% set err_items = [] %}
+      {% for a in d.mistakes %}{% set _ = err_items.append(a.prompt ~ ' → ' ~ a.answer ~ ' · ' ~ german_date(a.created_at)) %}{% endfor %}
+      {% with title='Deine Fehler', caption='✓' ~ d.right ~ ' ✗' ~ d.wrong, items=err_items, open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if d.searches %}
+    <section class="wort-section">
+      {% with type='title-info', title='Suchverlauf', info=d.searches ~ '× gesucht' %}{% include "components/table-header/template.html" %}{% endwith %}
+    </section>
+    {% endif %}
+
+    {# Not in the design canvas; kept until the next stage decides where they go. #}
+    {% if d.facts %}
+    <section class="wort-section">
+      {% with type='title-info', title='Grammatik', info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+      {% for line in d.facts %}{% with message=line %}{% include "components/empty-state/template.html" %}{% endwith %}{% endfor %}
+    </section>
+    {% endif %}
+
+    <section class="wort-section">
+      {% with type='title-info', title='Eigene Übersetzung', info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+      <form class="wort-row" method="post" action="/words/{{ v.id }}/translation">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {% with name='text', label='Eigene Übersetzung', value=v.word.own_translation, placeholder='Übersetzung', fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+        {% with priority='primary', underline='dotted', label='Speichern', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+      </form>
+      <form class="wort-row" method="post" action="/words/{{ v.id }}/delete">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {% with priority='secondary', underline='dotted', label='Wort entfernen', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+      </form>
+    </section>
+  </div></div>
+</section>

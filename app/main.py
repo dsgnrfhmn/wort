@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from wort import paths, sanitize
@@ -19,7 +19,7 @@ from wort.dictionary.lookup import Dictionary
 from wort.exercises import grammar_check
 from wort.exercises.sentence import targets
 
-from app import auth, ds, lexicon, practice, words
+from app import auth, ds, lexicon, practice, ui_terms, words
 from app.ai import config as ai_config
 from app.ai import service as ai_service
 from types import SimpleNamespace
@@ -44,6 +44,8 @@ def create_app(
     secure_cookies: bool | None = None,
     throttle: auth.LoginThrottle | None = None,
     ai: ai_service.AiService | None = None,
+    uk_path: Path | None = None,
+    uk_en_path: Path | None = None,
 ) -> FastAPI:
     sanitize.install_log_redaction()
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -53,6 +55,7 @@ def create_app(
     dictionary_path = dict_path or paths.dictionary_db()
     check = checker or grammar_check.check
     templates = Jinja2Templates(env=ds.make_env())
+    templates.env.globals["ui_glossary"] = ui_terms.glossary()
     if secure_cookies is None:  # behind the TLS front; WORT_INSECURE_COOKIES=1 only for plain-http dev
         secure_cookies = os.environ.get("WORT_INSECURE_COOKIES") != "1"
     throttle = throttle or auth.LoginThrottle()
@@ -67,9 +70,34 @@ def create_app(
         if user is None:
             raise LoginRequired()
         return user
+    if not secure_cookies:
+        @app.middleware("http")
+        async def loopback_only(request: Request, call_next):
+            """Without Secure cookies (plain-http dev) the session and password would cross the network in clear
+            text, so the app then answers loopback clients only: a run on a LAN address with
+            WORT_INSECURE_COOKIES=1 fails loudly instead of working insecurely."""
+            if not (request.client and auth.is_loopback(request.client.host)):
+                return PlainTextResponse(
+                    "WORT_INSECURE_COOKIES=1 serves 127.0.0.1 / ::1 only. For the LAN use scripts/dev.sh (https).",
+                    status_code=403)
+            return await call_next(request)
+
+    @app.middleware("http")
+    async def revalidate_assets(request: Request, call_next):
+        """CSS/JS/fonts carry no version in their URL, so the browser must ask before reusing a cached copy
+        (a 304 via ETag when unchanged); without this it may run a stale app.js after a change."""
+        response = await call_next(request)
+        if request.url.path.startswith(("/static/", "/ds/")):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     for part in ("tokens", "components", "icons"):
         app.mount(f"/ds/{part}", StaticFiles(directory=ds.DS_ROOT / part), name=f"ds-{part}")
+    # The self-hosted display face and the staged hero-block (dis-system local-components, not yet confirmed).
+    app.mount("/ds/fonts", StaticFiles(directory=ds.DS_ROOT / "fonts"), name="ds-fonts")
+    app.mount("/ds/local-components/hero-block", StaticFiles(directory=ds.DS_ROOT / "local-components" / "hero-block"),
+              name="ds-hero-block")
 
     def dictionary() -> Dictionary:
         try:
@@ -134,6 +162,7 @@ def create_app(
 
     shared = SimpleNamespace(
         store=store, render=render, verify_csrf=verify_csrf, current_user=current_user, dict_path=dictionary_path,
+        uk_path=uk_path or paths.dictionary_uk_db(), uk_en_path=uk_en_path or paths.dictionary_en_uk_db(),
         redirect=redirect, facts=lexicon.summary, checker=check,
         ai=ai or ai_service.build(ai_config.load(), store),
     )

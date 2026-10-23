@@ -28,23 +28,25 @@
     {% with label='Lernen' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
     {% for item in rows %}
     {% set r = item.row %}
-    {% with selected=false, cells=[
-      {'type': 'text-active-cell', 'content': r.query},
-      {'type': 'text-active-cell', 'content': ((item.entry.glosses[:2] | join(', ')) if item.entry else ('nicht gefunden' if not r.found else '–'))},
-      {'type': 'text-passive-cell', 'content': r.count | string},
-      {'type': 'date', 'content': r.last_at.strftime('%d.%m.%Y %H:%M')},
-      ({'type': 'text-passive-cell', 'content': 'in Wörtern'} if item.learned else
-       {'type': '1-action', 'content': 'Lernen', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="learn-' ~ loop.index ~ '"'} if item.entry else
-       {'type': 'text-passive-cell', 'content': '–'})
-    ] %}{% include "components/table-row/template.html" %}{% endwith %}
-    {% endfor %}
-  </div>
-  <div class="wort-forms">
-    {% for item in rows if item.entry and not item.learned %}
-    <form id="learn-{{ loop.index }}" method="post" action="/words/learn">
+    {# Built cell by cell: table-row does not pass submit/extra_attrs on to a 1-action cell, so the
+       Lernen button would render as a plain type="button" that submits nothing. #}
+    <div class="ds-table-row" data-selected="false">
+      {% with type='text-active-cell', content=r.query %}{% include "components/table-cell/template.html" %}{% endwith %}
+      {% with type='text-active-cell', content=((item.entry.glosses[:2] | join(', ')) if item.entry else ('nicht gefunden' if not r.found else '–')) %}{% include "components/table-cell/template.html" %}{% endwith %}
+      {% with type='text-passive-cell', content=r.count | string %}{% include "components/table-cell/template.html" %}{% endwith %}
+      {% with type='date', content=r.last_at.strftime('%d.%m.%Y %H:%M') %}{% include "components/table-cell/template.html" %}{% endwith %}
+      {% if item.entry and not item.learned %}
+      {% with type='1-action', content='Lernen', priority='secondary', submit=true, extra_attrs='form="learn-' ~ loop.index ~ '"' %}{% include "components/table-cell/template.html" %}{% endwith %}
+      {% else %}
+      {% with type='text-passive-cell', content='in Wörtern' if item.learned else '–' %}{% include "components/table-cell/template.html" %}{% endwith %}
+      {% endif %}
+    </div>
+    {% if item.entry and not item.learned %}
+    <form id="learn-{{ loop.index }}" method="post" action="/words/learn" hidden>
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="query" value="{{ item.row.query }}">
+      <input type="hidden" name="query" value="{{ r.query }}">
     </form>
+    {% endif %}
     {% endfor %}
   </div>
   {% if total > rows | length %}

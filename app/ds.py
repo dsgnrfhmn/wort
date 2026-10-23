@@ -19,7 +19,7 @@ DS_ROOT = ROOT / "vendor" / "dis-system"
 COMPONENTS = [
     "dropdown-menu", "text-button", "input-dropdown", "input", "tag", "inline-mark", "message", "disclosure", "empty-state",
     "table-cell", "table-header-cell", "table-row", "table-header", "table-header-actions", "table-footer",
-    "divider", "header-block", "header-tab", "page-head", "pane", "tooltip", "nav-bar", "toast",
+    "divider", "header-block", "header-tab", "page-head", "pane", "tooltip", "nav-bar", "toast", "fade-in",
 ]
 SCRIPTS = [
     "dropdown-menu", "text-button", "input-dropdown", "empty-state",

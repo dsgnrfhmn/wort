@@ -22,7 +22,7 @@ def env(tmp_path, dict_path):
 
 
 def client_for(app, name):
-    c = TestClient(app, follow_redirects=False)
+    c = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     c.get("/login")
     r = c.post("/login", data={"csrf": c.cookies.get("wort_csrf"), "name": name, "password": PASSWORD})
     assert r.status_code == 303
@@ -35,7 +35,7 @@ def test_list_shows_article_translation_and_score(env):
     wid = store.words(a)[0].id
     store.record_attempt(a, wid, "form", "article", "p", "das", "correct", now=NOW)
     html = client_for(app, "anna").get("/").text
-    assert "das Haus" in html and f'data-word-id="{wid}"' in html and f'href="/words/{wid}"' in html
+    assert "das Haus" in html and f'data-word-id="{wid}"' in html and f'href="/words/{wid}?' in html
     assert "1 Wörter" in html
 
 
@@ -201,4 +201,140 @@ def test_detail_examples_and_mistakes_are_disclosures(env):
     store.add_word(a, "Haus", "noun", now=NOW)
     wid = store.words(a)[0].id
     html = client_for(app, "anna").get(f"/words/{wid}").text
-    assert html.count('<details class="ds-disclosure"') == 2 and "Noch keine Fehler." in html
+    # only what the word has: its examples; no "Deine Fehler" without a mistake, no search history without a search
+    assert html.count('<details class="ds-disclosure"') == 1 and "Beispiele" in html
+    assert "Deine Fehler" not in html and "Suchverlauf" not in html
+    store.record_attempt(a, wid, "form", "article", "p", "der", "wrong", now=NOW)
+    html = client_for(app, "anna").get(f"/words/{wid}").text
+    assert html.count('<details class="ds-disclosure"') == 2 and "Deine Fehler" in html
+
+
+def test_list_and_detail_show_ukrainian_before_english(tmp_path, dict_path):
+    from wort.dictionary.ukrainian import import_entries
+    uk = tmp_path / "dictionary-uk.db"
+    import_entries([{"word": "Haus", "pos": "noun", "lang_code": "de",
+                     "senses": [{"translations": [{"lang_code": "uk", "word": "дім", "sense_index": "1"}]}]}], uk)
+    db = tmp_path / "web.db"
+    app = create_app(db_path=db, dict_path=dict_path, uk_path=uk, secure_cookies=False)
+    store = WebStore(db)
+    a = store.create_user("anna", auth.hash_password(PASSWORD)).id
+    store.add_word(a, "Haus", "noun", now=NOW)
+    c = client_for(app, "anna")
+    assert "дім · house" in c.get("/").text
+    assert "дім · house" in c.get(f"/words/{store.words(a)[0].id}").text
+
+
+def test_history_learn_button_submits_its_own_rows_query(env):
+    """The button in the page (not a hand-made POST): submit type, wired to the form for its own row."""
+    import re
+    app, store, a, _ = history_env(env)
+    c = client_for(app, "anna")
+    page = c.get("/history").text
+    rows = re.findall(r'<div class="ds-table-row"[^>]*>\s*<div class="ds-table-cell"[^>]*>\s*'
+                      r'<span class="ds-table-cell__text">([^<]*)</span>[\s\S]*?</div>\s*</div>', page)
+    buttons = re.findall(r'<button[^>]*type="submit"[^>]*form="(learn-\d+)"[^>]*>Lernen</button>', page)
+    assert len(buttons) == 2 and 'type="button" data-priority="secondary" data-status="active" data-underline="dotted">Lernen' not in page
+    form_id = buttons[-1]
+    query = re.search(rf'<form id="{form_id}"[\s\S]*?name="query" value="([^"]*)"', page).group(1)
+    row_of_button = page[:page.index(f'form="{form_id}"')].rsplit('<div class="ds-table-row"', 1)[1]
+    assert f'<span class="ds-table-cell__text">{query}</span>' in row_of_button  # the form belongs to this row
+    c.post("/words/learn", data={"csrf": c.cookies.get("wort_csrf"), "query": query})
+    assert [w.lemma for w in store.words(a)] == [query]
+    assert rows
+
+
+def test_lookup_shows_forms_and_adds_only_on_click(env):
+    app, store, a, _ = env
+    c = client_for(app, "anna")
+    page = c.get("/?s=1&q=Haus").text
+    assert "Deklination Haus" not in page and "Deklination das Haus" in page  # forms table of the entry
+    assert "dem Haus" in page and "Zu Wörtern hinzufügen" in page
+    assert store.words(a) == []  # looking up adds nothing
+    assert [h.query for h in store.history(a)] == ["Haus"]  # but the lookup is in the history
+    r = c.post("/words/add", data={"csrf": c.cookies.get("wort_csrf"), "lemma": "Haus", "pos": "noun", "q": "Haus"})
+    assert r.status_code == 303 and r.headers["location"] == "/?q=Haus"
+    assert [(w.lemma, w.added_from) for w in store.words(a)] == [("Haus", "lookup")]
+    again = c.get(r.headers["location"]).text
+    assert "in deinen Wörtern" in again and len(store.history(a)) == 1  # the return is not a new lookup
+    assert "wort-card" not in again  # the hero is the title and the field only
+
+
+def test_lookup_verb_conjugation_sentence_and_unknown(env):
+    app, store, a, _ = env
+    c = client_for(app, "anna")
+    verb = c.get("/?s=1&q=gehen").text
+    assert "Konjugation gehen" in verb and "bin gegangen" in verb
+    sentence = c.get("/?s=1&q=Haus gehen").text
+    assert "Ein Ergebnis pro Wort" in sentence and "Deklination das Haus" in sentence and "Konjugation gehen" in sentence
+    assert "Nichts gefunden" in c.get("/?s=1&q=qqqqqqqq").text
+
+
+def test_lookup_input_is_escaped_and_add_checks_the_dictionary(env):
+    app, store, a, _ = env
+    c = client_for(app, "anna")
+    page = c.get("/?s=1&q=<script>alert(1)</script>").text
+    assert "<script>alert(1)" not in page
+    tok = c.cookies.get("wort_csrf")
+    assert c.post("/words/add", data={"csrf": "forged", "lemma": "Haus", "pos": "noun"}).status_code == 403
+    assert c.post("/words/add", data={"csrf": tok, "lemma": "<b>", "pos": "noun"}).status_code == 400
+    r = c.post("/words/add", data={"csrf": tok, "lemma": "Erfunden", "pos": "noun", "q": "x"})
+    assert r.status_code == 303 and store.words(a) == []
+
+
+def test_open_word_splits_the_table_block_and_keeps_its_sort(env):
+    app, store, a, _ = env
+    for i, lemma in enumerate(["Haus", "Hund", "gehen"]):
+        store.add_word(a, lemma, "noun" if lemma != "gehen" else "verb", now=NOW.replace(hour=i))
+    c = client_for(app, "anna")
+    plain = c.get("/?sort=word&dir=asc").text
+    assert '<span class="ds-table-cell__text">Erstellt</span>' in plain and 'data-open="true"' not in plain
+    wid = next(w.id for w in store.words(a) if w.lemma == "Haus")
+    assert f'href="/words/{wid}?sort=word&amp;dir=asc&amp;limit=20#detail"' in plain  # the row opens it in place
+    page = c.get(f"/words/{wid}?sort=word&dir=asc").text
+    assert 'data-open="true"' in page and 'id="detail"' in page and "Deklination" in page
+    assert page.count('data-word-id="') == 3  # the whole table stays beside the word
+    assert '<span class="ds-table-cell__text">Erstellt</span>' in page  # rendered always, hidden by CSS while open
+    assert 'id="wort-side"' in plain and 'id="detail"' not in plain  # the side column exists empty when closed
+    assert 'href="/?sort=word&amp;dir=asc&amp;limit=20#wort-table"' in page  # "Schließen" keeps the sort
+    assert c.get("/words/99999").status_code == 404
+
+
+def test_detail_shows_the_forms_table_of_a_verb(env):
+    app, store, a, _ = env
+    store.add_word(a, "gehen", "verb", now=NOW)
+    html = client_for(app, "anna").get(f"/words/{store.words(a)[0].id}").text
+    assert "Konjugation" in html and "bin gegangen" in html and "Deklination" not in html
+
+
+def test_button_labels_have_english_and_ukrainian_for_tooltips(env):
+    import json
+    import re
+    app, *_ = env
+    html = client_for(app, "anna").get("/").text
+    data = json.loads(re.search(r'<script type="application/json" id="wort-glossary">(.*?)</script>', html, re.S).group(1))
+    assert data["labels"]["Sätze bilden"] == ["make sentences", "складати речення"]
+    assert "</script" not in re.search(r'id="wort-glossary">(.*?)</script>', html, re.S).group(1)
+
+
+def test_gloss_gives_lemma_and_translation_for_any_german_word(env):
+    app, *_ = env
+    c = client_for(app, "anna")
+    r = c.get("/api/gloss", params={"w": "Häuser"})  # an inflected form finds its lemma
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/json")
+    data = r.json()
+    assert data["label"] == "das Haus" and data["pos"] == "Nomen" and "house" in data["en"]
+    assert c.get("/api/gloss", params={"w": "ging"}).json()["label"] == "gehen"
+
+
+@pytest.mark.parametrize("w", ["", "zwei Wörter", "<b>Haus</b>", "{{7*7}}", "Haus;", "a" * 61])
+def test_gloss_rejects_anything_but_one_word(env, w):
+    app, *_ = env
+    assert client_for(app, "anna").get("/api/gloss", params={"w": w}).status_code == 400
+
+
+def test_gloss_unknown_word_is_404_and_needs_login(env):
+    app, *_ = env
+    assert client_for(app, "anna").get("/api/gloss", params={"w": "Quatschwort"}).status_code == 404
+    anon = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
+    r = anon.get("/api/gloss", params={"w": "Haus"})
+    assert r.status_code == 303 and r.headers["location"] == "/login"

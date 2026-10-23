@@ -1,5 +1,7 @@
 /* Layout only: page regions and grids, spacing from dis-system tokens. No colors, type or component styles. */
-body { margin: 0; background-color: var(--ds-color-bg-surface-pressed); }
+body { margin: 0; background-color: var(--ds-color-bg-surface); }
+/* Text outside a component takes the system's body text tokens (no new type style). */
+body { color: var(--ds-color-text-active); font-family: var(--ds-font-body-text-family); font-size: var(--ds-font-body-text-size); line-height: var(--ds-font-body-text-line-height); }
 .wort-main { max-width: calc(var(--ds-spacing-9) * 24); margin: 0 auto; padding: var(--ds-spacing-7) var(--ds-spacing-5); display: grid; gap: var(--ds-spacing-7); }
 .wort-section { display: grid; gap: var(--ds-spacing-3); }
 .wort-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-3); }
@@ -10,9 +12,6 @@ body { margin: 0; background-color: var(--ds-color-bg-surface-pressed); }
 .wort-form { display: grid; gap: var(--ds-spacing-3); max-width: calc(var(--ds-spacing-9) * 6); }
 .wort-words { grid-template-columns: max-content minmax(0, 1.2fr) minmax(0, 2fr) max-content max-content; }
 .wort-declension { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.wort-split { height: calc(100vh - var(--ds-spacing-9) * 4); }
-.wort-detail { display: grid; gap: var(--ds-spacing-7); align-content: start; }
-.wort-logout { max-width: calc(var(--ds-spacing-9) * 24); margin: 0 auto; padding: 0 var(--ds-spacing-5) var(--ds-spacing-7); display: flex; justify-content: flex-end; }
 .wort-results { grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); }
 .wort-answer { max-width: none; }
 .wort-history { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content max-content max-content; }
@@ -20,3 +19,64 @@ body { margin: 0; background-color: var(--ds-color-bg-surface-pressed); }
 
 .wort-tabs { display: flex; width: 100%; }
 .wort-messages { display: grid; gap: var(--ds-spacing-5); }
+
+/* Full-bleed pages (Wörter list): regions run edge to edge like the design canvas. */
+body[data-layout="full"] .wort-main { max-width: none; padding: 0; gap: 0; }
+
+/* Wörter page: an open word splits the table block into two equal halves, a border between them. The grid
+   always has both columns (the side one 0 wide while closed). The widths change in one step, not as a
+   transition: animating them re-laid out every row of the table on every frame (text rewrapping, dropped
+   frames); the word pane's own entrance is the animation (dis-system pane data-motion, app.js). "Erstellt" is hidden while
+   a word is open. At phone width the word comes first. */
+.wort-split-list { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0fr); align-items: stretch; container-type: inline-size; }
+.wort-split-list[data-open="true"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.wort-split-list__table { min-width: 0; }
+.wort-split-list__side { min-width: 0; overflow-x: clip; }
+/* Closing (app.js data-leaving): the table takes its full width at once, under the word pane, which lies over the
+   right half while it fades out, so the table's one widening step is hidden by the pane instead of following it. */
+@media (min-width: 721px) {
+  .wort-split-list[data-leaving] { position: relative; }
+  .wort-split-list[data-leaving] .wort-split-list__side { position: absolute; top: 0; right: 0; bottom: 0; width: 50%; pointer-events: none; }
+}
+.wort-split-list .wort-word { width: 50cqw; box-sizing: border-box; border-left: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+/* The word pane takes its content's height (a pane's body is flex 1 1 0, sized for a fixed-height split), stays
+   in view while the long table scrolls, and scrolls inside itself when taller than the window. */
+.wort-split-list .wort-word, .wort-split-list .wort-word .ds-pane__body { flex: none; min-height: auto; }
+.wort-split-list .wort-word { position: sticky; top: calc(var(--ds-spacing-9) * 2); max-height: calc(100vh - var(--ds-spacing-9) * 2); overflow-y: auto; overscroll-behavior: contain; }
+/* The Wort column has the same width whether a word is open or not (a share of the window, not of the table), so
+   the words and their translations stay where they are when the table gives up or takes back its right half; only
+   the translation column's end moves, under the word pane. */
+body[data-layout="full"] .wort-words { grid-template-columns: max-content minmax(0, 22vw) minmax(0, 1fr) max-content max-content; }
+body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-template-columns: max-content minmax(0, 22vw) minmax(0, 1fr) max-content; }
+.wort-split-list[data-open="true"] .wort-words > .ds-table-header-cell:nth-child(4),
+.wort-split-list[data-open="true"] .wort-words .ds-table-row > :nth-child(4) { display: none; }
+/* Jumping to #detail or #wort-table stops below the sticky nav bar, not under it. */
+#detail, #wort-table { scroll-margin-top: calc(var(--ds-spacing-9) * 2); }
+.wort-detail { display: grid; gap: var(--ds-spacing-7); align-content: start; padding: var(--ds-spacing-7) var(--ds-spacing-6) var(--ds-spacing-9); }
+@media (max-width: 720px) {
+  .wort-split-list, .wort-split-list[data-open="true"] { grid-template-columns: minmax(0, 1fr); }
+  .wort-split-list__side { order: -1; overflow: visible; }
+  .wort-split-list:not([data-open]) .wort-split-list__side { display: none; }
+  .wort-split-list .wort-word { width: auto; position: static; max-height: none; overflow: visible; border-left: 0; border-bottom: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+  .wort-split-list .wort-word .ds-pane__head { height: auto; min-height: calc(var(--ds-spacing-9) + var(--ds-spacing-5)); flex-wrap: wrap; column-gap: var(--ds-spacing-4); padding-top: var(--ds-spacing-3); padding-bottom: var(--ds-spacing-3); }
+  .wort-detail { padding: var(--ds-spacing-5) var(--ds-spacing-4) var(--ds-spacing-8); }
+  #detail, #wort-table { scroll-margin-top: calc(var(--ds-spacing-9) * 4.5); }  /* the nav bar wraps to three rows */
+  /* The word table keeps readable columns and scrolls sideways in its own box instead of squeezing them. */
+  .wort-split-list__table { overflow-x: auto; }
+  body[data-layout="full"] .wort-words { min-width: calc(var(--ds-spacing-9) * 18); }
+  /* The word pane sits above the table here, so the table never changes width: the Wort column goes back to its
+     share of the table (22vw would cut the words at phone width). */
+  body[data-layout="full"] .wort-words { grid-template-columns: max-content minmax(0, 1.4fr) minmax(0, 2fr) max-content max-content; }
+  body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-template-columns: max-content minmax(0, 1.4fr) minmax(0, 2fr) max-content; }
+}
+
+/* Wörter page: lookup results between the hero and the word table. */
+/* The opened lookup block runs the full page width, framed by a border above and below; its results sit
+   centred, in columns of 480-560px (a forms table's reading width). */
+.wort-lookup { display: grid; gap: var(--ds-spacing-6); padding: var(--ds-spacing-6) var(--ds-spacing-5) var(--ds-spacing-8); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); border-bottom: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-lookup > .wort-row { justify-content: center; }
+.wort-lookup__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 560px)); justify-content: center; gap: var(--ds-spacing-6) var(--ds-spacing-7); align-items: start; }
+.wort-lookup__item { display: grid; gap: var(--ds-spacing-4); padding-top: var(--ds-spacing-5); border-top: var(--ds-border-width-thin) solid var(--ds-color-border-table); }
+.wort-lookup h2 { margin: 0; }
+.wort-lookup .ds-table-header__title { padding: 0; }
+.wort-conjugation { grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1.4fr)); }

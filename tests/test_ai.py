@@ -99,7 +99,7 @@ def make_env(tmp_path, dict_path, features, cap=2, fake=None, words=(("Haus", "n
     fake = fake or FakeProvider()
     svc = service.build(cfg.AiConfig(enabled=True, api_key="k", daily_cap=cap, features=frozenset(features)), store, fake)
     app = create_app(db_path=db, dict_path=dict_path, secure_cookies=False, checker=lambda s: [], ai=svc)
-    c = TestClient(app, follow_redirects=False)
+    c = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     c.get("/login")
     c.post("/login", data={"csrf": c.cookies.get("wort_csrf"), "name": "anna", "password": PASSWORD})
     return c, store, uid, fake
@@ -169,7 +169,7 @@ def test_ai_off_makes_no_network_connection_during_a_session(tmp_path, dict_path
     app = create_app(db_path=db, dict_path=dict_path, secure_cookies=False, checker=lambda s: [])
     monkeypatch.setattr(socket.socket, "connect", deny)
     monkeypatch.setattr(socket, "getaddrinfo", deny)
-    c = TestClient(app, follow_redirects=False)  # TestClient talks to the ASGI app in-process
+    c = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))  # TestClient talks to the ASGI app in-process
     c.get("/login")
     c.post("/login", data={"csrf": c.cookies.get("wort_csrf"), "name": "anna", "password": PASSWORD})
     loc, sid = session(c, store, uid)
@@ -322,7 +322,7 @@ def test_other_user_cannot_recheck_or_start_rule_practice(tmp_path, dict_path):
     loc, sid = session(c, store, uid)
     bob = store.create_user("ben", auth.hash_password(PASSWORD)).id
     app2 = c.app
-    cb = TestClient(app2, follow_redirects=False)
+    cb = TestClient(app2, follow_redirects=False, client=("127.0.0.1", 50000))
     cb.get("/login")
     cb.post("/login", data={"csrf": cb.cookies.get("wort_csrf"), "name": "ben", "password": PASSWORD})
     tok = cb.cookies.get("wort_csrf")

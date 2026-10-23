@@ -49,7 +49,7 @@ BANNER = """
 █   █  ███  █      ██
 """.strip("\n")  # solid block letters
 
-COMMANDS = {"tui", "import", "t", "add", "list", "history", "export", "install-translation", "sync"}
+COMMANDS = {"tui", "import", "import-uk", "import-en-uk", "t", "add", "list", "history", "export", "install-translation", "sync"}
 FOOTER = "/history . /clear-history . clear . quit"
 PROMPT = "translate> "
 QUIT_WORDS = {"quit"}
@@ -85,6 +85,30 @@ def cmd_import(args: argparse.Namespace) -> None:
     with console.status("Importing…", spinner_style="none") as status:
         count = importer.import_file(source, paths.dictionary_db(), progress=lambda n: status.update(f"Importing… {n} entries"))
     _print(f"Done: {count} entries → {paths.dictionary_db()}")
+
+
+def cmd_import_uk(args: argparse.Namespace) -> None:
+    from wort.dictionary import ukrainian
+
+    source = Path(args.file)
+    if not source.is_file():
+        _print(f"No such file: {source}. Fetch the dump with scripts/fetch_data.py uk first.")
+        sys.exit(1)
+    with console.status("Importing…", spinner_style="none") as status:
+        count = ukrainian.import_file(source, paths.dictionary_uk_db(), progress=lambda n: status.update(f"Importing… {n} entries read"))
+    _print(f"Done: {count} words with Ukrainian translations → {paths.dictionary_uk_db()}")
+
+
+def cmd_import_en_uk(args: argparse.Namespace) -> None:
+    from wort.dictionary import ukrainian
+
+    source = Path(args.file)
+    if not source.is_file():
+        _print(f"No such file: {source}. Fetch it with scripts/fetch_data.py en-uk first.")
+        sys.exit(1)
+    with console.status("Importing…", spinner_style="none") as status:
+        count = ukrainian.import_english(source, paths.dictionary_en_uk_db(), progress=lambda n: status.update(f"Importing… {n} entries read"))
+    _print(f"Done: {count} English words with Ukrainian translations → {paths.dictionary_en_uk_db()}")
 
 
 MAX_PHRASE_WORDS = 30  # a sentence fits; each word is one picker entry
@@ -489,6 +513,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("import", help="import the Wiktionary dictionary from a kaikki.org JSONL file")
     p.add_argument("--file", required=True, help="JSONL fetched with scripts/fetch_data.py")
     p.set_defaults(func=cmd_import)
+
+    p = sub.add_parser("import-uk", help="import Ukrainian translations from the German Wiktionary dump (kaikki.org dewiktionary)")
+    p.add_argument("--file", required=True, help="raw-wiktextract-data.jsonl.gz fetched with scripts/fetch_data.py uk")
+    p.set_defaults(func=cmd_import_uk)
+
+    p = sub.add_parser("import-en-uk", help="import English→Ukrainian translations (English Wiktionary), used when the German dump has none")
+    p.add_argument("--file", required=True, help="kaikki-English-uk.jsonl.gz fetched with scripts/fetch_data.py en-uk")
+    p.set_defaults(func=cmd_import_en_uk)
 
     p = sub.add_parser("sync", help="push words and history to the web app (the only network use; see DEPLOY.md)")
     p.set_defaults(func=cmd_sync)

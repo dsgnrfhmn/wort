@@ -6,6 +6,7 @@ There is no signup; users are created with `scripts/adduser.py`.
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import secrets
 import time
 from datetime import datetime, timedelta
@@ -21,6 +22,16 @@ MAX_FIELD = 200  # caps both name and password before any hashing work
 _hasher = PasswordHasher()
 # Verified against when the user does not exist, so both cases cost the same.
 _DUMMY_HASH = _hasher.hash("wort-dummy-password")
+
+
+def is_loopback(host: str) -> bool:
+    """True for a loopback address (127.0.0.0/8, ::1, IPv4-mapped loopback); anything unparsable is not."""
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    mapped = getattr(addr, "ipv4_mapped", None)
+    return (mapped or addr).is_loopback
 
 
 def hash_password(password: str) -> str:

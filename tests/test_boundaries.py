@@ -35,7 +35,7 @@ def env(tmp_path, dict_path):
     fake = FakeProvider()
     ai = service.build(cfg.AiConfig(enabled=True, api_key="k", daily_cap=50), store, fake)
     app = create_app(db_path=db, dict_path=dict_path, secure_cookies=False, checker=lambda s: [], ai=ai)
-    c = TestClient(app, follow_redirects=False)
+    c = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     c.get("/login")
     c.post("/login", data={"csrf": c.cookies.get("wort_csrf"), "name": "anna", "password": PASSWORD})
     return c, store, uid, fake
@@ -73,7 +73,7 @@ def test_objection_and_own_translation_are_cleaned(env):
 
 def test_login_with_hostile_name_fails_cleanly(env):
     c, *_ = env
-    anon = TestClient(c.app, follow_redirects=False)
+    anon = TestClient(c.app, follow_redirects=False, client=("127.0.0.1", 50000))
     anon.get("/login")
     r = anon.post("/login", data={"csrf": anon.cookies.get("wort_csrf"), "name": HOSTILE * 50, "password": "x"})
     assert r.status_code == 401 and "<script>" not in r.text

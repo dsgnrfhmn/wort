@@ -1,4 +1,5 @@
-/* Theme switch glue for dis-system's nav-bar: applies data-theme and remembers it (same key as dis-system's site). */
+/* Theme switch glue for dis-system's nav-bar: remembers the theme (same key as dis-system's site). The stored
+   theme is already applied by theme-init.js in <head>, before the first paint. */
 (() => {
   const KEY = 'ds-theme';
   let stored = 'light';
@@ -42,7 +43,28 @@ window.addEventListener('DOMContentLoaded', () => {
       if (b.tagName === 'BUTTON') b.disabled = !on;
     });
   };
-  document.addEventListener('ds-table-row-select', syncButtons);
+  // The chosen words survive moving between the pages (localStorage; ids only). A preset from the server
+  // ("10 schwächste", "Letzte 20") replaces them. Ids of rows not loaded on this page are kept untouched.
+  const KEY = 'wort-selected';
+  const readStored = () => {
+    try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch (e) { return []; }
+  };
+  const saveSelection = () => {
+    try {
+      const visible = new Set(Array.from(table.querySelectorAll('.ds-table-row[data-word-id]')).map((r) => r.dataset.wordId));
+      const kept = readStored().filter((id) => !visible.has(id));
+      localStorage.setItem(KEY, JSON.stringify([...kept, ...selectedRows().map((r) => r.dataset.wordId)]));
+    } catch (e) { /* not persisted */ }
+  };
+  document.addEventListener('ds-table-row-select', () => { syncButtons(); saveSelection(); });
+  if (selectedRows().length) {
+    saveSelection();
+  } else {
+    const stored = new Set(readStored());
+    const rows = Array.from(table.querySelectorAll('.ds-table-row[data-word-id]')).filter((r) => stored.has(r.dataset.wordId));
+    rows.forEach((r) => r.setAttribute('data-selected', 'true'));
+    if (rows.length) table.dispatchEvent(new CustomEvent('ds-table-row-select', { bubbles: true, detail: { selected: true, restored: true } }));
+  }
   syncButtons();
 
   document.querySelector('[data-clear-selection]')?.addEventListener('click', () => {
@@ -82,3 +104,350 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+/* Tooltips with the English and Ukrainian for every German button label (app/ui_terms.py, embedded as
+   JSON). The tooltip sits on the button's label span, not on the button: text-button draws its hover
+   brackets with ::before/::after, and tooltip draws its bubble with ::after. A bare-text label gets a
+   span of its own (its text moved into it unchanged). Text is set with setAttribute, never as HTML. */
+window.addEventListener('DOMContentLoaded', () => {
+  const source = document.getElementById('wort-glossary');
+  if (!source) return;
+  window.wortLabelButtons = (root) => labelButtons(root);
+  let glossary;
+  try { glossary = JSON.parse(source.textContent); } catch (e) { return; }
+  const patterns = glossary.patterns.map(([re, en, uk]) => [new RegExp(`^(?:${re})$`), en, uk]);
+  const lookup = (label) => {
+    if (glossary.labels[label]) return glossary.labels[label];
+    for (const [re, en, uk] of patterns) {
+      const m = label.match(re);
+      if (m) return [en.replace('$1', m[1] || ''), uk.replace('$1', m[1] || '')];
+    }
+    return null;
+  };
+  const labelButtons = (root) => root.querySelectorAll('.ds-text-button, .ds-header-tab, .ds-table-header-cell__sort-btn').forEach((button) => {
+    if (button.closest('[data-tooltip]') || button.querySelector('[data-tooltip]')) return;
+    let target = button.querySelector('.ds-text-button__label, .ds-text-button__text, .ds-header-tab__label, .ds-table-cell__text');
+    const label = (target || button).textContent.replace(/\s+/g, ' ').trim();
+    const tip = lookup(label);
+    if (!tip) return;
+    if (!target) {
+      if (button.children.length) return;  // an icon-only or composed button: leave it alone
+      target = document.createElement('span');
+      target.className = 'wort-tip';
+      target.textContent = button.textContent;
+      button.textContent = '';
+      button.appendChild(target);
+    }
+    target.setAttribute('data-tooltip', `${tip[0]}\n${tip[1]}`);
+  });
+  labelButtons(document);
+});
+
+/* Tooltips are dis-system's layer mode (data-tooltip-mode="layer" on <html>: one fixed layer, 500 ms delay, never cut
+   by a scrolling table or covered by the sticky bar). On top of it: any German word in a text shows its lemma,
+   Ukrainian and English when the pointer rests on it (GET /api/gloss, 404 for anything that is not a German
+   dictionary word). The word is found under the pointer in the text itself, so no page needs extra markup; fields
+   and controls with a tooltip of their own are left alone. Answers, misses included, are kept for the page's life. */
+window.addEventListener('DOMContentLoaded', () => {
+  const tip = window.dsTooltip;
+  if (!tip) return;
+  const DELAY = tip.delay || 500;
+  const LETTER = /[A-Za-zÄÖÜäöüß]/;
+  const glosses = new Map();
+  const glossText = (word) => {
+    if (!glosses.has(word)) {
+      glosses.set(word, fetch(`/api/gloss?w=${encodeURIComponent(word)}`, {
+        credentials: 'same-origin', redirect: 'manual', headers: { Accept: 'application/json' },
+      }).then((res) => (res.ok ? res.json() : null)).then((g) => {
+        if (!g) return null;
+        const head = [g.label, g.pos].filter(Boolean).join(' · ');
+        return [head, g.uk, g.en].filter(Boolean).join('\n');
+      }).catch(() => null));
+    }
+    return glosses.get(word);
+  };
+  const wordAt = (x, y) => {
+    let node = null;
+    let offset = 0;
+    if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (pos) { node = pos.offsetNode; offset = pos.offset; }
+    } else if (document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(x, y);
+      if (range) { node = range.startContainer; offset = range.startOffset; }
+    }
+    if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+    const el = node.parentElement;
+    if (!el || el.closest('input, textarea, select, [contenteditable], script, style, .ds-tooltip-layer')) return null;
+    const text = node.data;
+    const joins = (i) => (text[i] === '-' || text[i] === "'") && LETTER.test(text[i - 1] || '') && LETTER.test(text[i + 1] || '');
+    let start = offset;
+    let end = offset;
+    while (start > 0 && (LETTER.test(text[start - 1]) || joins(start - 1))) start -= 1;
+    while (end < text.length && (LETTER.test(text[end]) || joins(end))) end += 1;
+    if (end - start < 2 || end - start > 60) return null;
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, end);
+    // The caret API answers the nearest text even past a line's end: only a pointer on the word itself counts.
+    const on = Array.from(range.getClientRects()).some((r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom);
+    return on ? { word: text.slice(start, end), node, start, range } : null;
+  };
+  let current = null;
+  let timer = 0;
+  const drop = () => {
+    clearTimeout(timer);
+    if (current && current.shown) tip.hide();
+    current = null;
+  };
+  document.addEventListener('mousemove', (e) => {
+    if (tip.isTrigger(e.target)) { if (current) drop(); return; }  // a control with its own tooltip
+    const hit = wordAt(e.clientX, e.clientY);
+    if (!hit) { if (current) drop(); return; }
+    if (current && current.node === hit.node && current.start === hit.start) return;  // still the same word
+    drop();
+    const t = { node: hit.node, start: hit.start, shown: false };
+    current = t;
+    timer = setTimeout(async () => {
+      if (current !== t || !hit.node.isConnected) return;
+      const text = await glossText(hit.word);
+      if (current !== t || !text) return;
+      tip.show({ getBoundingClientRect: () => hit.range.getBoundingClientRect() }, text);
+      t.shown = true;
+    }, DELAY);
+  });
+  ['scroll', 'click', 'keydown'].forEach((type) => window.addEventListener(type, () => { clearTimeout(timer); current = null; }, true));
+});
+
+/* dis-system's scripts bind once at load; a block swapped in later (the word pane, a lookup result) gets the
+   text-button label wrapper and the tooltips here. */
+window.wortPrepare = (root) => {
+  root.querySelectorAll('.ds-text-button').forEach((button) => {
+    if (button.querySelector(':scope > .ds-text-button__label, :scope > .ds-text-button__text') || button.dataset.iconOnly === 'true') return;
+    const text = document.createElement('span');
+    text.className = 'ds-text-button__text';
+    while (button.firstChild) text.appendChild(button.firstChild);
+    button.appendChild(text);
+  });
+  if (window.wortLabelButtons) window.wortLabelButtons(root);
+};
+
+/* The word beside the table opens, switches and closes in place, without a page load: the page keeps its
+   scroll position, the table keeps its selection and filter, and only the side pane's content is swapped
+   (fetched from the word's own URL, taken from the page by id). The columns change in one step and the pane
+   slides in / out (dis-system pane data-motion); switching words changes no layout. The address
+   bar follows (pushState), back/forward work, and any failure falls back to a normal page load.
+   Clicking the open word again, or "Schließen", closes it. */
+(() => {
+  const split = document.getElementById('wort-table');
+  const side = document.getElementById('wort-side');
+  if (!split || !side) return;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const narrow = window.matchMedia('(max-width: 720px)');
+  let token = 0;
+  let leaving = false;
+  const isOpen = () => split.dataset.open === 'true';
+  // Runs one entrance / exit animation of the word pane (dis-system pane data-motion: a slide beside the table,
+  // a fade when the pane sits above it at phone width), then done. Starting another one, or settle(), cancels the
+  // running one (its done never runs). With reduced motion done runs at once; if the animation never reports its
+  // end, a fallback timer finishes it. While leaving, the split carries data-leaving (layout.css: the pane lies
+  // over the already widened table).
+  let running = null;
+  const settle = () => {
+    if (running) running.cancel();
+    running = null;
+    leaving = false;
+    split.removeAttribute('data-leaving');
+  };
+  const animate = (kind, done) => {
+    settle();
+    if (reduce.matches) { if (done) done(); return; }
+    const pane = side.querySelector('.ds-pane');
+    if (!pane) { if (done) done(); return; }
+    const motion = narrow.matches ? (kind === 'enter' ? 'fade-in' : 'fade-out') : kind;
+    let over = false;
+    const onEnd = (e) => { if (e.target === pane) finish(); };
+    const timer = setTimeout(() => finish(), 400);
+    const stop = () => {
+      over = true; clearTimeout(timer); pane.removeEventListener('animationend', onEnd);
+      delete pane.dataset.motion; split.removeAttribute('data-leaving');
+    };
+    const finish = () => { if (over) return; stop(); running = null; if (done) done(); };
+    running = { cancel: () => { if (!over) stop(); } };
+    pane.addEventListener('animationend', onEnd);
+    if (kind === 'leave') split.setAttribute('data-leaving', '');
+    pane.dataset.motion = motion;
+  };
+  const idOf = (href) => (/^\/words\/(\d+)/.exec(href) || [])[1] || null;
+  const openId = () => (isOpen() ? idOf(location.pathname) : null);
+  const listHref = (href) => {
+    const q = href.split('#')[0].split('?')[1];
+    return q ? `/?${q}` : '/';
+  };
+  const mark = (id) => split.querySelectorAll('.ds-table-row[data-word-id]').forEach((row) => {
+    if (row.dataset.wordId === id) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current');
+  });
+  const prepare = window.wortPrepare;
+  const load = async (href) => {
+    const res = await fetch(href, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+    if (!res.ok) throw new Error(String(res.status));
+    const pane = new DOMParser().parseFromString(await res.text(), 'text/html').getElementById('detail');
+    if (!pane) throw new Error('no word');
+    return pane;
+  };
+  // A word's pane is fetched ahead while the pointer rests on its row, so the click shows it without waiting
+  // for the server. Kept 30 s, at most 20 words; a failed fetch is not kept.
+  const cache = new Map();
+  const TTL = 30000;
+  const fetched = (href) => {
+    const key = href.split('#')[0];
+    const hit = cache.get(key);
+    if (hit && Date.now() - hit.at < TTL) return hit.pane;
+    const pane = load(key);
+    cache.set(key, { at: Date.now(), pane });
+    pane.catch(() => cache.delete(key));
+    while (cache.size > 20) cache.delete(cache.keys().next().value);
+    return pane;
+  };
+  const fetchPane = async (href) => document.importNode(await fetched(href), true);
+  let hoverTimer = 0;
+  split.addEventListener('pointerover', (e) => {
+    const row = e.target instanceof Element && e.target.closest('.wort-word-table .ds-table-row[data-href]');
+    if (!row || e.pointerType === 'touch') return;
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => { if (idOf(row.dataset.href) !== openId()) fetched(row.dataset.href); }, 80);
+  });
+  split.addEventListener('pointerout', () => clearTimeout(hoverTimer));
+  const reveal = () => split.scrollIntoView({ behavior: reduce.matches ? 'auto' : 'smooth', block: 'start' });
+
+  const show = async (href, { push = true, scroll = false } = {}) => {
+    const mine = ++token;
+    let pane;
+    try { pane = await fetchPane(href); } catch (err) { location.assign(href); return; }
+    if (mine !== token) return;
+    const wasOpen = isOpen();
+    side.replaceChildren(pane);
+    prepare(pane);
+    mark(idOf(href));
+    if (!wasOpen || leaving) {
+      settle();
+      split.dataset.open = 'true';
+      animate('enter');
+    }
+    if (push) history.pushState(null, '', href.split('#')[0]);
+    if (scroll) reveal();
+  };
+  const close = (href, { push = true } = {}) => {
+    token += 1;
+    if (!isOpen() || leaving) return;
+    mark(null);
+    if (push) history.pushState(null, '', href);
+    const mine = token;
+    // Wide: the table widens at once under the fading pane (layout.css data-leaving). Narrow: the word sits above
+    // the table, so it fades first and the table moves up after.
+    const overlay = !narrow.matches;
+    animate('leave', () => {
+      leaving = false;
+      if (mine !== token) return;  // reopened meanwhile
+      delete split.dataset.open;
+      side.replaceChildren();
+    });
+    if (overlay) delete split.dataset.open;
+    leaving = !reduce.matches && (overlay || isOpen());
+  };
+
+  const activate = (href, inTable) => {
+    if (idOf(href) === openId()) {
+      if (inTable) close(listHref(href)); else reveal();
+      return;
+    }
+    show(href, { scroll: !inTable });
+  };
+  // dis-system's table-row navigates on a row click unless the host cancels its ds-table-row-open event:
+  // the word opens here, in place, and the click handler below leaves that click alone.
+  let rowEventClick = false;
+  document.addEventListener('ds-table-row-open', (e) => {
+    const href = e.detail && e.detail.href;
+    if (!(e.target instanceof Element) || !e.target.closest('.wort-word-table') || !idOf(href || '')) return;
+    e.preventDefault();
+    rowEventClick = true;
+    activate(href, true);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (rowEventClick) { rowEventClick = false; return; }
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!(e.target instanceof Element)) return;
+    const closer = e.target.closest('.wort-word a[href^="/?"]');
+    if (closer) { e.preventDefault(); close(closer.getAttribute('href').split('#')[0]); return; }
+    const link = e.target.closest('a[href^="/words/"]');
+    const row = e.target.closest('.wort-word-table .ds-table-row[data-href]');
+    let href = null;
+    if (link && !link.closest('.wort-word') && idOf(link.getAttribute('href'))) {
+      href = link.getAttribute('href');
+    } else if (!link && row && !e.target.closest('a, button, input, label, [data-type="checkbox-cell"], [data-type="icon-cell"]') && !String(window.getSelection())) {
+      href = row.dataset.href;
+    }
+    if (!href || !idOf(href)) return;
+    e.preventDefault();
+    activate(href, !!e.target.closest('.wort-word-table'));
+  });
+
+  window.addEventListener('popstate', () => {
+    const id = idOf(location.pathname);
+    if (id) show(location.pathname + location.search, { push: false });
+    else close(location.pathname + location.search, { push: false });
+  });
+})();
+
+/* Lookup in place: the hero's field submits by fetch and only the result block (.wort-lookup) is swapped in
+   below the hero, fading in; the hero and the field do not move, the page is not reloaded and the scroll stays.
+   The result block's own "Suche schließen" removes it. Address bar and back/forward follow (pushState); a
+   failed fetch falls back to the normal page load. */
+(() => {
+  const hero = document.querySelector('.ds-hero-block');
+  const form = hero?.querySelector('form[role="search"]');
+  if (!form) return;
+  const input = form.querySelector('input[name="q"]');
+  let token = 0;
+  const swap = (section) => {
+    document.querySelector('.wort-lookup')?.remove();
+    if (!section) return;
+    const block = document.importNode(section, true);
+    hero.after(block);
+    window.wortPrepare(block);
+    block.classList.add('ds-fade-in');  // dis-system fade-in: the result block arrives softly, the field stays put
+    block.addEventListener('animationend', () => block.classList.remove('ds-fade-in'), { once: true });
+  };
+  const load = async (url, { push = true } = {}) => {
+    const mine = ++token;
+    let section;
+    try {
+      const res = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+      if (!res.ok) throw new Error(String(res.status));
+      section = new DOMParser().parseFromString(await res.text(), 'text/html').querySelector('.wort-lookup');
+    } catch (err) { location.assign(url); return; }
+    if (mine !== token) return;
+    swap(section);
+    if (push) history.pushState(null, '', url);
+  };
+  form.addEventListener('submit', (e) => {
+    if (!input || !input.value.trim()) return;
+    e.preventDefault();
+    load(`/?${new URLSearchParams(new FormData(form))}`);
+  });
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!(e.target instanceof Element) || !e.target.closest('.wort-lookup > .wort-row a[href="/"]')) return;
+    e.preventDefault();
+    token += 1;
+    swap(null);
+    history.pushState(null, '', '/');
+  });
+  window.addEventListener('popstate', () => {
+    if (location.pathname !== '/') return;
+    const q = new URLSearchParams(location.search).get('q') || '';
+    if (input) input.value = q;
+    if (q) load(location.pathname + location.search, { push: false }); else { token += 1; swap(null); }
+  });
+})();

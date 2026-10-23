@@ -26,7 +26,7 @@ def env(tmp_path, dict_path):
 
 
 def login(app, name):
-    c = TestClient(app, follow_redirects=False)
+    c = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     c.get("/login")
     c.post("/login", data={"csrf": c.cookies.get("wort_csrf"), "name": name, "password": PASSWORD})
     return c
