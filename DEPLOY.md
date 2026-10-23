@@ -34,7 +34,9 @@ read-only.
 
 The first user created adopts the history and favorites that existed before accounts. Sessions are
 cookies (HttpOnly, SameSite=Strict, Secure); the app is meant to be reached over the TLS front only.
-For plain-http local development set `WORT_INSECURE_COOKIES=1` (never on the server).
+For plain-http local development set `WORT_INSECURE_COOKIES=1` (never on the server). In that mode the app answers
+loopback clients only (127.0.0.1 / ::1) and returns 403 to everyone else, so a run on a LAN address cannot send the
+password or the session cookie in clear text; for the LAN use `scripts/dev.sh` (https).
 
 ## 3b. CLI sync (port 8456, write-only token)
 

@@ -91,14 +91,15 @@ explanations.
 
 ## Security boundaries (hard)
 
-- **Host is shared** with other services. wort runs as its own unix user,
-  as a sandboxed systemd service (`ProtectHome`, `ProtectSystem=strict`,
-  `NoNewPrivileges`, `PrivateTmp`, writable path limited to its data dir).
+- **Host is shared** with other services. wort runs as its own unix user in a **rootless podman compose**
+  stack (`compose.yaml`, `DEPLOY.md`; decided 2026-10-23, DECISIONS D00f): containers `read_only`, `cap_drop: ALL`,
+  `no-new-privileges`, `/tmp` as tmpfs, the repo mounted read-only, the only writable path its data volume. The
+  app listens on `127.0.0.1` inside nginx's network namespace; only nginx publishes ports, on the LAN IP.
   It must not be able to read the other services' files. Verify, don't assume (see PLAN Step 1).
 - **Outbound network (web app only)**: the web backend may reach **one host, `api.anthropic.com:443`**,
-  and only for the AI blocks (D0r). Everything else is denied: the unit/container allows localhost and the
-  LAN/VPN subnets plus that one destination (egress proxy or firewall by name, see DEPLOY.md §6);
-  `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`. The sync service and the CLI have no outbound
+  and only for the AI blocks (D0r). Everything else is denied: the containers reach localhost and the
+  LAN/VPN subnets plus that one destination (egress proxy or host firewall by name, see DEPLOY.md §6).
+  The sync service and the CLI have no outbound
   access at all. The LanguageTool client refuses non-loopback URLs. `base_url` for the API is fixed in
   code, never taken from the environment.
 - **Access**: only over private network (LAN / VPN). No port forwarding, no public
@@ -158,18 +159,20 @@ Keep README and this file in sync after each session.
 - `app/auth.py`, `app/words.py`, `app/practice.py`, `app/scoring.py` — login, word list, practice, score formula
 - `app/ai/` — AI layer (interface, schemas, daily cap, fake provider, Anthropic provider; off until the key is set)
 - `src/wort/sanitize.py` — the sanitizers used by the CLI and the web app
-- `app/ds.py` — Jinja environment that includes `vendor/dis-system` templates + asset lists; `app/static/` — layout.css (layout only), app.js (theme + toast glue)
-- `app/ocr.py` — image validation + Tesseract **[post-MVP]**
-- `app/lexicon.py` — lemmatize, lookup, inflection, translation cache
-  (ported from `src/wort/dictionary/*`)
-- `app/grammar_check.py` — loopback-only LanguageTool client **[post-MVP]**
-  (ported from `src/wort/exercises/grammar_check.py`)
-- `app/exercises.py` — exercise generation + local grading
-  (ported from `src/wort/exercises/*`)
-- `app/scoring.py` — score + scheduling rules (pure functions, unit-tested)
-  (ported from `src/wort/srs.py`)
-- `scripts/import_lexicon.py` — builds the local dictionary DB
-  (ported from `src/wort/dictionary/importer.py`)
-- `scripts/adduser.py` — admin user creation
+- `app/ds.py` — Jinja environment that includes `vendor/dis-system` templates + asset lists; `app/static/` —
+  layout.css (layout only), theme-init.js (theme before first paint), app.js (glue: selection, word pane, lookup,
+  word tooltips via dis-system's `window.dsTooltip`)
+- `app/lookup.py` — lookup on the Wörter page (word or sentence → entries, forms tables);
+  `app/words.py` also serves `GET /api/gloss` (one German word → lemma, Ukrainian, English)
+- `app/lexicon.py` — dictionary summaries for the word detail; the lookup engine itself is `src/wort/dictionary/`
+  (shared with the CLI; Ukrainian in `src/wort/dictionary/ukrainian.py`)
+- `app/checking.py` — sentence checks (required form; LanguageTool client is `src/wort/exercises/grammar_check.py`,
+  loopback only)
+- `app/importer.py`, `app/sync_app.py` — CLI export import, `POST /sync` (own process); `app/ui_terms.py` — EN/UK
+  tooltips for the German button labels
+- `app/db.py` — web.db schema v3 + migrations
+- `app/ocr.py` — image validation + Tesseract **[post-MVP]**, not written yet
+- `scripts/adduser.py`, `scripts/synctoken.py` — admin user and sync-token creation; `scripts/fetch_data.py` —
+  downloads (the CLI never downloads); `scripts/dev.sh` — https dev server on the LAN
 - `spikes/` — Step 0 measurement scripts (run on the server by the maintainer)
 - `vendor/dis-system/` — submodule

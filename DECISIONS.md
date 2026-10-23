@@ -92,6 +92,54 @@ Confirmed by maintainer (date)*.
 - **Confirmed by maintainer:** 2026-10-21 (requested in session; variant: HTTPS push + write-only token,
   OS rule + in-code guard, downloads moved out of the CLI)
 
+## D00f — Deploy form: rootless podman compose
+
+- **Question:** run the web app as the sandboxed systemd unit of PLAN Step 1, or as the podman compose stack that
+  was built and documented (`compose.yaml`, `nginx.conf`, `DEPLOY.md`)?
+- **Decision (2026-10-23):** rootless **podman compose**. The systemd unit is dropped. The sandbox requirements stay
+  and are met by the containers: `read_only`, `cap_drop: ALL`, `no-new-privileges`, tmpfs `/tmp`, repo read-only,
+  writable data volume only, app on `127.0.0.1` in nginx's network namespace, nginx published on the LAN IP only;
+  outbound per DEPLOY.md §6. `CLAUDE.md` "Security boundaries" updated to match.
+- **Still to prove (PLAN Step 1, D6):** other services' files unreadable from the containers; no outbound except the
+  AI host; the app unreachable from outside the LAN/VPN.
+- **Confirmed by maintainer:** 2026-10-23
+
+## D00e — Temporary local overrides of dis-system components (web UI)
+
+> **Closed 2026-10-23:** every gap below moved into dis-system (branch `dsgnrfhmn/reading-upload-components`):
+> table-cell `plain` links and table-row `href` (gap 1), nav-bar `right_actions` (gap 2), hero-block `data-fit`
+> (gap 3), wrapping nav-bar / page-head / header-block (gap 4), tooltip layer mode + `window.dsTooltip` (gap 5),
+> pane `data-motion` (gap 6), the existing `fade-in` class for the lookup block (gap 7). `app/static/overrides.css`
+> and `app/templates/_nav.html` are deleted. The submodule points at that branch until it is merged (D00b).
+
+- **Question:** the design canvas colours words by gender with verbs/adjectives in the text colour, drops
+  the underline on word links and puts "Abmelden" in the nav bar. dis-system cannot do any of the three
+  today (a `link` cell is always accent-1 and underlined; `nav-bar` has no right-side slot).
+- **Options:** (a) dis-system PR first, then bump the submodule; (b) temporary local overrides in wort.
+- **Decision (2026-10-22):** (b), as an explicit, temporary exception to CLAUDE.md's design-system rules.
+  Everything lives in two places only: `app/static/overrides.css` (gap 1: word-link colour and no
+  underline in `.wort-word-table`; the whole row opens the word, `app.js`) and `app/templates/_nav.html`
+  (gap 2: a fork of `nav-bar/template.html` with the logout form on the right).
+- **Added 2026-10-22 (lookup hero, Figma open-projects 376:12066 adapted):** the Wörter page uses
+  dis-system's *staged* `local-components/hero-block` (CSS served from the submodule, markup written in
+  `words.html`, it has no `template.html` yet). Gap 3: a card (titled box, 260px) in `overrides.css`;
+  Figma's base/50 fill has no themed token, `bg-surface-pressed` stands in. Gap 4: page-head and
+  header-block rows wrap at phone width (`overrides.css`, as the design canvas does; header-block's
+  fixed row height is lifted there). The sticky nav-bar gets a stacking order (`z-index`), else positioned
+  content scrolling under it paints over it.
+- **Added 2026-10-22 (tooltips, opening animation):** gap 5, tooltip: every German button label gets an
+  English + Ukrainian tooltip (`app/ui_terms.py`, matched in `app.js`) after a 500 ms delay, drawn on one
+  fixed layer in `<body>` so no scrolling table or sticky bar clips or covers it (dis-system's tooltip is
+  the trigger's own `::after`, cut by any `overflow` ancestor and has no delay). Gap 6: the word beside
+  the table opens and closes in place (no page load) as a column-width transition, switching words does not animate,
+  not with reduced motion.
+- **Exit:** move all of it into dis-system (a `word` variant of the `link` cell, an `actions_right` slot on
+  `nav-bar`, a card component, hero-block confirmed with a template and a cards slot, wrapping rows),
+  bump the submodule, delete both files. Also open: `table-row` does not pass
+  `submit`/`extra_attrs` to a `1-action` cell (history and favorites build those rows by hand).
+- **Confirmed by maintainer:** 2026-10-22 ("temporary local CSS in wort"; the whole row is the click
+  target instead of an underline).
+
 ## D00 — Scope and note language
 
 - **Decision (2026-10-04):** notes and translations are in **English**
@@ -140,7 +188,10 @@ Confirmed by maintainer (date)*.
     dis-system PR #2 (`form-props`), merged to its `main` on 2026-10-21.
     Gaps still without a component: file input (native control used),
     textarea-free sentence result block (empty-state used for text lines).
-- **dis-system commit in use:** `a2404a4` (2026-10-22: `main` after the merge of dis-system PR #4,
+- **dis-system commit in use (working tree, 2026-10-23):** `cb13772` on branch `dsgnrfhmn/reading-upload-components`
+  (pushed; the submodule pointer is committed on `wip/web-view`). Bump the pointer to the merge commit once the branch
+  is merged into dis-system `main` (a squash merge would orphan `cb13772`), and record it here.
+  Previous: `a2404a4` (2026-10-22: `main` after the merge of dis-system PR #4,
   `dsgnrfhmn/table-row-cell-props`, on top of PR #3). Together they bring the tag cell, `article`, page-head
   props, header-tab `href`, `inline-mark`, `message`, `disclosure` (with `items`), multi-line tooltip, table-row
   forwarding of `tag_type`/`tag_subtype`/`article`, and article link colors in the dark theme. The temporary
