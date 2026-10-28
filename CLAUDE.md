@@ -122,7 +122,9 @@ explanations.
   machine). The CLI never downloads anything: big files come from
   `scripts/fetch_data.py`, run separately. Enforced at the OS level
   (`scripts/wort-offline`) with an in-process guard (`src/wort/netguard.py`) as a
-  second layer. The exported JSON file (browser import) remains an equal path.
+  second layer. The exported JSON file (browser import) remains an equal path. In development only, with
+  `WORT_CLI_DB` set, "Gesuchte laden" reads the CLI's `user.db` on the same machine read-only (DECISIONS D00g);
+  never set on the server.
   Both paths treat the JSON as untrusted user data (size, schema, length caps).
 - **Web network:** the sync service (`app/sync_app.py`, own process and port)
   has no outbound access. The web app's only permitted outbound destination is
@@ -157,15 +159,22 @@ Keep README and this file in sync after each session.
 - `src/wort/` — CLI + TUI (stays; fully local; command `wort`; Python package `wort`)
 - `app/` — FastAPI app, routes, templates
 - `app/auth.py`, `app/words.py`, `app/practice.py`, `app/scoring.py` — login, word list, practice, score formula
+- `app/questions.py` + `app/questions.json` — topic questions for "Sätze bilden" (hand-edited list, picked at random,
+  no AI; the file is validated at startup)
 - `app/ai/` — AI layer (interface, schemas, daily cap, fake provider, Anthropic provider; off until the key is set)
 - `src/wort/sanitize.py` — the sanitizers used by the CLI and the web app
 - `app/ds.py` — Jinja environment that includes `vendor/dis-system` templates + asset lists; `app/static/` —
   layout.css (layout only), theme-init.js (theme before first paint), app.js (glue: selection, word pane, lookup,
-  word tooltips via dis-system's `window.dsTooltip`)
+  word tooltips via dis-system's `window.dsTooltip`, the lookup side panel, Enter-to-send and terminal-style
+  editing keys in text fields)
 - `app/lookup.py` — lookup on the Wörter page (word or sentence → entries, forms tables);
   `app/words.py` also serves `GET /api/gloss` (one German word → lemma, Ukrainian, English)
 - `app/lexicon.py` — dictionary summaries for the word detail; the lookup engine itself is `src/wort/dictionary/`
-  (shared with the CLI; Ukrainian in `src/wort/dictionary/ukrainian.py`)
+  (shared with the CLI; Ukrainian in `src/wort/dictionary/ukrainian.py`; German definitions in
+  `src/wort/dictionary/german.py` → `dictionary-de.db`, imported with `wort import-de`)
+- `app/grammar.py` + `app/grammar.json` — Üben › Grammatik: B1/B2 topics (explanation, tables) and exercises
+  (Lückentext, Multiple Choice, Satz umbauen, eigener Satz), graded locally; progress in `grammar_attempts`
+- `app/hints.py` — Üben tooltip texts (what a task's form means, the corrected word's forms, Ukrainian rule glosses)
 - `app/checking.py` — sentence checks (required form; LanguageTool client is `src/wort/exercises/grammar_check.py`,
   loopback only)
 - `app/importer.py`, `app/sync_app.py` — CLI export import, `POST /sync` (own process); `app/ui_terms.py` — EN/UK

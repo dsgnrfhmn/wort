@@ -11,6 +11,7 @@ from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from wort.dictionary import grammar as g
 from wort.dictionary.lookup import Dictionary, Entry
+from wort.dictionary.german import GermanDefinitions
 from wort.dictionary.ukrainian import Ukrainian
 
 from wort import sanitize
@@ -166,6 +167,12 @@ def register(app, ctx) -> None:
         except FileNotFoundError:
             return None
 
+    def german_or_none() -> GermanDefinitions | None:
+        try:
+            return GermanDefinitions(ctx.de_path)
+        except FileNotFoundError:
+            return None
+
     def ukrainian_or_none() -> Ukrainian | None:
         try:
             return Ukrainian(ctx.uk_path, ctx.uk_en_path)
@@ -190,6 +197,7 @@ def register(app, ctx) -> None:
             this_week=sum(1 for w in all_words if w.added_at.timestamp() >= week),
             last_added=last.strftime("%H:%M") if last else "", german_date=german_date,
             has_dictionary=dic is not None, query="", results=[], note="", detail=None,
+            cli_import=ctx.cli_db is not None,
             recent_queries=[h.query for h in store.history(user.id)[:3]],
             weakest=[view(w, dic, uk) for w in order([w for w in all_words if w.score is not None], "score", False)[:3]],
             latest=[view(w, dic, uk) for w in order(all_words, "added", True)[:3]],
@@ -208,7 +216,7 @@ def register(app, ctx) -> None:
         query = sanitize.text(q, lookup.MAX_QUERY)
         if query and page["dic"] is not None:
             owned = {(w.lemma.casefold(), w.pos) for w in page["all_words"]}
-            page["results"], page["note"] = lookup.search(page["dic"], page["uk"], query, owned)
+            page["results"], page["note"] = lookup.search(page["dic"], page["uk"], query, owned, german_or_none())
             if s == "1":  # typed into the search field; reloads and the return after "add" are not new lookups
                 found = bool(page["results"]) and not page["note"].startswith("Nicht")
                 store.add_history(user.id, [(query, found, datetime.now())])

@@ -1,108 +1,226 @@
 {% extends "base.html" %}
 {% block title %}{{ kinds[sess.kind] }} · wort{% endblock %}
+{# fade-in from the head (its documented place): it shows held parts after 10 s even if app.js never runs. #}
+{% block head_extra %}<script src="/ds/components/fade-in/component.js"></script>{% endblock %}
+
+{# A task's prompt: the topic question (if any) with the instruction as its note, then hints for an open task. #}
+{% macro prompt_turn(t) %}
+  {% with variant='task', label='Aufgabe ' ~ (t.index + 1), text=t.question or t.prompt, note=t.prompt if t.question else none, note_tooltip=t.task_hint if t.question else none, note_more='mehr', segments=none %}{% include "components/message/template.html" %}{% endwith %}
+  {% if not t.result %}
+    {# Hint: an example answer to the question, on hover or focus (dis-system tooltip on the wrapper). #}
+    {% if t.example %}<div class="wort-row">
+      <span class="wort-tip-wrap" data-tooltip="{{ t.example }}">{% with priority='secondary', underline='dotted', label='Beispielantwort' %}{% include "components/text-button/template.html" %}{% endwith %}</span>
+      {% if t.kind == 'sentence' %}
+      {# Another question that fits the word, when this one makes no sense with it. #}
+      <form method="post" action="/ueben/s/{{ sess.id }}/frage">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="at" value="{{ t.index }}">
+        {% with priority='secondary', underline='dotted', label='Andere Frage', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+      </form>
+      {% endif %}
+    </div>{% endif %}
+    {% if t.hint %}{% with message='Hinweis: ' ~ t.hint %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+    {% if t.choices %}{% with message='Antworte mit einer Nummer oder dem Wort: ' ~ (t.choices | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+    {% if t.notice %}{% with message=t.notice %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+  {% endif %}
+{% endmacro %}
+
+{# The reply block: the answer, the corrected sentence attached under it, then the feedback on a plain surface. The
+   AI actions only on the current task (`live`). #}
+{% macro reply(t, live) %}
+  {% set result = t.result %}
+  {% set vlabel = 'Tipp' if result.tip and result.verdict is none and not result.word_ok else {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch'}.get(result.verdict, 'nicht bewertet') %}
+  {% set delta_text = (' · Score ' ~ ('%+d' | format(result.delta))) if result.delta is not none else '' %}
+  {% set fb = [] %}
+  {% if result.word_results %}
+    {% for w in result.word_results %}{% set _ = fb.append({'name': w.word, 'status': 'richtig' if w.ok else 'falsch', 'note': w.note}) %}{% endfor %}
+    {% set caption = (result.word_results | selectattr('ok') | list | length) ~ ' von ' ~ (result.word_results | length) ~ ' Wörtern richtig' ~ delta_text %}
+  {% elif result.grammar %}
+    {# Sentence tasks: the word and the grammar are two rows; a tip about the form is a row of its own. #}
+    {% if result.word_ok %}
+      {% set _ = fb.append({'name': 'Wort', 'status': 'richtig', 'note': t.word_label ~ ' ist verwendet.'}) %}
+      {% if result.tip %}{% set _ = fb.append({'name': 'Form', 'status': 'Tipp', 'note': result.tip}) %}{% endif %}
+    {% else %}
+      {% set _ = fb.append({'name': 'Wort', 'status': 'Tipp', 'note': result.tip or result.feedback}) %}
+    {% endif %}
+    {% set n = (result.remarks or []) | length %}
+    {% set _ = fb.append({'name': 'Grammatik', 'status': {'ok': 'richtig', 'errors': 'falsch'}.get(result.grammar, 'nicht geprüft'),
+        'note': {'ok': 'Keine Fehler gefunden.', 'errors': n ~ ' Fehler, siehe unten.'}.get(result.grammar, 'LanguageTool nicht erreichbar: kein Score.')}) %}
+    {% set caption = vlabel ~ delta_text %}
+  {% else %}
+    {% set _ = fb.append({'name': t.word_label, 'status': vlabel, 'note': result.feedback}) %}
+    {% set caption = vlabel ~ delta_text %}
+  {% endif %}
+  {# The current result arrives in steps (app.js): answer, correction, feedback, then the next task. Each step
+     is held invisible (dis-system fade-in's data-fade-hold) until its turn. #}
+  <div class="wort-reply"{% if live %} aria-live="polite"{% endif %}>
+    {# Messenger-like: the answer and its correction on the right, as one bubble; the feedback below, full width. #}
+    <div class="wort-reply__mine">
+    <div{% if live and not erklaert %} data-fade-hold data-result-step="0"{% endif %}>{% with variant='answer', label='Deine Antwort', text=t.answer, segments=none, note=none %}{% include "components/message/template.html" %}{% endwith %}</div>
+    {% if t.segments %}<div{% if live and not erklaert %} data-fade-hold data-result-step="1"{% endif %}>{% with variant='prompt', label='Korrigiert', segments=t.segments, note=none %}{% include "components/message/template.html" %}{% endwith %}</div>{% endif %}
+    </div>
+    {# The review: the feedback and the word's facts, framed as one block. #}
+    <div class="wort-review">
+    <section class="ds-pane wort-feedback" aria-labelledby="fb-title-{{ t.index }}"{% if live and not erklaert %} data-fade-hold data-result-step="2"{% endif %}>
+      <div class="ds-pane__head">
+        <div class="ds-pane__heading">
+          <span class="ds-pane__title" data-emphasis="true" id="fb-title-{{ t.index }}">Feedback</span>
+          <span class="ds-pane__caption">{{ caption }}</span>
+        </div>
+        {% if result.remarks and not (live and can_explain) %}
+        {% with priority='secondary', underline='dotted', label='Fehler erklären', href='?fehler=' ~ t.index ~ '-1#jetzt' %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% endif %}
+        {% if live and not t.explanation and can_explain and result.verdict in ('wrong', 'almost') %}
+        <form method="post" action="/ueben/s/{{ sess.id }}/explain">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% with priority='secondary', underline='dotted', label='Fehler erklären', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        </form>
+        {% endif %}
+      </div>
+      <div class="ds-pane__body">
+        <div class="wort-table wort-feedback-table" role="table" aria-label="Bewertung">
+          {% for label in ('Bewertung', 'Ergebnis', 'Kommentar') %}{% with label=label %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+          {% for r in fb %}
+          {% with selected=false, cells=[
+            {'type': 'text-active-cell', 'content': r.name},
+            {'type': 'tag', 'content': r.status, 'tag_type': {'richtig': 'success', 'fast richtig': 'warning', 'falsch': 'danger', 'Tipp': 'accent-2'}.get(r.status, 'neutral'), 'tag_subtype': 'passive'},
+            {'type': 'text-passive-cell', 'content': r.note, 'wrap': true}
+          ] %}{% include "components/table-row/template.html" %}{% endwith %}
+          {% endfor %}
+        </div>
+        {# Everything else about the answer, one labelled row each, left-aligned: the corrected sentence, each
+           mistake, the word's facts, notes and translations. #}
+        {% if t.details %}
+        <div class="wort-table wort-details-table" role="table" aria-label="Details">
+          {% for label, text, href in t.details %}
+          {% with selected=false, cells=[
+            {'type': 'link', 'content': label, 'href': href} if href else {'type': 'text-passive-cell', 'content': label},
+            {'type': 'text-active-cell', 'content': text, 'wrap': true}
+          ] %}{% include "components/table-row/template.html" %}{% endwith %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if live and can_recheck and result.verdict in ('wrong', 'almost') %}
+        <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/recheck">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% with name='objection', label='Doch richtig? Warum?', fill='filled', required=true, placeholder='Doch richtig? Warum?' %}{% include "components/input/template.html" %}{% endwith %}
+          {% with priority='secondary', underline='dotted', label='Doch richtig? (' ~ ai_left ~ ' KI-Anfragen heute übrig)', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        </form>
+        {% endif %}
+        {% if live and can_rule and result.verdict in ('wrong', 'almost') %}
+        <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/regel">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% with priority='secondary', underline='dotted', label='Diese Regel üben', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        </form>
+        {% endif %}
+      </div>
+    </section>
+    </div>
+  </div>
+{% endmacro %}
+
 {% block content %}
+{% set checked_by = 'KI' if ai_check or item.kind in ('bedeutung', 'erklaere') and ai_on else 'lokal' %}
 <section class="wort-section">
-  {% with type='title-info', title=kinds[sess.kind], info='Aufgabe ' ~ (pos + 1) ~ ' / ' ~ total %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with type='title-info', title=kinds[sess.kind], info='Aufgabe ' ~ ((target.index if target else pos) + 1) ~ ' / ' ~ total ~ ' · Prüfung: ' ~ checked_by %}{% include "components/table-header/template.html" %}{% endwith %}
   <div class="wort-row">
     {% for t in tags %}{% with type='neutral', subtype='passive', label=t %}{% include "components/tag/template.html" %}{% endwith %}{% endfor %}
+    {% if sess.kind == 'grammatik' %}
+    {% with priority='secondary', underline='solid', label='Anderes Thema', href='/ueben?neu=1&modus=grammatik' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% else %}
+    {% with priority='secondary', underline='solid', label='Neue Wörter wählen', href='/ueben?neu=1' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% endif %}
     {% with priority='secondary', underline='solid', label='Beenden', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
 </section>
 
-<section class="wort-section">
-  <div class="wort-messages">
-    {% with variant='prompt', label='Aufgabe ' ~ (pos + 1), text=prompt %}{% include "components/message/template.html" %}{% endwith %}
+<section class="wort-chat" aria-label="Übung">
+  {% for t in turns %}
+  <div class="wort-turn"{% if loop.last and not upcoming %} id="jetzt"{% endif %}>
+    {{ prompt_turn(t) }}
+    {% if t.result %}{{ reply(t, loop.last) }}{% endif %}
   </div>
-  {% with message='Prüfung: ' ~ ('KI' if ai_check or item.kind in ('bedeutung', 'erklaere') and ai_on else 'lokal') %}{% include "components/empty-state/template.html" %}{% endwith %}
-  {% if hint %}{% with message='Hinweis: ' ~ hint %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
-  {% if choices %}
-    {% with message='Antworte mit einer Nummer oder dem Wort: ' ~ (choices | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% endfor %}
+  {% if upcoming %}
+  <div class="wort-turn" id="jetzt"{% if not erklaert %} data-fade-hold data-result-step="3"{% endif %}>{{ prompt_turn(upcoming) }}</div>
   {% endif %}
-  {% if item.notice %}{% with message=item.notice %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
 </section>
 
-{% if result %}
-<section class="wort-section" aria-live="polite">
-  <div class="wort-messages">
-    {% with variant='answer', label='Deine Antwort', text=answer %}{% include "components/message/template.html" %}{% endwith %}
-    {% if segments %}{% with variant='prompt', label='Korrigiert', segments=segments %}{% include "components/message/template.html" %}{% endwith %}{% endif %}
-  </div>
-  {% set vlabel = {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch'}.get(result.verdict, 'nicht bewertet') %}
-  {% set delta_text = (' · Score ' ~ ('%+d' | format(result.delta))) if result.delta is not none else '' %}
-  {% set fb = [] %}
-  {% if result.word_results %}
-    {% for w in result.word_results %}{% set _ = fb.append({'status': 'richtig' if w.ok else 'falsch', 'word': w.word, 'note': w.note, 'score': ''}) %}{% endfor %}
-    {% set caption = (result.word_results | selectattr('ok') | list | length) ~ ' von ' ~ (result.word_results | length) ~ ' Wörtern richtig' ~ delta_text %}
+<div class="wort-composer">
+  {% if target %}
+  <form class="wort-form wort-answer" method="post" action="/ueben/s/{{ sess.id }}/answer">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="at" value="{{ target.index }}">
+    {% with type=target.input, name='text', label='Deine Antwort', rows=2, fill='filled', required=true, placeholder='Deine Antwort auf Aufgabe ' ~ (target.index + 1) %}{% include "components/input/template.html" %}{% endwith %}
+    <div class="wort-row">
+      {% with priority='primary', underline='dotted', label='Senden', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+    </div>
+  </form>
   {% else %}
-    {% set _ = fb.append({'status': vlabel, 'word': word_label, 'note': result.feedback, 'score': ('Score ' ~ ('%+d' | format(result.delta))) if result.delta is not none else ''}) %}
-    {% set caption = vlabel ~ delta_text %}
-  {% endif %}
-  <section class="ds-pane wort-feedback" aria-labelledby="fb-title">
-    <div class="ds-pane__head">
-      <div class="ds-pane__heading">
-        <span class="ds-pane__title" data-emphasis="true" id="fb-title">Feedback</span>
-        <span class="ds-pane__caption">{{ caption }}</span>
-      </div>
-      {% if not explanation and can_explain and result.verdict in ('wrong', 'almost') %}
-      <form method="post" action="/ueben/s/{{ sess.id }}/explain">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        {% with priority='secondary', underline='dotted', label='Fehler erklären', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-      </form>
-      {% endif %}
-    </div>
-    <div class="ds-pane__body">
-      {% if result.corrected and result.corrected != answer %}{% with message='Korrigiert: ' ~ result.corrected %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
-      {% if result.natural and result.natural != result.corrected %}{% with message='Natürlicher: ' ~ result.natural %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
-      {% for r in fb %}
-      {% with selected=false, cells=[
-        {'type': 'tag', 'content': r.status, 'tag_type': {'richtig': 'success', 'fast richtig': 'warning', 'falsch': 'danger'}.get(r.status, 'neutral'), 'tag_subtype': 'passive'},
-        {'type': 'text-active-cell', 'content': r.word},
-        {'type': 'text-passive-cell', 'content': r.note},
-        {'type': 'text-active-cell', 'content': r.score}
-      ] %}{% include "components/table-row/template.html" %}{% endwith %}
-      {% endfor %}
-      {% if result.verdict == 'wrong' and result.expected %}{% with message='Erwartet: ' ~ result.expected %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
-      {% for r in result.remarks or [] %}
-        {% with message='«' ~ r.fragment ~ '»: ' ~ r.message ~ (' → ' ~ (r.replacements | join(', ')) if r.replacements else '') %}{% include "components/empty-state/template.html" %}{% endwith %}
-      {% endfor %}
-      {% if result.verdict != 'correct' %}
-        {% for line in facts %}{% with message=line %}{% include "components/empty-state/template.html" %}{% endwith %}{% endfor %}
-      {% endif %}
-    </div>
-  </section>
-  {% if ai_note %}{% with message=ai_note %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
-  {% if explanation %}
-    {% with type='title-info', title='Erklärung', info=explanation.rule %}{% include "components/table-header/template.html" %}{% endwith %}
-    {% with message=explanation.explanation %}{% include "components/empty-state/template.html" %}{% endwith %}
-    {% with message='Merke: ' ~ explanation.merke %}{% include "components/empty-state/template.html" %}{% endwith %}
-    {% with message=explanation.explanation_uk %}{% include "components/empty-state/template.html" %}{% endwith %}
-  {% endif %}
-  {% if translations %}{% with message='Übersetzung: ' ~ (translations | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
-  {% if can_recheck and result.verdict in ('wrong', 'almost') %}
-  <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/recheck">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% with name='objection', label='Doch richtig? Warum?', fill='filled', required=true, placeholder='Doch richtig? Warum?' %}{% include "components/input/template.html" %}{% endwith %}
-    {% with priority='secondary', underline='dotted', label='Doch richtig? (' ~ ai_left ~ ' KI-Anfragen heute übrig)', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-  </form>
-  {% endif %}
-  {% if can_rule and result.verdict in ('wrong', 'almost') %}
-  <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/regel">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% with priority='secondary', underline='dotted', label='Diese Regel üben', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-  </form>
-  {% endif %}
   <form class="wort-row" method="post" action="/ueben/s/{{ sess.id }}/next">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% with priority='primary', underline='dotted', label=('Weiter mit Aufgabe ' ~ (pos + 2)) if pos + 1 < total else 'Ergebnis ansehen', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='primary', underline='dotted', label='Ergebnis ansehen', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
   </form>
-</section>
-{% else %}
-<form class="wort-form wort-answer" method="post" action="/ueben/s/{{ sess.id }}/answer">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% with type='textarea' if item.kind in ('sentence', 'erklaere') else 'text', name='text', label='Deine Antwort', rows=3, fill='filled', required=true, placeholder='Deine Antwort' %}{% include "components/input/template.html" %}{% endwith %}
-  <div class="wort-row">
-    {% with priority='primary', underline='dotted', label='Senden', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  {% endif %}
+</div>
+
+{% if erklaert %}
+{# "Fehler erklärt" (design: Üben 4): over the page at the right like the lookup panel, resizable, closed by a link. #}
+{% set e = erklaert %}
+<aside class="wort-side wort-explain ds-split" data-resizable data-min-size="360" data-min-rest="240" aria-label="Fehler erklärt">
+  <div class="wort-side__rest" aria-hidden="true"></div>
+  <div class="ds-split__handle" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Breite der Erklärung ändern"></div>
+  {% set body_html %}
+  <div class="wort-explain__section">
+    {% with variant='prompt', label='Dein Satz', segments=e.segments, text=none, note=none %}{% include "components/message/template.html" %}{% endwith %}
+    <p>{{ e.ai.explanation if e.ai else e.why }}</p>
   </div>
-</form>
+  {% if e.table %}
+  <section class="wort-explain__section" aria-label="{{ e.table.title }}">
+    {% with type='title-info', title=e.table.title, info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+    <div class="wort-table wort-rule-{{ (e.table.headers | length) or 1 }}" role="table" aria-label="{{ e.table.title }}">
+      {% for h in e.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+      {% for row in e.table.rows %}{% set r = loop.index0 %}
+      {% set cells = [] %}
+      {% for c in row %}{% set _ = cells.append({'type': 'text-passive-cell' if loop.first and row | length > 1 else 'text-active-cell', 'content': c, 'highlight': 'success' if e.table.hl == (r, loop.index0) else none}) %}{% endfor %}
+      {% with selected=false, cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% if e.ai and e.ai.merke or e.merke %}
+  <section class="wort-explain__section">
+    {% with type='title-info', title='Merke', info=e.ai.rule if e.ai else '' %}{% include "components/table-header/template.html" %}{% endwith %}
+    <p>{{ e.ai.merke if e.ai else e.merke }}</p>
+  </section>
+  {% endif %}
+  {% if e.ai and e.ai.explanation_uk or e.uk %}
+  <section class="wort-explain__section">
+    {% with type='title-info', title='Українською', info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+    <p>{{ e.ai.explanation_uk if e.ai else e.uk }}</p>
+  </section>
+  {% endif %}
+  {% if e.similar %}
+  <section class="wort-explain__section">
+    {% with type='title-info', title='Ähnliche Fehler von dir', info=(e.similar | length) ~ '' %}{% include "components/table-header/template.html" %}{% endwith %}
+    {% for s in e.similar %}{% with variant='answer', label=s.date, segments=s.segments, text=s.text, note=none %}{% include "components/message/template.html" %}{% endwith %}{% endfor %}
+  </section>
+  {% endif %}
+  {% if e.total > 1 %}
+  <div class="wort-explain__section wort-row">
+    {% for k in range(1, e.total + 1) %}
+    {% with priority='secondary', underline='dotted', label='Fehler ' ~ k, href='?fehler=' ~ e.index ~ '-' ~ k ~ '#jetzt', current=(k == e.n) %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if e.index == pos and (can_recheck or can_rule) %}
+  <div class="wort-explain__section wort-row">
+    {% if can_recheck %}<form method="post" action="/ueben/s/{{ sess.id }}/recheck"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="objection" value="Doch richtig?">{% with priority='secondary', underline='dotted', label='Doch richtig?', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}</form>{% endif %}
+    {% if can_rule %}<form method="post" action="/ueben/s/{{ sess.id }}/regel"><input type="hidden" name="csrf" value="{{ csrf }}">{% with priority='primary', underline='dotted', label='Diese Regel üben', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}</form>{% endif %}
+  </div>
+  {% endif %}
+  {% endset %}
+  {% with id='wort-explain', title='Fehler erklärt', caption=e.caption, action='Schließen', action_href='/ueben/s/' ~ sess.id ~ '#jetzt', emphasis=true, content=none %}{% include "components/pane/template.html" %}{% endwith %}
+</aside>
 {% endif %}
 {% endblock %}

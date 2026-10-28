@@ -30,6 +30,11 @@ def dictionary_uk_db() -> Path:
     return data_dir() / "dictionary-uk.db"
 
 
+def dictionary_de_db() -> Path:
+    """German definitions (German Wiktionary, the same dump as the Ukrainian file), for the lookup's explanation."""
+    return data_dir() / "dictionary-de.db"
+
+
 def dictionary_en_uk_db() -> Path:
     """English -> Ukrainian translation tables (English Wiktionary), for words the direct file lacks."""
     return data_dir() / "dictionary-en-uk.db"

@@ -28,7 +28,7 @@ KAIKKI_URL = "https://kaikki.org/dictionary/German/kaikki.org-dictionary-German.
 KAIKKI_DE_URL = "https://kaikki.org/dewiktionary/raw-wiktextract-data.jsonl.gz"  # German Wiktionary, all languages
 KAIKKI_EN_URL = "https://kaikki.org/dictionary/English/kaikki.org-dictionary-English.jsonl"  # English words, en.wiktionary
 UK_MARK = b'"lang_code": "uk"'  # a line without it has no Ukrainian translation; the importer parses the rest
-DIRECTIONS = (("de", "en"), ("en", "de"))
+DIRECTIONS = (("de", "en"), ("en", "de"), ("en", "uk"))  # en→uk: the web app's Ukrainian, through English
 
 
 def sha256(path: Path) -> str:

@@ -23,6 +23,8 @@ class Issue:
     offset: int
     length: int
     replacements: list[str]
+    rule: str = ""  # LanguageTool's rule id, e.g. DE_AGREEMENT
+    category: str = ""  # its category id, e.g. GRAMMAR
 
 
 def server_url() -> str | None:
@@ -50,6 +52,8 @@ def check(text: str, timeout: float = 5.0) -> list[Issue] | None:
             offset=m.get("offset", 0),
             length=m.get("length", 0),
             replacements=[r.get("value", "") for r in m.get("replacements", [])[:3]],
+            rule=str((m.get("rule") or {}).get("id", ""))[:80],
+            category=str(((m.get("rule") or {}).get("category") or {}).get("id", ""))[:80],
         )
         for m in payload.get("matches", [])
     ]

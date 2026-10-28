@@ -47,6 +47,10 @@
       </form>
       {% endif %}
     </div>
+    {% if r.definitions %}
+    {# German definitions; every word in them shows its translation on hover (app.js). #}
+    <ol class="wort-definitions" aria-label="Bedeutung">{% for d in r.definitions %}<li>{{ d }}</li>{% endfor %}</ol>
+    {% endif %}
     {% if r.table %}
     <div class="wort-table {{ 'wort-conjugation' if r.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ r.table.title }} {{ r.label }}">
       {% for h in r.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
@@ -68,7 +72,12 @@
 {% endif %}
 
 <section class="wort-section">
-  {% with title='Wörter', actions_left=[{'label': 'Importieren', 'href': '/history', 'underline': 'solid'}], meta_text=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche' ~ (' · zuletzt ' ~ last_added if last_added else ''), actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
+  {# "Gesuchte laden" (dev only, WORT_CLI_DB set): the CLI's searches and words from this machine's user.db. #}
+  {% set actions = [{'label': 'Importieren', 'href': '/history', 'underline': 'solid'}] + ([{'label': 'Gesuchte laden', 'submit': true, 'underline': 'dotted'}] if cli_import else []) %}
+  <form method="post" action="/import/cli" class="wort-cli-import">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% with title='Wörter', actions_left=actions, meta_text=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche' ~ (' · zuletzt ' ~ last_added if last_added else ''), actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
+  </form>
   {% with layout='bulk', search=true, search_placeholder='Wort oder Übersetzung', actions=[
     {'label': 'Sätze bilden', 'priority': 'primary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/saetze" data-needs-selection'},
     {'label': 'Abfrage', 'priority': 'secondary', 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/abfrage" data-needs-selection'},

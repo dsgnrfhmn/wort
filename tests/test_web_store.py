@@ -105,7 +105,7 @@ def test_legacy_v0_db_is_migrated_and_adopted_by_first_user(tmp_path):
     """)
     old.commit(); old.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 4
     u = web.create_user("anna", "h")
     assert [r.query for r in web.history(u.id)] == ["Haus"]
     assert [f.lemma for f in web.favorites(u.id)] == ["Haus"]
@@ -176,7 +176,7 @@ def test_v1_database_is_migrated_to_current(tmp_path):
     """)
     con.commit(); con.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 4
     assert web.practice(1, 1)["kind"] == "saetze"
     assert web.create_practice(1, "regel", []) > 0  # new kind accepted
     assert "state_before" in {r["name"] for r in web.conn.execute("PRAGMA table_info(attempts)")}

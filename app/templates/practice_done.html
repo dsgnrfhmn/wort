@@ -8,7 +8,7 @@
     {% for r in rows %}
     {% with cells=[
       {'type': 'text-active-cell', 'content': r.label},
-      {'type': 'text-active-cell', 'content': {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch'}.get(r.verdict, 'nicht bewertet')},
+      {'type': 'text-active-cell', 'content': {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch', 'tip': 'Tipp'}.get(r.verdict, 'nicht bewertet')},
       {'type': 'text-active-cell', 'content': (r.score | string) if r.score is not none else '–'},
       {'type': 'text-active-cell', 'content': '%+d' | format(r.delta)}
     ] %}{% include "components/table-row/template.html" %}{% endwith %}
@@ -16,7 +16,15 @@
   </div>
   <div class="wort-row">
     {% with priority='primary', underline='solid', label='Zu den Wörtern', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
-    {% with priority='secondary', underline='solid', label='Noch eine Runde', href='/ueben' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='solid', label='Neue Wörter wählen', href='/ueben?neu=1' %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
+  {% if batch %}
+  {# Another round with the same words: they stay the current batch until a new one is chosen. #}
+  <form class="wort-row" method="post" action="/ueben/{{ batch.kind }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for id in batch.ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+    {% with priority='primary', underline='dotted', label='Noch eine Runde mit denselben Wörtern', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+  {% endif %}
 </section>
 {% endblock %}

@@ -144,7 +144,7 @@ def test_missing_form_is_decided_locally_without_an_api_call(env):
     loc, sid = session(c, store, uid)
     c.post(f"/ueben/s/{sid}/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": "Das ist ein Satz hier"})
     assert fake.calls == []
-    assert "Die verlangte Form fehlt" in c.get(loc).text
+    assert "Verwende:" in c.get(loc).text and ">Tipp<" in c.get(loc).text
 
 
 def test_cap_reached_falls_back_to_local_check_and_says_so(env, dict_path):
@@ -213,7 +213,8 @@ def test_task_wording_comes_from_the_ai_with_translation_and_local_form_check(tm
     assert "Was machst du mit Haus? (" in page  # AI wording, local task kept in brackets
     req = required_for(store, uid, sid, dict_path)
     answer(c, sid, "Das ist " + " ".join(req) + " dort")
-    assert "Übersetzung: …" in c.get(loc).text
+    html = c.get(loc).text
+    assert ">Übersetzung<" in html and "…" in html.split(">Übersetzung<", 1)[1].split("</div>", 2)[1]
 
 
 def test_task_generation_failure_keeps_local_wording(tmp_path, dict_path):

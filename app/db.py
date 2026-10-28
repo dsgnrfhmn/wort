@@ -14,7 +14,7 @@ from pathlib import Path
 
 from app import scoring
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -96,6 +96,15 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     calls INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day)
 );
+CREATE TABLE IF NOT EXISTS grammar_attempts (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    topic TEXT NOT NULL,
+    exercise INTEGER NOT NULL,
+    verdict TEXT NOT NULL,
+    answered_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_grammar_user_topic ON grammar_attempts(user_id, topic);
 """
 
 # v0 had single-user history/favorites without user_id. Rebuild them with the column
@@ -206,7 +215,7 @@ class WebStore:
         if legacy:
             self.conn.executescript(_COPY_V0)
         if version == 1:
-            self._migrate_v1()  # v2 -> v3 needs no step: SCHEMA adds sync_tokens
+            self._migrate_v1()  # v2 -> v3 and v3 -> v4 need no step: SCHEMA adds sync_tokens, grammar_attempts
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 
@@ -478,6 +487,43 @@ class WebStore:
     def practice(self, user_id: int, session_id: int) -> dict | None:
         r = self.conn.execute(
             "SELECT * FROM practice_sessions WHERE user_id = ? AND id = ?", (user_id, session_id)
+        ).fetchone()
+        return {"id": r["id"], "kind": r["kind"], "items": json.loads(r["items"]), "pos": r["pos"]} if r else None
+
+    def practice_history(self, user_id: int, limit: int = 50) -> list[dict]:
+        """The user's recent sessions, newest first: id, created_at (datetime) and items."""
+        rows = self.conn.execute(
+            "SELECT id, items, created_at FROM practice_sessions WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+        return [{"id": r["id"], "items": json.loads(r["items"]), "created_at": datetime.fromisoformat(r["created_at"])}
+                for r in rows]
+
+    def record_grammar(self, user_id: int, topic: str, exercise: int, verdict: str,
+                       now: datetime | None = None) -> None:
+        """One graded grammar exercise (correct | almost | wrong)."""
+        self.conn.execute(
+            "INSERT INTO grammar_attempts (user_id, topic, exercise, verdict, answered_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, topic, exercise, verdict, _ts(now or datetime.now())),
+        )
+        self.conn.commit()
+
+    def grammar_progress(self, user_id: int, last: int = 20) -> dict[str, tuple[int, int]]:
+        """Per topic: (correct, answered) over the last `last` attempts."""
+        out: dict[str, tuple[int, int]] = {}
+        rows = self.conn.execute(
+            "SELECT topic, verdict FROM grammar_attempts WHERE user_id = ? ORDER BY id DESC", (user_id,)
+        ).fetchall()
+        for r in rows:
+            right, seen = out.get(r["topic"], (0, 0))
+            if seen < last:
+                out[r["topic"]] = (right + (r["verdict"] == "correct"), seen + 1)
+        return out
+
+    def latest_practice(self, user_id: int) -> dict | None:
+        """The user's most recent practice session (its words are the current batch until a new one starts)."""
+        r = self.conn.execute(
+            "SELECT * FROM practice_sessions WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user_id,)
         ).fetchone()
         return {"id": r["id"], "kind": r["kind"], "items": json.loads(r["items"]), "pos": r["pos"]} if r else None
 

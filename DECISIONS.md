@@ -104,6 +104,16 @@ Confirmed by maintainer (date)*.
   AI host; the app unreachable from outside the LAN/VPN.
 - **Confirmed by maintainer:** 2026-10-23
 
+## D00g — Dev only: "Gesuchte laden" reads the CLI's user.db on the same machine
+
+- **Question:** a button on Wörter that pulls the CLI's searches without `wort export` / `wort sync`.
+- **Decision (2026-10-28, maintainer):** only where web app and CLI share a machine (development). With
+  `WORT_CLI_DB` set to the CLI's `user.db`, `POST /import/cli` opens it read-only, copies it into memory and sends
+  it through the same export → import as an uploaded file (same caps, same checks). Without the variable there is
+  no button and the route answers 404. The server never sets it: there the paths stay export/import and `wort sync`
+  (D00d); the server still never reaches the CLI machine.
+- **Confirmed by maintainer:** 2026-10-28
+
 ## D00e — Temporary local overrides of dis-system components (web UI)
 
 > **Closed 2026-10-23:** every gap below moved into dis-system (branch `dsgnrfhmn/reading-upload-components`):
@@ -188,9 +198,20 @@ Confirmed by maintainer (date)*.
     dis-system PR #2 (`form-props`), merged to its `main` on 2026-10-21.
     Gaps still without a component: file input (native control used),
     textarea-free sentence result block (empty-state used for text lines).
-- **dis-system commit in use (working tree, 2026-10-23):** `cb13772` on branch `dsgnrfhmn/reading-upload-components`
-  (pushed; the submodule pointer is committed on `wip/web-view`). Bump the pointer to the merge commit once the branch
-  is merged into dis-system `main` (a squash merge would orphan `cb13772`), and record it here.
+- **Temporary local color override (2026-10-27, maintainer request):** in the dark theme the accent
+  (`--ds-color-accent-1` and its hover/pressed) and the input focus border (`--ds-color-input-border-focus`) are set to
+  `--ds-color-text-active` (white) in `app/static/layout.css`,
+  an exception to "no colors in this repo". Move it into dis-system or drop it once decided.
+- **dis-system commit in use (2026-10-28):** `b2ed6ea` on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
+  top of `ab5d22e` (Mono style draft). Adds message `note` / `note_tooltip` / `note_more` / `task`, table-cell `wrap`,
+  inline-mark `href` / `current`, textarea `rows`. Push the branch and open a dis-system PR before this pointer is
+  pushed, or the submodule commit will be missing for everyone else.
+  Previous: `2db2701` (2026-10-27), `main` after the merge of dis-system PR #7
+  (`dsgnrfhmn/isolated`), on top of PR #5 (`dsgnrfhmn/reading-upload-components`) and PR #6. Brings motion
+  (fade-in), loading states (skeleton), themed passive tag colors, the tooltip in the top layer, context-menu,
+  date-range and portfolio components. `message` is unchanged.
+  Previous: `cb13772` (2026-10-23, branch `dsgnrfhmn/reading-upload-components`, merged into `main` by PR #5;
+  ancestor of `2db2701`).
   Previous: `a2404a4` (2026-10-22: `main` after the merge of dis-system PR #4,
   `dsgnrfhmn/table-row-cell-props`, on top of PR #3). Together they bring the tag cell, `article`, page-head
   props, header-tab `href`, `inline-mark`, `message`, `disclosure` (with `items`), multi-line tooltip, table-row

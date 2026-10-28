@@ -14,6 +14,7 @@
 </head>
 <body{% block body_attrs %}{% endblock %}>
   {% if user %}
+  <header class="wort-head">
   {% with workspace_label='DE → UK', nav_links=[
     {'label': 'Wörter', 'href': '/', 'current': page in ('words', 'history', 'favorites')},
     {'label': 'Üben', 'href': '/ueben', 'current': page == 'practice'},
@@ -21,10 +22,37 @@
   ], right_actions=[
     {'label': 'Abmelden (' ~ user.name ~ ')', 'form_action': '/logout', 'hidden': {'csrf': csrf}}
   ] %}{% include "components/nav-bar/template.html" %}{% endwith %}
+  {# Second header row: settings (to come) on the left, the lookup side panel's toggle on the right. #}
+  <div class="wort-toolbar">
+    <div class="wort-row wort-toolbar__settings"></div>
+    <div class="wort-row">
+      {% with priority='secondary', underline='dotted', label='Nachschlagen', extra_attrs='data-side-toggle aria-controls="wort-lookup-side" aria-expanded="false"' %}{% include "components/text-button/template.html" %}{% endwith %}
+    </div>
+  </div>
+  </header>
   {% endif %}
+  <div class="wort-shell">
   <main class="wort-main">
     {% block content %}{% endblock %}
   </main>
+  {% if user %}
+  {# Lookup side panel: the same search as on the Wörter page, results fetched in place (app.js). It lies over the
+     page (nothing moves): a full-width resizable row (dis-system pane's data-resizable) whose left part is an empty,
+     click-through neighbour, then the resize handle, then the panel. #}
+  <aside class="wort-side ds-split" id="wort-lookup-side" data-resizable data-min-size="320" data-min-rest="240" hidden>
+    <div class="wort-side__rest" aria-hidden="true"></div>
+    <div class="ds-split__handle" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Breite der Seitenleiste ändern"></div>
+    {% set body_html %}
+    <form class="wort-side__search" method="get" action="/" role="search">
+      <input type="hidden" name="s" value="1">
+      {% with name='q', label='Wort oder Satz nachschlagen', placeholder='Wort oder Satz: Deutsch oder Englisch …', fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+    </form>
+    <div class="wort-side__results" aria-live="polite"></div>
+    {% endset %}
+    {% with id='wort-lookup-side', title='Nachschlagen', caption='', action='Schließen', emphasis=true %}{% include "components/pane/template.html" %}{% endwith %}
+  </aside>
+  {% endif %}
+  </div>
   {% if message %}<div hidden data-flash="{{ message_status | default('default') }}">{{ message }}</div>{% endif %}
   {% for src in ds_js %}
   <script src="{{ src }}"></script>

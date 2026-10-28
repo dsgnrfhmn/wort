@@ -1,5 +1,47 @@
 /* Layout only: page regions and grids, spacing from dis-system tokens. No colors, type or component styles. */
 body { margin: 0; background-color: var(--ds-color-bg-surface); }
+
+/* TEMPORARY local exception to "no colors in this repo" (maintainer request, 2026-10-27): in the dark theme the accent
+   is the theme's white text color instead of dis-system's orange. Only existing tokens are referenced; move this
+   into dis-system (or drop it) once decided. Hover and pressed stay distinguishable by the [ ] brackets. */
+[data-theme="dark"] {
+  --ds-color-accent-1: var(--ds-color-text-active);
+  --ds-color-accent-1-hover: var(--ds-color-text-active);
+  --ds-color-accent-1-pressed: var(--ds-color-text-active);
+  --ds-color-input-border-focus: var(--ds-color-text-active);
+}
+
+/* Header: the nav bar and the toolbar row under it stay at the top together. --wort-head-h is their height (app.js
+   measures it; the fallback is one nav row plus the toolbar); sticky panes and jump targets stop below it. */
+:root { --wort-head-h: calc(var(--ds-spacing-9) * 3); }
+.wort-head { position: sticky; top: 0; z-index: 4; background-color: var(--ds-color-bg-surface); }
+.wort-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--ds-spacing-5); min-height: var(--ds-spacing-9); padding: 0 var(--ds-spacing-cell); border-bottom: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+
+/* Lookup side panel: lies over the page below the header (the page does not move). The aside is a full-width
+   resizable row (dis-system pane): an empty click-through part, the handle, the panel; only the handle and the
+   panel take the pointer. The panel starts 440px wide; once dragged, dis-system's --_resize-size rules. */
+.wort-shell { display: grid; grid-template-columns: minmax(0, 1fr); }
+.wort-shell > .wort-main { width: 100%; box-sizing: border-box; }  /* auto margins would shrink a grid item to its content */
+/* A side panel that would cover the page's column moves it aside: app.js sets --wort-side-push to the overlap (0 when
+   the column is clear of the panel, so nothing moves on a wide window). */
+.wort-shell { padding-right: var(--wort-side-push, 0px); }
+.wort-side { position: fixed; top: var(--wort-head-h); right: 0; bottom: 0; left: 0; z-index: 3; display: flex; pointer-events: none; }
+.wort-side[hidden] { display: none; }
+.wort-side__rest { flex: 1 1 0; min-width: 0; }
+.wort-side > .ds-split__handle, .wort-side > .ds-pane { pointer-events: auto; }
+.wort-side > .ds-pane { background-color: var(--ds-color-bg-surface); border-left: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-side > .ds-pane:not([data-resized]) { flex: 0 0 calc(var(--ds-spacing-9) * 11); }
+.wort-explain > .ds-pane:not([data-resized]) { flex: 0 0 calc(var(--ds-spacing-9) * 17); }
+.wort-explain__section { display: grid; gap: var(--ds-spacing-3); padding: var(--ds-spacing-5) var(--ds-spacing-6); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-explain__section:first-child { border-top: 0; }
+.wort-explain__section p { margin: 0; }
+.wort-rule-4 { grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1fr)); }
+.wort-rule-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.wort-rule-1 { grid-template-columns: minmax(0, 1fr); }
+.wort-side__search { padding: var(--ds-spacing-5) var(--ds-spacing-cell); }
+.wort-side__results .wort-lookup { padding: var(--ds-spacing-5) var(--ds-spacing-cell) var(--ds-spacing-7); border-bottom: 0; }
+.wort-side__results .wort-lookup__list { grid-template-columns: minmax(0, 1fr); }
+.wort-side__results .wort-lookup > .wort-row { justify-content: flex-start; }
 /* Text outside a component takes the system's body text tokens (no new type style). */
 body { color: var(--ds-color-text-active); font-family: var(--ds-font-body-text-family); font-size: var(--ds-font-body-text-size); line-height: var(--ds-font-body-text-line-height); }
 .wort-main { max-width: calc(var(--ds-spacing-9) * 24); margin: 0 auto; padding: var(--ds-spacing-7) var(--ds-spacing-5); display: grid; gap: var(--ds-spacing-7); }
@@ -19,6 +61,29 @@ body { color: var(--ds-color-text-active); font-family: var(--ds-font-body-text-
 
 .wort-tabs { display: flex; width: 100%; }
 .wort-messages { display: grid; gap: var(--ds-spacing-5); }
+
+/* Üben as a chat: tasks run down the page; a task's reply (the answer, the corrected sentence, the feedback) is
+   one block with no gaps; the answer input stays pinned to the bottom of the window. */
+.wort-chat { display: grid; gap: var(--ds-spacing-7); }
+.wort-turn { display: grid; gap: var(--ds-spacing-4); scroll-margin-top: var(--wort-head-h); }
+.wort-reply { display: grid; gap: var(--ds-spacing-4); }
+.wort-review { display: grid; border: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+/* Messenger-like sides: the task on the left, the answer with its correction on the right, each at most 75% wide. */
+.wort-turn > .ds-message { justify-self: start; max-width: 75%; }
+.wort-reply__mine { justify-self: end; max-width: 75%; display: grid; }  /* as wide as its widest bubble */
+/* Feedback table: Bewertung | Ergebnis | Kommentar, the comment 60% of the width; the details under it: label | text. */
+.wort-feedback-table { grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 6fr); }
+.wort-details-table { grid-template-columns: minmax(0, 2fr) minmax(0, 8fr); }
+/* Grammar: the topic list (Thema | Niveau | Worum es geht | Richtig) and a topic's tables, N equal columns. */
+.wort-topics { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 5fr) minmax(0, 1fr); }
+.wort-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.wort-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wort-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.wort-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.wort-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.wort-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.wort-grammar p, .wort-grammar__lead { margin: 0; max-width: calc(var(--ds-spacing-9) * 18); }
+.wort-composer { position: sticky; bottom: 0; padding: var(--ds-spacing-4) 0; background-color: var(--ds-color-bg-surface); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
 
 /* Full-bleed pages (Wörter list): regions run edge to edge like the design canvas. */
 body[data-layout="full"] .wort-main { max-width: none; padding: 0; gap: 0; }
@@ -42,7 +107,7 @@ body[data-layout="full"] .wort-main { max-width: none; padding: 0; gap: 0; }
 /* The word pane takes its content's height (a pane's body is flex 1 1 0, sized for a fixed-height split), stays
    in view while the long table scrolls, and scrolls inside itself when taller than the window. */
 .wort-split-list .wort-word, .wort-split-list .wort-word .ds-pane__body { flex: none; min-height: auto; }
-.wort-split-list .wort-word { position: sticky; top: calc(var(--ds-spacing-9) * 2); max-height: calc(100vh - var(--ds-spacing-9) * 2); overflow-y: auto; overscroll-behavior: contain; }
+.wort-split-list .wort-word { position: sticky; top: var(--wort-head-h); max-height: calc(100vh - var(--wort-head-h)); overflow-y: auto; overscroll-behavior: contain; }
 /* The Wort column has the same width whether a word is open or not (a share of the window, not of the table), so
    the words and their translations stay where they are when the table gives up or takes back its right half; only
    the translation column's end moves, under the word pane. */
@@ -51,7 +116,7 @@ body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-t
 .wort-split-list[data-open="true"] .wort-words > .ds-table-header-cell:nth-child(4),
 .wort-split-list[data-open="true"] .wort-words .ds-table-row > :nth-child(4) { display: none; }
 /* Jumping to #detail or #wort-table stops below the sticky nav bar, not under it. */
-#detail, #wort-table { scroll-margin-top: calc(var(--ds-spacing-9) * 2); }
+#detail, #wort-table { scroll-margin-top: var(--wort-head-h); }
 .wort-detail { display: grid; gap: var(--ds-spacing-7); align-content: start; padding: var(--ds-spacing-7) var(--ds-spacing-6) var(--ds-spacing-9); }
 @media (max-width: 720px) {
   .wort-split-list, .wort-split-list[data-open="true"] { grid-template-columns: minmax(0, 1fr); }
@@ -60,7 +125,7 @@ body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-t
   .wort-split-list .wort-word { width: auto; position: static; max-height: none; overflow: visible; border-left: 0; border-bottom: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
   .wort-split-list .wort-word .ds-pane__head { height: auto; min-height: calc(var(--ds-spacing-9) + var(--ds-spacing-5)); flex-wrap: wrap; column-gap: var(--ds-spacing-4); padding-top: var(--ds-spacing-3); padding-bottom: var(--ds-spacing-3); }
   .wort-detail { padding: var(--ds-spacing-5) var(--ds-spacing-4) var(--ds-spacing-8); }
-  #detail, #wort-table { scroll-margin-top: calc(var(--ds-spacing-9) * 4.5); }  /* the nav bar wraps to three rows */
+  /* #detail / #wort-table: --wort-head-h is measured, so it already covers the nav bar wrapping to three rows */
   /* The word table keeps readable columns and scrolls sideways in its own box instead of squeezing them. */
   .wort-split-list__table { overflow-x: auto; }
   body[data-layout="full"] .wort-words { min-width: calc(var(--ds-spacing-9) * 18); }
@@ -78,5 +143,6 @@ body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-t
 .wort-lookup__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 560px)); justify-content: center; gap: var(--ds-spacing-6) var(--ds-spacing-7); align-items: start; }
 .wort-lookup__item { display: grid; gap: var(--ds-spacing-4); padding-top: var(--ds-spacing-5); border-top: var(--ds-border-width-thin) solid var(--ds-color-border-table); }
 .wort-lookup h2 { margin: 0; }
+.wort-definitions { margin: 0; padding-left: var(--ds-spacing-6); display: grid; gap: var(--ds-spacing-2); }
 .wort-lookup .ds-table-header__title { padding: 0; }
 .wort-conjugation { grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1.4fr)); }

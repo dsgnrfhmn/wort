@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.title }} · Grammatik · wort{% endblock %}
+{% block content %}
+<section class="wort-section">
+  {% with type='title-info', title=topic.title, info=topic.level ~ ((' · ' ~ progress[0] ~ ' / ' ~ progress[1] ~ ' richtig') if progress else '') %}{% include "components/table-header/template.html" %}{% endwith %}
+  <div class="wort-row">
+    <form method="post" action="/ueben/grammatik/{{ topic_id }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% with priority='primary', underline='dotted', label='Üben (' ~ (topic.exercises | length) ~ ' Aufgaben)', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+    </form>
+    {% with priority='secondary', underline='solid', label='Alle Themen', href='/ueben?neu=1&modus=grammatik' %}{% include "components/text-button/template.html" %}{% endwith %}
+  </div>
+  <p class="wort-grammar__lead">{{ topic.summary }}</p>
+</section>
+
+{# The explanation: one block per section — German, the Ukrainian note, and a table where the rule is a table. #}
+{% for s in topic.sections %}
+<section class="wort-section wort-grammar" aria-label="{{ s.title }}">
+  {% with type='title-info', title=s.title, info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+  <p>{{ s.text }}</p>
+  {% if s.uk %}<p class="wort-grammar__uk">{{ s.uk }}</p>{% endif %}
+  {% if s.table %}
+  <div class="wort-table wort-cols-{{ s.table.headers | length }}" role="table" aria-label="{{ s.title }}">
+    {% for h in s.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+    {% for row in s.table.rows %}
+    {% set cells = [] %}
+    {% for c in row %}{% set _ = cells.append({'type': 'text-passive-cell' if loop.first else 'text-active-cell', 'content': c, 'wrap': true}) %}{% endfor %}
+    {% with selected=false, cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endfor %}
+
+<section class="wort-section">
+  <form class="wort-row" method="post" action="/ueben/grammatik/{{ topic_id }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% with priority='primary', underline='dotted', label='Jetzt üben', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+  </form>
+</section>
+{% endblock %}

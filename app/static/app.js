@@ -201,7 +201,9 @@ window.addEventListener('DOMContentLoaded', () => {
     current = null;
   };
   document.addEventListener('mousemove', (e) => {
-    if (tip.isTrigger(e.target)) { if (current) drop(); return; }  // a control with its own tooltip
+    // A control with its own tooltip: forget the word without hide(), which would also cancel that control's
+    // tooltip in the shared layer; its tooltip replaces the word's when it shows.
+    if (tip.isTrigger(e.target)) { clearTimeout(timer); current = null; return; }
     const hit = wordAt(e.clientX, e.clientY);
     if (!hit) { if (current) drop(); return; }
     if (current && current.node === hit.node && current.start === hit.start) return;  // still the same word
@@ -450,4 +452,211 @@ window.wortPrepare = (root) => {
     if (input) input.value = q;
     if (q) load(location.pathname + location.search, { push: false }); else { token += 1; swap(null); }
   });
+})();
+
+/* Üben: Enter in the answer box sends it, like "Senden"; Shift+Enter starts a new line. An Enter that confirms an
+   input-method composition (e.g. a dead key or IME) is left alone. An empty answer is not sent. */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+  const box = e.target instanceof HTMLTextAreaElement ? e.target.closest('.wort-composer form') && e.target : null;
+  if (!box) return;
+  e.preventDefault();
+  if (box.value.trim()) box.form.requestSubmit();
+});
+
+/* Terminal-style (readline / emacs) editing in every text field of the app:
+   Ctrl+B / Ctrl+F   one character back / forward      Alt+B / Alt+F   one word back / forward
+   Ctrl+A / Ctrl+E   start / end of the line           Ctrl+P / Ctrl+N line up / down (textarea)
+   Ctrl+D / Ctrl+H   delete the next / previous char   Alt+D           delete the next word
+   Ctrl+K / Ctrl+U   cut to the end / start of line    Alt+Backspace   cut the previous word
+   Ctrl+Y            paste the last cut text
+   Edits go through execCommand so Ctrl+Z still undoes them. Some browsers keep Ctrl+N and Ctrl+W for
+   themselves (new window, close tab); Cmd on macOS is left alone. */
+(() => {
+  let killed = '';
+  const isField = (el) => el instanceof HTMLTextAreaElement
+    || (el instanceof HTMLInputElement && ['text', 'search', ''].includes(el.type));
+  const lineStart = (v, i) => v.lastIndexOf('\n', i - 1) + 1;
+  const lineEnd = (v, i) => { const n = v.indexOf('\n', i); return n === -1 ? v.length : n; };
+  const wordBack = (v, i) => { while (i > 0 && !/[\wäöüÄÖÜß]/.test(v[i - 1])) i--; while (i > 0 && /[\wäöüÄÖÜß]/.test(v[i - 1])) i--; return i; };
+  const wordFwd = (v, i) => { while (i < v.length && !/[\wäöüÄÖÜß]/.test(v[i])) i++; while (i < v.length && /[\wäöüÄÖÜß]/.test(v[i])) i++; return i; };
+  const lineMove = (v, i, dir) => {
+    const s = lineStart(v, i), col = i - s;
+    if (dir < 0) { if (s === 0) return 0; const ps = lineStart(v, s - 1); return Math.min(ps + col, s - 1); }
+    const e = lineEnd(v, i); if (e === v.length) return v.length;
+    const ns = e + 1; return Math.min(ns + col, lineEnd(v, ns));
+  };
+  const cut = (el, from, to, keep) => {
+    if (from === to) return;
+    const [a, b] = from < to ? [from, to] : [to, from];
+    if (keep) killed = el.value.slice(a, b);
+    el.setSelectionRange(a, b);
+    if (!document.execCommand('delete')) el.setRangeText('', a, b, 'end');
+  };
+  const KEYS = {
+    'C-b': (el, v, i) => el.setSelectionRange(Math.max(0, i - 1), Math.max(0, i - 1)),
+    'C-f': (el, v, i) => el.setSelectionRange(Math.min(v.length, i + 1), Math.min(v.length, i + 1)),
+    'M-b': (el, v, i) => { const j = wordBack(v, i); el.setSelectionRange(j, j); },
+    'M-f': (el, v, i) => { const j = wordFwd(v, i); el.setSelectionRange(j, j); },
+    'C-a': (el, v, i) => { const j = lineStart(v, i); el.setSelectionRange(j, j); },
+    'C-e': (el, v, i) => { const j = lineEnd(v, i); el.setSelectionRange(j, j); },
+    'C-p': (el, v, i) => { const j = lineMove(v, i, -1); el.setSelectionRange(j, j); },
+    'C-n': (el, v, i) => { const j = lineMove(v, i, 1); el.setSelectionRange(j, j); },
+    'C-d': (el, v, i) => cut(el, i, Math.min(v.length, i + 1), false),
+    'C-h': (el, v, i) => cut(el, Math.max(0, i - 1), i, false),
+    'M-d': (el, v, i) => cut(el, i, wordFwd(v, i), true),
+    'M-Backspace': (el, v, i) => cut(el, wordBack(v, i), i, true),
+    'C-k': (el, v, i) => cut(el, i, lineEnd(v, i) === i && i < v.length ? i + 1 : lineEnd(v, i), true),
+    'C-u': (el, v, i) => cut(el, lineStart(v, i), i, true),
+    'C-y': (el) => { if (killed && !document.execCommand('insertText', false, killed)) el.setRangeText(killed, el.selectionStart, el.selectionEnd, 'end'); },
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.isComposing || e.shiftKey || e.ctrlKey === e.altKey || !isField(e.target)) return;
+    const key = e.key === 'Backspace' ? 'Backspace' : (e.code.startsWith('Key') ? e.code.slice(3).toLowerCase() : '');
+    const run = KEYS[`${e.ctrlKey ? 'C' : 'M'}-${key}`];
+    if (!run) return;
+    e.preventDefault();
+    const el = e.target;
+    run(el, el.value, el.selectionDirection === 'backward' ? el.selectionStart : el.selectionEnd);
+  });
+})();
+
+/* Header height: --wort-head-h (layout.css) follows the sticky header (nav bar + toolbar), which wraps on
+   narrow windows, so the side panel and sticky panes start right below it. */
+(() => {
+  const head = document.querySelector('.wort-head');
+  if (!head) return;
+  const set = () => document.documentElement.style.setProperty('--wort-head-h', `${head.offsetHeight}px`);
+  set();
+  new ResizeObserver(set).observe(head);
+})();
+
+/* Lookup side panel: "Nachschlagen" in the toolbar opens and closes it (remembered per browser, a viewer
+   convenience only). Its search fetches the Wörter page's lookup for the query and shows that page's result
+   block (.wort-lookup) in the panel; "Zu Wörtern hinzufügen" is posted the same way, so the page beside the panel
+   (an exercise, the word list) is never left. Results are parsed HTML from our own server, moved in as nodes;
+   nothing is built from strings. A failed fetch says so in the panel. */
+(() => {
+  const side = document.getElementById('wort-lookup-side');
+  const toggle = document.querySelector('[data-side-toggle]');
+  if (!side || !toggle) return;
+  const KEY = 'wort-side';
+  const form = side.querySelector('.wort-side__search');
+  const input = form.querySelector('input[name="q"]');
+  const results = side.querySelector('.wort-side__results');
+  const close = side.querySelector('.ds-pane__head .ds-text-button');
+
+  const pane = side.querySelector('.ds-pane');
+  const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // One entrance / exit of the panel (dis-system pane data-motion, as the word pane on the Wörter page): it slides
+  // in when opened; when closed it slides out first and is hidden after. Without motion it just appears / goes.
+  const animate = (open, done) => {
+    if (still()) { done(); return; }
+    pane.dataset.motion = open ? 'enter' : 'leave';
+    pane.addEventListener('animationend', () => { delete pane.dataset.motion; done(); }, { once: true });
+  };
+  const setOpen = (open, { focus = false, motion = true } = {}) => {
+    if (open) side.hidden = false;
+    if (motion) animate(open, () => { if (!open) side.hidden = true; });
+    else side.hidden = !open;
+    document.body.dataset.side = open ? 'open' : 'closed';
+    toggle.setAttribute('aria-expanded', String(open));
+    try { localStorage.setItem(KEY, open ? 'open' : 'closed'); } catch (e) { /* not persisted */ }
+    if (open && focus) input.focus();
+    if (!open && focus) toggle.focus();
+  };
+  let stored = 'closed';
+  try { stored = localStorage.getItem(KEY) || 'closed'; } catch (e) { /* not persisted */ }
+  setOpen(stored === 'open', { motion: false });  // a page load restores the panel without an entrance
+  toggle.addEventListener('click', () => setOpen(document.body.dataset.side !== 'open', { focus: true }));
+  close?.addEventListener('click', () => setOpen(false, { focus: true }));
+
+  const message = (text) => {
+    const p = document.createElement('p');
+    p.className = 'wort-side__message';
+    p.textContent = text;
+    results.replaceChildren(p);
+  };
+  let token = 0;
+  const show = async (url, init = {}) => {
+    const mine = ++token;
+    let doc;
+    try {
+      const res = await fetch(url, { ...init, credentials: 'same-origin', headers: { Accept: 'text/html' } });
+      if (!res.ok) throw new Error(String(res.status));
+      doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+    } catch (err) { if (mine === token) message('Nachschlagen fehlgeschlagen. Bitte noch einmal versuchen.'); return; }
+    if (mine !== token) return;
+    const block = doc.querySelector('.wort-lookup');
+    if (!block) { results.replaceChildren(); return; }
+    block.querySelector('a[href="/"]')?.remove();  // the Wörter page's "Suche schließen"; the panel has its own close
+    const node = document.importNode(block, true);
+    results.replaceChildren(node);
+    window.wortPrepare(node);
+    const flash = doc.querySelector('[data-flash]');
+    if (flash && window.dsToast) window.dsToast.show({ message: flash.textContent.trim(), status: flash.dataset.flash || 'default' });
+  };
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!input.value.trim()) { results.replaceChildren(); return; }
+    show(`/?${new URLSearchParams(new FormData(form))}`);
+  });
+  results.addEventListener('submit', (e) => {
+    const add = e.target instanceof HTMLFormElement && e.target.getAttribute('action') === '/words/add' ? e.target : null;
+    if (!add) return;
+    e.preventDefault();
+    show('/words/add', { method: 'POST', body: new FormData(add) });
+  });
+})();
+
+/* Üben: the current result arrives in steps — the answer, the correction, the feedback, then the next task —
+   each one released from dis-system fade-in's hold (data-fade-hold) and faded in with its class, STEP ms apart.
+   With reduced motion everything is shown at once. */
+(() => {
+  const steps = Array.from(document.querySelectorAll('[data-result-step][data-fade-hold]'))
+    .sort((a, b) => Number(a.dataset.resultStep) - Number(b.dataset.resultStep));
+  if (!steps.length) return;
+  const STEP = 220;
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const release = (el) => {
+    el.removeAttribute('data-fade-hold');
+    if (still) return;
+    el.classList.add('ds-fade-in');
+    el.addEventListener('animationend', () => el.classList.remove('ds-fade-in'), { once: true });
+  };
+  steps.forEach((el, i) => (still ? release(el) : setTimeout(() => release(el), i * STEP)));
+})();
+
+/* Side panels (lookup, Fehler erklärt) lie over the page. When one covers the page's column, the column moves left by
+   the overlap (--wort-side-push on <html>, layout.css); when it does not, nothing moves. Measured on open/close, on a
+   handle drag (dis-system's ds-split-resize), on a window resize and once on load. */
+(() => {
+  const shell = document.querySelector('.wort-shell');
+  const main = shell?.querySelector('.wort-main');
+  if (!main) return;
+  const root = document.documentElement;
+  const panels = () => Array.from(document.querySelectorAll('.wort-side:not([hidden]) > .ds-pane'))
+    .filter((p) => !p.dataset.motion || p.dataset.motion === 'enter');
+  let frame = 0;
+  const measure = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      const set = (px) => root.style.setProperty('--wort-side-push', `${px}px`);
+      set(0);  // the column where it would be without a push
+      const left = Math.min(...panels().map((p) => p.getBoundingClientRect().left), Infinity);
+      const right0 = main.getBoundingClientRect().right;
+      const overlap = Number.isFinite(left) ? Math.max(0, right0 - left) : 0;
+      if (!overlap) return;
+      // How far the column's edge moves per pixel of padding depends on the window: half while the column keeps its
+      // max width and recentres, all of it once it has to shrink. Try the overlap once and scale by what it did.
+      set(overlap);
+      const moved = right0 - main.getBoundingClientRect().right;
+      set(Math.ceil(moved > 0 ? overlap * (overlap / moved) : overlap));
+    });
+  };
+  window.wortSidePush = measure;
+  window.addEventListener('resize', measure);
+  document.addEventListener('ds-split-resize', measure);
+  new MutationObserver(measure).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden', 'data-motion'] });
+  measure();
 })();

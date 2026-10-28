@@ -46,6 +46,8 @@ def create_app(
     ai: ai_service.AiService | None = None,
     uk_path: Path | None = None,
     uk_en_path: Path | None = None,
+    de_path: Path | None = None,
+    cli_db: Path | None = None,
 ) -> FastAPI:
     sanitize.install_log_redaction()
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -163,6 +165,9 @@ def create_app(
     shared = SimpleNamespace(
         store=store, render=render, verify_csrf=verify_csrf, current_user=current_user, dict_path=dictionary_path,
         uk_path=uk_path or paths.dictionary_uk_db(), uk_en_path=uk_en_path or paths.dictionary_en_uk_db(),
+        de_path=de_path or paths.dictionary_de_db(),
+        # Dev only (DECISIONS D00g): the CLI's own user.db on this machine, for "Gesuchte laden". Unset on the server.
+        cli_db=cli_db or (Path(os.environ["WORT_CLI_DB"]) if os.environ.get("WORT_CLI_DB") else None),
         redirect=redirect, facts=lexicon.summary, checker=check,
         ai=ai or ai_service.build(ai_config.load(), store),
     )
@@ -205,6 +210,40 @@ def create_app(
         if result.words_total == 0:
             return redirect("/history", msg + " Der Export enthält nur den Verlauf: füge Wörter hier mit „Lernen“ hinzu.")
         return redirect("/", msg)
+
+    @app.post("/import/cli")
+    def import_cli(request: Request, csrf: str = Form(...), user: User = Depends(current_user)):
+        """"Gesuchte laden" (dev only, DECISIONS D00g): the CLI's user.db on this machine, opened read-only and
+        copied into memory, goes through the same export → import as an uploaded file (same caps and checks)."""
+        import json
+        import sqlite3
+
+        from wort.store import Store
+        from wort.transfer import export_words
+
+        verify_csrf(request, csrf)
+        source = shared.cli_db
+        if source is None:
+            raise HTTPException(404, "WORT_CLI_DB is not set")
+        if not source.is_file():
+            return redirect("/", f"CLI-Datenbank nicht gefunden: {sanitize.text(str(source), 150)}")
+        ro = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
+        copy = sqlite3.connect(":memory:", check_same_thread=False)
+        try:
+            ro.backup(copy)  # the CLI's file is never written: Store would create its schema on open
+        finally:
+            ro.close()
+        cli = Store.__new__(Store)
+        cli.conn = copy
+        cli.conn.row_factory = sqlite3.Row
+        try:
+            result = import_export(store, user.id, json.dumps(export_words(cli)).encode())
+        except ValueError as e:
+            return redirect("/", f"Laden fehlgeschlagen: {sanitize.text(str(e), 150)}")
+        finally:
+            copy.close()
+        return redirect("/", f"Aus dem CLI geladen: {result.queries_new} neue von {result.queries_total} Suchen, "
+                             f"{result.words_new} neue von {result.words_total} Wörtern.")
 
     @app.post("/favorites/toggle")
     def toggle(request: Request, csrf: str = Form(...), lemma: str = Form(...), pos: str = Form(""), next: str = Form("/history"),

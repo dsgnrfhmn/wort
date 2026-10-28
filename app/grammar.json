@@ -1,0 +1,1443 @@
+{
+  "modalverben": {
+    "title": "Modalverben",
+    "level": "B1",
+    "summary": "können, müssen, dürfen, sollen, wollen, möchten: Bedeutung, Formen, Satzbau.",
+    "sections": [
+      {
+        "title": "Bedeutung",
+        "text": "können: Fähigkeit oder Möglichkeit. müssen: Notwendigkeit. dürfen: Erlaubnis (nicht dürfen: Verbot). sollen: Auftrag oder Rat von jemand anderem. wollen: eigener Wille. möchten: höflicher Wunsch.",
+        "uk": "können — могти, вміти; müssen — мусити; dürfen — мати дозвіл (nicht dürfen — заборона); sollen — слід, хтось велить; wollen — хотіти (твердо); möchten — хотів би (ввічливо)."
+      },
+      {
+        "title": "Präsens",
+        "text": "Bei ich und er/sie/es gibt es keine Endung, und können, müssen, dürfen, wollen ändern im Singular den Vokal.",
+        "uk": "У ich та er/sie/es закінчення немає, а в однині змінюється голосна.",
+        "table": {
+          "headers": [
+            "Person",
+            "können",
+            "müssen",
+            "dürfen",
+            "sollen",
+            "wollen",
+            "möchten"
+          ],
+          "rows": [
+            [
+              "ich",
+              "kann",
+              "muss",
+              "darf",
+              "soll",
+              "will",
+              "möchte"
+            ],
+            [
+              "du",
+              "kannst",
+              "musst",
+              "darfst",
+              "sollst",
+              "willst",
+              "möchtest"
+            ],
+            [
+              "er/sie/es",
+              "kann",
+              "muss",
+              "darf",
+              "soll",
+              "will",
+              "möchte"
+            ],
+            [
+              "wir",
+              "können",
+              "müssen",
+              "dürfen",
+              "sollen",
+              "wollen",
+              "möchten"
+            ],
+            [
+              "ihr",
+              "könnt",
+              "müsst",
+              "dürft",
+              "sollt",
+              "wollt",
+              "möchtet"
+            ],
+            [
+              "sie/Sie",
+              "können",
+              "müssen",
+              "dürfen",
+              "sollen",
+              "wollen",
+              "möchten"
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Satzbau",
+        "text": "Das Modalverb steht an Position 2, der Infinitiv ganz am Ende: Ich kann heute nicht kommen. Im Nebensatz steht das Modalverb am Ende: …, weil ich arbeiten muss.",
+        "uk": "Модальне дієслово — на другому місці, інфінітив — у самому кінці. У підрядному реченні модальне дієслово йде в кінець."
+      },
+      {
+        "title": "Präteritum",
+        "text": "Ohne Umlaut, mit -te: konnte, musste, durfte, sollte, wollte. möchten hat kein eigenes Präteritum: man sagt wollte.",
+        "uk": "Минулий час без умлауту, з -te: konnte, musste, durfte. Для möchten уживають wollte.",
+        "table": {
+          "headers": [
+            "Person",
+            "können",
+            "müssen",
+            "dürfen"
+          ],
+          "rows": [
+            [
+              "ich",
+              "konnte",
+              "musste",
+              "durfte"
+            ],
+            [
+              "du",
+              "konntest",
+              "musstest",
+              "durftest"
+            ],
+            [
+              "er/sie/es",
+              "konnte",
+              "musste",
+              "durfte"
+            ],
+            [
+              "wir",
+              "konnten",
+              "mussten",
+              "durften"
+            ]
+          ]
+        }
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Ich ___ heute leider nicht kommen. (können)",
+        "answers": [
+          "kann"
+        ],
+        "why": "ich + können → kann: im Singular ohne Endung und mit a.",
+        "uk": "ich kann — без закінчення, з a."
+      },
+      {
+        "type": "luecke",
+        "prompt": "Wir ___ morgen früh aufstehen. (müssen)",
+        "answers": [
+          "müssen"
+        ],
+        "why": "wir + müssen → müssen (wie der Infinitiv).",
+        "uk": "wir müssen — як інфінітив."
+      },
+      {
+        "type": "mc",
+        "prompt": "Hier ___ man nicht rauchen.",
+        "choices": [
+          "darf",
+          "darfst",
+          "dürft",
+          "dürfen"
+        ],
+        "answers": [
+          "darf"
+        ],
+        "why": "man wie er/sie/es: darf.",
+        "uk": "man — як er/sie/es: darf."
+      },
+      {
+        "type": "mc",
+        "prompt": "Gestern ___ ich nicht schlafen.",
+        "choices": [
+          "kann",
+          "konnte",
+          "könnte",
+          "gekonnt"
+        ],
+        "answers": [
+          "konnte"
+        ],
+        "why": "gestern → Präteritum: konnte (ohne Umlaut).",
+        "uk": "Вчора → минулий час: konnte."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Ich arbeite heute. (müssen)",
+        "answers": [
+          "Ich muss heute arbeiten.",
+          "Heute muss ich arbeiten."
+        ],
+        "why": "muss an Position 2, arbeiten ans Ende.",
+        "uk": "muss — друге місце, arbeiten — у кінець."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Er spricht gut Deutsch. (können)",
+        "answers": [
+          "Er kann gut Deutsch sprechen."
+        ],
+        "why": "kann an Position 2, sprechen ans Ende.",
+        "uk": "kann — друге місце, sprechen — у кінець."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Was musst du diese Woche noch machen? Antworte mit «müssen».",
+        "rules": {
+          "any": [
+            [
+              "muss",
+              "musst",
+              "müssen",
+              "müsst"
+            ]
+          ],
+          "infinitive_last_after": [
+            "muss",
+            "musst",
+            "müssen",
+            "müsst"
+          ]
+        },
+        "example": "Ich muss diese Woche noch meine Steuererklärung machen.",
+        "why": "Modalverb an Position 2, Infinitiv am Ende des Satzes.",
+        "uk": "Модальне дієслово — друге, інфінітив — у кінці."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Was durftest du als Kind nicht? Antworte mit «dürfen» im Präteritum.",
+        "rules": {
+          "any": [
+            [
+              "durfte",
+              "durftest",
+              "durften",
+              "durftet"
+            ]
+          ],
+          "infinitive_last_after": [
+            "durfte",
+            "durftest",
+            "durften",
+            "durftet"
+          ]
+        },
+        "example": "Als Kind durfte ich abends nicht lange fernsehen.",
+        "why": "durfte (Präteritum) an Position 2, Infinitiv am Ende.",
+        "uk": "durfte — друге місце, інфінітив — у кінці."
+      }
+    ]
+  },
+  "nebensaetze": {
+    "title": "Nebensätze",
+    "level": "B1",
+    "summary": "weil, dass, obwohl, wenn, als, ob: das Verb steht am Ende.",
+    "sections": [
+      {
+        "title": "Konjunktionen",
+        "text": "Ein Nebensatz beginnt mit einer Konjunktion und hat das konjugierte Verb am Ende.",
+        "uk": "Підрядне речення починається сполучником, а відмінюване дієслово стоїть у кінці.",
+        "table": {
+          "headers": [
+            "Konjunktion",
+            "Bedeutung",
+            "Beispiel"
+          ],
+          "rows": [
+            [
+              "weil",
+              "Grund — тому що",
+              "…, weil ich krank bin."
+            ],
+            [
+              "dass",
+              "Inhalt — що",
+              "…, dass er kommt."
+            ],
+            [
+              "obwohl",
+              "Gegensatz — хоча",
+              "…, obwohl es regnet."
+            ],
+            [
+              "wenn",
+              "Bedingung, Wiederholung — якщо, коли",
+              "Wenn ich Zeit habe, …"
+            ],
+            [
+              "als",
+              "einmal in der Vergangenheit — коли",
+              "Als ich Kind war, …"
+            ],
+            [
+              "ob",
+              "Ja/Nein-Frage — чи",
+              "…, ob er kommt."
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Satzbau",
+        "text": "Hauptsatz + Nebensatz: Ich bleibe zu Hause, weil ich krank bin. Nebensatz zuerst: dann beginnt der Hauptsatz mit dem Verb: Weil ich krank bin, bleibe ich zu Hause. Mit Modalverb oder Perfekt steht die konjugierte Form ganz am Ende: …, weil ich arbeiten muss. …, dass er gekommen ist.",
+        "uk": "Якщо підрядне речення стоїть першим, головне починається з дієслова. З модальним дієсловом чи Perfekt відмінювана форма стоїть у самому кінці."
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Ich bleibe zu Hause, ___ ich krank bin.",
+        "answers": [
+          "weil"
+        ],
+        "why": "Grund → weil.",
+        "uk": "Причина → weil."
+      },
+      {
+        "type": "luecke",
+        "prompt": "Ich weiß nicht, ___ er heute kommt.",
+        "answers": [
+          "ob"
+        ],
+        "why": "Indirekte Ja/Nein-Frage → ob.",
+        "uk": "Непряме питання «так/ні» → ob (чи)."
+      },
+      {
+        "type": "mc",
+        "prompt": "___ ich ein Kind war, wohnte ich in Kyjiw.",
+        "choices": [
+          "Als",
+          "Wenn",
+          "Ob",
+          "Dass"
+        ],
+        "answers": [
+          "Als"
+        ],
+        "why": "Einmal, in der Vergangenheit → als.",
+        "uk": "Одноразово в минулому → als."
+      },
+      {
+        "type": "mc",
+        "prompt": "Sie geht spazieren, ___ es regnet.",
+        "choices": [
+          "obwohl",
+          "weil",
+          "dass",
+          "ob"
+        ],
+        "answers": [
+          "obwohl"
+        ],
+        "why": "Gegensatz → obwohl.",
+        "uk": "Протиставлення → obwohl (хоча)."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Ich komme nicht. Ich bin müde. (weil)",
+        "answers": [
+          "Ich komme nicht, weil ich müde bin."
+        ],
+        "why": "Nach weil steht das Verb am Ende: bin.",
+        "uk": "Після weil дієслово йде в кінець."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Er sagt: Er hat keine Zeit. (dass)",
+        "answers": [
+          "Er sagt, dass er keine Zeit hat."
+        ],
+        "why": "Nach dass steht das Verb am Ende: hat.",
+        "uk": "Після dass дієслово — у кінці."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Warum lernst du Deutsch? Antworte mit «weil».",
+        "rules": {
+          "any": [
+            [
+              "weil"
+            ]
+          ],
+          "verb_last_after": [
+            "weil"
+          ]
+        },
+        "example": "Ich lerne Deutsch, weil ich in Deutschland arbeite.",
+        "why": "Im weil-Satz steht das Verb am Ende.",
+        "uk": "У реченні з weil дієслово — у кінці."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Was machst du, wenn du Zeit hast? Antworte mit «wenn».",
+        "rules": {
+          "any": [
+            [
+              "wenn"
+            ]
+          ],
+          "verb_last_after": [
+            "wenn"
+          ]
+        },
+        "example": "Wenn ich Zeit habe, fahre ich mit dem Fahrrad an den See.",
+        "why": "Im wenn-Satz steht das Verb am Ende; danach beginnt der Hauptsatz mit dem Verb.",
+        "uk": "У реченні з wenn дієслово — у кінці; далі головне речення починається з дієслова."
+      }
+    ]
+  },
+  "relativsaetze": {
+    "title": "Relativsätze",
+    "level": "B1/B2",
+    "summary": "der, die, das, dem, denen, dessen …: ein Nomen genauer beschreiben.",
+    "sections": [
+      {
+        "title": "Relativpronomen",
+        "text": "Genus und Numerus kommen vom Nomen davor, der Kasus von der Rolle im Relativsatz. Das Verb steht am Ende.",
+        "uk": "Рід і число — від іменника перед комою, відмінок — від ролі в підрядному реченні. Дієслово — у кінці.",
+        "table": {
+          "headers": [
+            "Kasus",
+            "maskulin",
+            "feminin",
+            "neutrum",
+            "Plural"
+          ],
+          "rows": [
+            [
+              "Nom.",
+              "der",
+              "die",
+              "das",
+              "die"
+            ],
+            [
+              "Akk.",
+              "den",
+              "die",
+              "das",
+              "die"
+            ],
+            [
+              "Dat.",
+              "dem",
+              "der",
+              "dem",
+              "denen"
+            ],
+            [
+              "Gen.",
+              "dessen",
+              "deren",
+              "dessen",
+              "deren"
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Mit Präposition",
+        "text": "Die Präposition steht vor dem Relativpronomen: Das sind die Kinder, mit denen ich spiele. Der Ort, an dem ich gern bin, …",
+        "uk": "Прийменник стоїть перед відносним займенником."
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Das ist der Mann, ___ mir geholfen hat.",
+        "answers": [
+          "der"
+        ],
+        "why": "maskulin, Subjekt im Relativsatz → Nominativ: der.",
+        "uk": "Чоловічий рід, підмет → Nom.: der."
+      },
+      {
+        "type": "luecke",
+        "prompt": "Die Frau, ___ ich gestern getroffen habe, ist Ärztin.",
+        "answers": [
+          "die"
+        ],
+        "why": "feminin, Objekt (wen?) → Akkusativ: die.",
+        "uk": "Жіночий рід, додаток (кого?) → Akk.: die."
+      },
+      {
+        "type": "mc",
+        "prompt": "Das sind die Kinder, mit ___ ich spiele.",
+        "choices": [
+          "denen",
+          "den",
+          "die",
+          "deren"
+        ],
+        "answers": [
+          "denen"
+        ],
+        "why": "mit + Dativ, Plural → denen.",
+        "uk": "mit + Dat., множина → denen."
+      },
+      {
+        "type": "mc",
+        "prompt": "Der Kollege, ___ Auto kaputt ist, kommt zu Fuß.",
+        "choices": [
+          "dessen",
+          "deren",
+          "dem",
+          "den"
+        ],
+        "answers": [
+          "dessen"
+        ],
+        "why": "Besitz (wessen Auto?), maskulin → dessen.",
+        "uk": "Присвійність (чиє авто?), ч. р. → dessen."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Ich kenne den Mann. Er wohnt nebenan. (Relativsatz)",
+        "answers": [
+          "Ich kenne den Mann, der nebenan wohnt."
+        ],
+        "why": "er (Nominativ, maskulin) → der; Verb ans Ende.",
+        "uk": "er → der (Nom.); дієслово — у кінець."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Das ist das Buch. Ich habe es gelesen. (Relativsatz)",
+        "answers": [
+          "Das ist das Buch, das ich gelesen habe."
+        ],
+        "why": "es (Akkusativ, neutrum) → das; habe ans Ende.",
+        "uk": "es → das (Akk.); habe — у кінець."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Beschreibe eine Person, die du gut kennst, mit einem Relativsatz.",
+        "rules": {
+          "any": [
+            [
+              "der",
+              "die",
+              "das",
+              "den",
+              "dem",
+              "denen",
+              "dessen",
+              "deren"
+            ]
+          ],
+          "verb_last_after": [
+            "der",
+            "die",
+            "das",
+            "den",
+            "dem",
+            "denen",
+            "dessen",
+            "deren"
+          ],
+          "after_comma": true
+        },
+        "example": "Ich habe eine Freundin, die sehr gut kochen kann.",
+        "why": "Komma, Relativpronomen, Verb am Ende.",
+        "uk": "Кома, відносний займенник, дієслово в кінці."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Beschreibe einen Ort, an dem du gern bist (…, an dem / in dem …).",
+        "rules": {
+          "any": [
+            [
+              "dem",
+              "der",
+              "denen"
+            ]
+          ],
+          "verb_last_after": [
+            "dem",
+            "der",
+            "denen"
+          ],
+          "after_comma": true
+        },
+        "example": "Das ist der Park, in dem ich jeden Morgen laufe.",
+        "why": "Präposition + Relativpronomen im Dativ, Verb am Ende.",
+        "uk": "Прийменник + займенник у Dat., дієслово в кінці."
+      }
+    ]
+  },
+  "konjunktiv2": {
+    "title": "Konjunktiv II",
+    "level": "B1",
+    "summary": "würde, hätte, wäre, könnte: höflich bitten, wünschen, raten, irreale Bedingungen.",
+    "sections": [
+      {
+        "title": "Verwendung",
+        "text": "Höflich: Könnten Sie mir helfen? Wunsch: Ich hätte gern einen Kaffee. Rat: Du solltest mehr schlafen. Irreal: Wenn ich Zeit hätte, würde ich reisen.",
+        "uk": "Ввічливе прохання, бажання, порада, нереальна умова («якби …, то …»)."
+      },
+      {
+        "title": "Formen",
+        "text": "Die meisten Verben: würde + Infinitiv. sein, haben, werden und die Modalverben haben eigene Formen.",
+        "uk": "Більшість дієслів: würde + інфінітив. sein, haben, werden і модальні мають власні форми.",
+        "table": {
+          "headers": [
+            "Person",
+            "sein",
+            "haben",
+            "werden",
+            "können"
+          ],
+          "rows": [
+            [
+              "ich",
+              "wäre",
+              "hätte",
+              "würde",
+              "könnte"
+            ],
+            [
+              "du",
+              "wärst",
+              "hättest",
+              "würdest",
+              "könntest"
+            ],
+            [
+              "er/sie/es",
+              "wäre",
+              "hätte",
+              "würde",
+              "könnte"
+            ],
+            [
+              "wir",
+              "wären",
+              "hätten",
+              "würden",
+              "könnten"
+            ],
+            [
+              "ihr",
+              "wärt",
+              "hättet",
+              "würdet",
+              "könntet"
+            ],
+            [
+              "sie/Sie",
+              "wären",
+              "hätten",
+              "würden",
+              "könnten"
+            ]
+          ]
+        }
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Wenn ich mehr Zeit ___, würde ich mehr lesen. (haben)",
+        "answers": [
+          "hätte"
+        ],
+        "why": "Irreale Bedingung → Konjunktiv II: hätte.",
+        "uk": "Нереальна умова → hätte."
+      },
+      {
+        "type": "luecke",
+        "prompt": "___ Sie mir bitte helfen? (können)",
+        "answers": [
+          "Könnten"
+        ],
+        "why": "Höfliche Bitte → könnten.",
+        "uk": "Ввічливе прохання → könnten."
+      },
+      {
+        "type": "mc",
+        "prompt": "Wenn ich du ___, würde ich zum Arzt gehen.",
+        "choices": [
+          "wäre",
+          "bin",
+          "war",
+          "würde"
+        ],
+        "answers": [
+          "wäre"
+        ],
+        "why": "Irreal → wäre.",
+        "uk": "Нереально → wäre."
+      },
+      {
+        "type": "mc",
+        "prompt": "Du ___ mehr schlafen.",
+        "choices": [
+          "solltest",
+          "sollst",
+          "solltet",
+          "sollen"
+        ],
+        "answers": [
+          "solltest"
+        ],
+        "why": "Rat → solltest (Konjunktiv II von sollen).",
+        "uk": "Порада → solltest."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Ich habe kein Auto. Ich fahre nicht ans Meer. (Wenn …, würde …)",
+        "answers": [
+          "Wenn ich ein Auto hätte, würde ich ans Meer fahren.",
+          "Ich würde ans Meer fahren, wenn ich ein Auto hätte."
+        ],
+        "why": "Irreale Bedingung: hätte + würde … fahren.",
+        "uk": "Нереальна умова: hätte + würde … fahren."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Kannst du mir helfen? (höflich)",
+        "answers": [
+          "Könntest du mir helfen?",
+          "Würdest du mir helfen?"
+        ],
+        "why": "Höflich mit Konjunktiv II: Könntest du …?",
+        "uk": "Ввічливо: Könntest du …?"
+      },
+      {
+        "type": "eigen",
+        "prompt": "Was würdest du machen, wenn du ein Jahr frei hättest?",
+        "rules": {
+          "any": [
+            [
+              "würde",
+              "würdest",
+              "wäre",
+              "hätte",
+              "könnte",
+              "würden"
+            ]
+          ]
+        },
+        "example": "Wenn ich ein Jahr frei hätte, würde ich mit dem Fahrrad durch Europa fahren.",
+        "why": "Konjunktiv II: würde/hätte/wäre.",
+        "uk": "Konjunktiv II: würde/hätte/wäre."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Gib einem Freund einen Rat mit «solltest».",
+        "rules": {
+          "any": [
+            [
+              "solltest"
+            ]
+          ],
+          "infinitive_last_after": [
+            "solltest"
+          ]
+        },
+        "example": "Du solltest öfter eine Pause machen.",
+        "why": "solltest an Position 2, Infinitiv am Ende.",
+        "uk": "solltest — друге місце, інфінітив — у кінці."
+      }
+    ]
+  },
+  "passiv": {
+    "title": "Passiv",
+    "level": "B1/B2",
+    "summary": "werden + Partizip II: wird gemacht, wurde gemacht, ist gemacht worden.",
+    "sections": [
+      {
+        "title": "Bildung",
+        "text": "Passiv = werden + Partizip II. Präsens: Das Fahrrad wird repariert. Präteritum: wurde repariert. Perfekt: ist repariert worden. Mit Modalverb: muss repariert werden. Wer es macht: von + Dativ.",
+        "uk": "Пасив = werden + Partizip II. Хто виконує дію — von + Dat.",
+        "table": {
+          "headers": [
+            "Person",
+            "Präsens",
+            "Präteritum"
+          ],
+          "rows": [
+            [
+              "ich",
+              "werde",
+              "wurde"
+            ],
+            [
+              "du",
+              "wirst",
+              "wurdest"
+            ],
+            [
+              "er/sie/es",
+              "wird",
+              "wurde"
+            ],
+            [
+              "wir",
+              "werden",
+              "wurden"
+            ],
+            [
+              "ihr",
+              "werdet",
+              "wurdet"
+            ],
+            [
+              "sie/Sie",
+              "werden",
+              "wurden"
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Wann?",
+        "text": "Wenn die Handlung wichtiger ist als die Person: Hier wird Deutsch gesprochen. Das Haus wurde 1990 gebaut.",
+        "uk": "Коли важлива дія, а не той, хто її виконує."
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Das Haus ___ 1990 gebaut. (Präteritum)",
+        "answers": [
+          "wurde"
+        ],
+        "why": "Passiv Präteritum: wurde + Partizip II.",
+        "uk": "Пасив у минулому: wurde + Partizip II."
+      },
+      {
+        "type": "luecke",
+        "prompt": "Hier ___ Deutsch gesprochen. (Präsens)",
+        "answers": [
+          "wird"
+        ],
+        "why": "Passiv Präsens: wird + Partizip II.",
+        "uk": "Пасив теперішнього: wird + Partizip II."
+      },
+      {
+        "type": "mc",
+        "prompt": "Der Brief ist gestern geschrieben ___.",
+        "choices": [
+          "worden",
+          "geworden",
+          "wird",
+          "wurde"
+        ],
+        "answers": [
+          "worden"
+        ],
+        "why": "Passiv Perfekt: ist … geschrieben worden (nicht geworden).",
+        "uk": "Пасив Perfekt: ist … worden (не geworden)."
+      },
+      {
+        "type": "mc",
+        "prompt": "Die Rechnung muss bis Freitag bezahlt ___.",
+        "choices": [
+          "werden",
+          "worden",
+          "wird",
+          "wurde"
+        ],
+        "answers": [
+          "werden"
+        ],
+        "why": "Modalverb + Partizip II + werden (Infinitiv).",
+        "uk": "Модальне + Partizip II + werden."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Man repariert das Fahrrad. (Passiv Präsens)",
+        "answers": [
+          "Das Fahrrad wird repariert."
+        ],
+        "why": "Das Objekt wird Subjekt: Das Fahrrad wird repariert.",
+        "uk": "Додаток стає підметом."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Man hat den Termin abgesagt. (Passiv Perfekt)",
+        "answers": [
+          "Der Termin ist abgesagt worden."
+        ],
+        "why": "Perfekt Passiv: ist + Partizip II + worden.",
+        "uk": "Perfekt пасиву: ist + Partizip II + worden."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Was wird in deiner Stadt gerade gebaut oder renoviert? Antworte im Passiv.",
+        "rules": {
+          "any": [
+            [
+              "wird",
+              "werden"
+            ]
+          ]
+        },
+        "example": "In meiner Straße wird gerade eine neue Schule gebaut.",
+        "why": "wird/werden + Partizip II am Ende.",
+        "uk": "wird/werden + Partizip II у кінці."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Was wurde gestern bei dir zu Hause gemacht? Antworte im Passiv Präteritum.",
+        "rules": {
+          "any": [
+            [
+              "wurde",
+              "wurden"
+            ]
+          ]
+        },
+        "example": "Gestern wurde bei uns die Küche geputzt.",
+        "why": "wurde/wurden + Partizip II am Ende.",
+        "uk": "wurde/wurden + Partizip II у кінці."
+      }
+    ]
+  },
+  "praepositionen": {
+    "title": "Präpositionen und Kasus",
+    "level": "B1",
+    "summary": "Akkusativ, Dativ, Wechselpräpositionen (wo? / wohin?), Genitiv.",
+    "sections": [
+      {
+        "title": "Feste Kasus",
+        "text": "Nach manchen Präpositionen steht immer derselbe Kasus.",
+        "uk": "Після деяких прийменників завжди той самий відмінок.",
+        "table": {
+          "headers": [
+            "Kasus",
+            "Präpositionen"
+          ],
+          "rows": [
+            [
+              "Akkusativ",
+              "durch, für, gegen, ohne, um"
+            ],
+            [
+              "Dativ",
+              "aus, bei, mit, nach, seit, von, zu, gegenüber"
+            ],
+            [
+              "Genitiv",
+              "wegen, während, trotz, statt"
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Wechselpräpositionen",
+        "text": "an, auf, hinter, in, neben, über, unter, vor, zwischen: Wohin? (Bewegung) → Akkusativ: Ich lege das Buch auf den Tisch. Wo? (Ort) → Dativ: Das Buch liegt auf dem Tisch.",
+        "uk": "Куди? (рух) → Akk. Де? (місце) → Dat."
+      },
+      {
+        "title": "Kurzformen",
+        "text": "in dem → im, an dem → am, zu dem → zum, zu der → zur, in das → ins.",
+        "uk": "Злиті форми прийменника з артиклем."
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Ich fahre mit ___ Bus zur Arbeit. (der)",
+        "answers": [
+          "dem"
+        ],
+        "why": "mit + Dativ: der Bus → dem Bus.",
+        "uk": "mit + Dat.: dem Bus."
+      },
+      {
+        "type": "luecke",
+        "prompt": "Das Geschenk ist für ___ Mutter. (meine)",
+        "answers": [
+          "meine"
+        ],
+        "why": "für + Akkusativ, feminin: meine.",
+        "uk": "für + Akk., ж. р.: meine."
+      },
+      {
+        "type": "mc",
+        "prompt": "Ich lege das Buch auf ___ Tisch.",
+        "choices": [
+          "den",
+          "dem",
+          "der",
+          "des"
+        ],
+        "answers": [
+          "den"
+        ],
+        "why": "Wohin? → Akkusativ: den Tisch.",
+        "uk": "Куди? → Akk.: den Tisch."
+      },
+      {
+        "type": "mc",
+        "prompt": "Das Buch liegt auf ___ Tisch.",
+        "choices": [
+          "dem",
+          "den",
+          "der",
+          "das"
+        ],
+        "answers": [
+          "dem"
+        ],
+        "why": "Wo? → Dativ: dem Tisch.",
+        "uk": "Де? → Dat.: dem Tisch."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Ich gehe in den Park. → Wo bist du? Ich bin …",
+        "answers": [
+          "Ich bin im Park.",
+          "Ich bin in dem Park."
+        ],
+        "why": "Wo? → Dativ: in dem → im Park.",
+        "uk": "Де? → Dat.: im Park."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Wir bleiben zu Hause. Das Wetter ist schlecht. (wegen)",
+        "answers": [
+          "Wegen des schlechten Wetters bleiben wir zu Hause.",
+          "Wir bleiben wegen des schlechten Wetters zu Hause."
+        ],
+        "why": "wegen + Genitiv: des schlechten Wetters.",
+        "uk": "wegen + Gen.: des schlechten Wetters."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Wo wohnst du, und wohin gehst du am Wochenende? Benutze «in» einmal mit Dativ und einmal mit Akkusativ.",
+        "rules": {
+          "all": [
+            [
+              "im",
+              "in der",
+              "in dem"
+            ],
+            [
+              "ins",
+              "in den",
+              "in die",
+              "in das"
+            ]
+          ]
+        },
+        "example": "Ich wohne im Zentrum, und am Wochenende gehe ich ins Kino.",
+        "why": "Wo? → im/in der; Wohin? → ins/in den/in die.",
+        "uk": "Де? → im/in der; Куди? → ins/in den/in die."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Schreibe einen Satz mit «mit» und «für».",
+        "rules": {
+          "all": [
+            [
+              "mit"
+            ],
+            [
+              "für"
+            ]
+          ]
+        },
+        "example": "Ich kaufe mit meiner Schwester ein Geschenk für unsere Mutter.",
+        "why": "mit + Dativ, für + Akkusativ.",
+        "uk": "mit + Dat., für + Akk."
+      }
+    ]
+  },
+  "verben_praep": {
+    "title": "Verben mit Präpositionen",
+    "level": "B1/B2",
+    "summary": "warten auf, denken an, sich freuen auf/über, sich interessieren für …",
+    "sections": [
+      {
+        "title": "Feste Verbindungen",
+        "text": "Viele Verben haben eine feste Präposition mit festem Kasus. Lerne sie zusammen.",
+        "uk": "Багато дієслів мають сталий прийменник з певним відмінком — вчи їх разом.",
+        "table": {
+          "headers": [
+            "Verb",
+            "Präposition",
+            "Kasus",
+            "Beispiel"
+          ],
+          "rows": [
+            [
+              "warten",
+              "auf",
+              "Akk.",
+              "Ich warte auf den Bus."
+            ],
+            [
+              "denken",
+              "an",
+              "Akk.",
+              "Ich denke an dich."
+            ],
+            [
+              "sich freuen",
+              "auf (Zukunft)",
+              "Akk.",
+              "Ich freue mich auf den Urlaub."
+            ],
+            [
+              "sich freuen",
+              "über (jetzt/vorbei)",
+              "Akk.",
+              "Ich freue mich über das Geschenk."
+            ],
+            [
+              "sich interessieren",
+              "für",
+              "Akk.",
+              "Er interessiert sich für Kunst."
+            ],
+            [
+              "teilnehmen",
+              "an",
+              "Dat.",
+              "Sie nimmt am Kurs teil."
+            ],
+            [
+              "Angst haben",
+              "vor",
+              "Dat.",
+              "Ich habe Angst vor dem Hund."
+            ],
+            [
+              "sich kümmern",
+              "um",
+              "Akk.",
+              "Ich kümmere mich um die Kinder."
+            ],
+            [
+              "träumen",
+              "von",
+              "Dat.",
+              "Er träumt von einem Haus."
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Fragen und da-Wörter",
+        "text": "Sachen: wo(r) + Präposition: Worauf wartest du? Antwort: Ich warte darauf. Personen: Präposition + wen/wem: Auf wen wartest du?",
+        "uk": "Про речі питають wo(r)+прийменник (Worauf?), відповідають da(r)+прийменник (darauf). Про людей — Auf wen?"
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Ich warte ___ den Bus.",
+        "answers": [
+          "auf"
+        ],
+        "why": "warten auf + Akkusativ.",
+        "uk": "warten auf + Akk."
+      },
+      {
+        "type": "luecke",
+        "prompt": "Sie interessiert sich ___ Kunst.",
+        "answers": [
+          "für"
+        ],
+        "why": "sich interessieren für + Akkusativ.",
+        "uk": "sich interessieren für + Akk."
+      },
+      {
+        "type": "mc",
+        "prompt": "Ich freue mich ___ den Urlaub nächste Woche.",
+        "choices": [
+          "auf",
+          "über",
+          "an",
+          "für"
+        ],
+        "answers": [
+          "auf"
+        ],
+        "why": "Etwas kommt noch → sich freuen auf.",
+        "uk": "Щось попереду → sich freuen auf."
+      },
+      {
+        "type": "mc",
+        "prompt": "Er hat Angst vor ___ Hund.",
+        "choices": [
+          "dem",
+          "den",
+          "der",
+          "des"
+        ],
+        "answers": [
+          "dem"
+        ],
+        "why": "Angst haben vor + Dativ: dem Hund.",
+        "uk": "Angst haben vor + Dat.: dem Hund."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Ich denke an den Urlaub. → Frage mit wo(r)-: …?",
+        "answers": [
+          "Woran denkst du?",
+          "Woran denken Sie?"
+        ],
+        "why": "Sache → wo(r) + an = woran.",
+        "uk": "Річ → woran."
+      },
+      {
+        "type": "umbau",
+        "prompt": "Wartest du auf den Brief? → Antworte mit da(r)-: Ja, ich …",
+        "answers": [
+          "Ja, ich warte darauf."
+        ],
+        "why": "Sache → da(r) + auf = darauf.",
+        "uk": "Річ → darauf."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Worauf freust du dich? Antworte mit «sich freuen auf».",
+        "rules": {
+          "all": [
+            [
+              "freue mich",
+              "freuen uns",
+              "freust dich",
+              "freut sich"
+            ],
+            [
+              "auf"
+            ]
+          ]
+        },
+        "example": "Ich freue mich auf das Wochenende am See.",
+        "why": "sich freuen auf + Akkusativ.",
+        "uk": "sich freuen auf + Akk."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Wofür interessierst du dich?",
+        "rules": {
+          "all": [
+            [
+              "interessiere mich",
+              "interessieren uns",
+              "interessiert sich"
+            ],
+            [
+              "für"
+            ]
+          ]
+        },
+        "example": "Ich interessiere mich für Typografie und alte Fahrräder.",
+        "why": "sich interessieren für + Akkusativ.",
+        "uk": "sich interessieren für + Akk."
+      }
+    ]
+  },
+  "adjektive": {
+    "title": "Adjektivdeklination",
+    "level": "B1",
+    "summary": "Endungen nach der/die/das, nach ein/kein/mein und ohne Artikel.",
+    "sections": [
+      {
+        "title": "Nach der/die/das",
+        "text": "Im Nominativ Singular und im Akkusativ feminin und neutrum: -e. Sonst: -en.",
+        "uk": "У Nom. однини та в Akk. ж./с. роду: -e. Інакше: -en.",
+        "table": {
+          "headers": [
+            "Kasus",
+            "maskulin",
+            "feminin",
+            "neutrum",
+            "Plural"
+          ],
+          "rows": [
+            [
+              "Nom.",
+              "der alte Mann",
+              "die alte Frau",
+              "das alte Haus",
+              "die alten Häuser"
+            ],
+            [
+              "Akk.",
+              "den alten Mann",
+              "die alte Frau",
+              "das alte Haus",
+              "die alten Häuser"
+            ],
+            [
+              "Dat.",
+              "dem alten Mann",
+              "der alten Frau",
+              "dem alten Haus",
+              "den alten Häusern"
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Nach ein/kein/mein",
+        "text": "Wo der Artikel das Genus nicht zeigt, zeigt es das Adjektiv: ein alter Mann, ein altes Haus.",
+        "uk": "Де артикль не показує рід, його показує прикметник.",
+        "table": {
+          "headers": [
+            "Kasus",
+            "maskulin",
+            "feminin",
+            "neutrum"
+          ],
+          "rows": [
+            [
+              "Nom.",
+              "ein alter Mann",
+              "eine alte Frau",
+              "ein altes Haus"
+            ],
+            [
+              "Akk.",
+              "einen alten Mann",
+              "eine alte Frau",
+              "ein altes Haus"
+            ],
+            [
+              "Dat.",
+              "einem alten Mann",
+              "einer alten Frau",
+              "einem alten Haus"
+            ]
+          ]
+        }
+      },
+      {
+        "title": "Ohne Artikel",
+        "text": "Das Adjektiv hat die Endung des Artikels: guter Kaffee, mit kaltem Wasser, frische Brötchen.",
+        "uk": "Без артикля прикметник бере закінчення артикля."
+      }
+    ],
+    "exercises": [
+      {
+        "type": "luecke",
+        "prompt": "Ich trinke einen heiß___ Tee.",
+        "answers": [
+          "en",
+          "heißen"
+        ],
+        "why": "Akkusativ maskulin nach einen → -en.",
+        "uk": "Akk. ч. р. після einen → -en."
+      },
+      {
+        "type": "luecke",
+        "prompt": "Das ist ein schön___ Haus.",
+        "answers": [
+          "es",
+          "schönes"
+        ],
+        "why": "Nominativ neutrum nach ein → -es.",
+        "uk": "Nom. с. р. після ein → -es."
+      },
+      {
+        "type": "mc",
+        "prompt": "Mit ___ Freunden gehe ich ins Kino.",
+        "choices": [
+          "guten",
+          "gute",
+          "guter",
+          "gutes"
+        ],
+        "answers": [
+          "guten"
+        ],
+        "why": "Dativ Plural ohne Artikel → -en.",
+        "uk": "Dat. множини без артикля → -en."
+      },
+      {
+        "type": "mc",
+        "prompt": "Der ___ Mann ist mein Nachbar.",
+        "choices": [
+          "alte",
+          "alten",
+          "alter",
+          "altes"
+        ],
+        "answers": [
+          "alte"
+        ],
+        "why": "Nominativ Singular nach der → -e.",
+        "uk": "Nom. однини після der → -e."
+      },
+      {
+        "type": "umbau",
+        "prompt": "der Tisch (neu): Ich kaufe … (unbestimmter Artikel)",
+        "answers": [
+          "Ich kaufe einen neuen Tisch."
+        ],
+        "why": "Akkusativ maskulin: einen neuen Tisch.",
+        "uk": "Akk. ч. р.: einen neuen Tisch."
+      },
+      {
+        "type": "umbau",
+        "prompt": "die Stadt (groß): Ich wohne in … (bestimmter Artikel)",
+        "answers": [
+          "Ich wohne in der großen Stadt."
+        ],
+        "why": "in + Dativ (wo?), feminin: der großen Stadt.",
+        "uk": "in + Dat. (де?), ж. р.: der großen Stadt."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Beschreibe deine Wohnung mit zwei Adjektiven (z. B. eine helle Küche).",
+        "rules": {
+          "any": [
+            [
+              "ein",
+              "eine",
+              "einen",
+              "einem",
+              "einer",
+              "der",
+              "die",
+              "das",
+              "den",
+              "dem",
+              "meine",
+              "mein",
+              "meinen"
+            ]
+          ]
+        },
+        "example": "Ich habe eine kleine Wohnung mit einem großen Balkon.",
+        "why": "Die Endung hängt vom Artikel, Genus und Kasus ab.",
+        "uk": "Закінчення залежить від артикля, роду й відмінка."
+      },
+      {
+        "type": "eigen",
+        "prompt": "Was für ein Fahrrad möchtest du? (ein + Adjektiv + Fahrrad)",
+        "rules": {
+          "all": [
+            [
+              "fahrrad"
+            ]
+          ]
+        },
+        "example": "Ich möchte ein leichtes, schnelles Fahrrad.",
+        "why": "Akkusativ neutrum nach ein → -es.",
+        "uk": "Akk. с. р. після ein → -es."
+      }
+    ]
+  }
+}
