@@ -105,7 +105,7 @@ def test_legacy_v0_db_is_migrated_and_adopted_by_first_user(tmp_path):
     """)
     old.commit(); old.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 5
     u = web.create_user("anna", "h")
     assert [r.query for r in web.history(u.id)] == ["Haus"]
     assert [f.lemma for f in web.favorites(u.id)] == ["Haus"]
@@ -176,10 +176,11 @@ def test_v1_database_is_migrated_to_current(tmp_path):
     """)
     con.commit(); con.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 4
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 5
     assert web.practice(1, 1)["kind"] == "saetze"
     assert web.create_practice(1, "regel", []) > 0  # new kind accepted
-    assert "state_before" in {r["name"] for r in web.conn.execute("PRAGMA table_info(attempts)")}
+    assert {"state_before", "task", "expected", "corrected", "rule"} <= {
+        r["name"] for r in web.conn.execute("PRAGMA table_info(attempts)")}
 
 
 def test_v2_database_gets_the_sync_tokens_table(tmp_path):
@@ -200,3 +201,29 @@ def test_sync_tokens_are_scoped_to_their_owner(web, two):
     tid = web.create_sync_token(a, "h")
     assert web.revoke_sync_token(b, tid) is False  # another user cannot revoke it
     assert web.sync_tokens(b) == [] and web.user_for_sync_token("h").id == a
+
+
+def test_v4_database_gets_the_attempt_details(tmp_path):
+    path = tmp_path / "v4.db"
+    WebStore(path)
+    con = sqlite3.connect(path)
+    con.executescript("""
+        ALTER TABLE attempts DROP COLUMN task; ALTER TABLE attempts DROP COLUMN expected;
+        ALTER TABLE attempts DROP COLUMN corrected; ALTER TABLE attempts DROP COLUMN rule;
+        INSERT INTO users VALUES (1, 'anna', 'h', '2026-10-01T00:00:00');
+        INSERT INTO user_words (id, user_id, lemma, pos, added_at) VALUES (1, 1, 'Haus', 'noun', '2026-10-01T00:00:00');
+        INSERT INTO attempts (user_id, word_id, skill, kind, prompt, answer, verdict, delta, created_at)
+            VALUES (1, 1, 'form', 'article', 'p', 'der', 'wrong', -1, '2026-10-02T00:00:00');
+        PRAGMA user_version = 4;
+    """)
+    con.commit(); con.close()
+    web = WebStore(path)
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 5
+    old = web.attempts(1, 1)[0]
+    assert (old.answer, old.task, old.expected, old.corrected, old.rule) == ("der", "", "", "", "")
+    web.record_attempt_full(1, 1, "form", "sentence", "p", "Ich sehe der Haus.", "wrong",
+                            details={"task": "Akkusativ Singular", "expected": "das … Haus",
+                                     "corrected": "Ich sehe das Haus.", "rule": "x" * 999})
+    new = web.attempts(1, 1)[0]
+    assert (new.task, new.expected, new.corrected, len(new.rule)) == ("Akkusativ Singular", "das … Haus",
+                                                                      "Ich sehe das Haus.", 300)

@@ -177,7 +177,8 @@ def test_empty_word_list_points_to_the_history(env):
 
 def test_list_uses_article_color_and_score_chip(env):
     app, store, a, _ = env
-    store.add_word(a, "Haus", "noun", now=NOW)
+    # "diese Woche" counts against the real clock, so this word is added now, not at the fixed NOW.
+    store.add_word(a, "Haus", "noun", now=datetime.now())
     wid = store.words(a)[0].id
     store.record_attempt(a, wid, "form", "article", "p", "das", "correct", now=NOW)
     html = client_for(app, "anna").get("/").text
@@ -248,7 +249,8 @@ def test_lookup_shows_forms_and_adds_only_on_click(env):
     c = client_for(app, "anna")
     page = c.get("/?s=1&q=Haus").text
     assert "Deklination Haus" not in page and "Deklination das Haus" in page  # forms table of the entry
-    assert "dem Haus" in page and "Zu Wörtern hinzufügen" in page
+    assert "dem Haus" in page and "Zur Wortliste" in page and "Noch nicht in deiner Liste" in page
+    assert "Ergebnis für „Haus“ · 1 Treffer · 1× gesucht" in page
     assert store.words(a) == []  # looking up adds nothing
     assert [h.query for h in store.history(a)] == ["Haus"]  # but the lookup is in the history
     r = c.post("/words/add", data={"csrf": c.cookies.get("wort_csrf"), "lemma": "Haus", "pos": "noun", "q": "Haus"})
@@ -338,3 +340,73 @@ def test_gloss_unknown_word_is_404_and_needs_login(env):
     anon = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     r = anon.get("/api/gloss", params={"w": "Haus"})
     assert r.status_code == 303 and r.headers["location"] == "/login"
+
+
+def _attempt(**kw):
+    from app.db import Attempt
+    base = dict(kind="sentence", prompt="p", answer="", verdict="wrong", delta=-1, created_at=NOW)
+    return Attempt(**(base | kw))
+
+
+def test_form_marks_find_the_one_cell_or_none():
+    from app.lookup import FormsTable
+    from app.words import form_marks
+    t = FormsTable("Deklination", ["Kasus", "Singular", "Plural"], [
+        ["Nom.", "die Wohnung", "die Wohnungen"], ["Akk.", "die Wohnung", "die Wohnungen"],
+        ["Dat.", "der Wohnung", "den Wohnungen"], ["Gen.", "der Wohnung", "der Wohnungen"]])
+    assert form_marks(t, [_attempt(expected="den … Wohnungen")]) == {(2, 2): 1}
+    # in two cells: the asked form decides; without one, no mark rather than a guess
+    assert form_marks(t, [_attempt(expected="der Wohnung", task="Dativ Singular")] * 2) == {(2, 1): 2}
+    assert form_marks(t, [_attempt(expected="der Wohnung")]) == {}
+    assert form_marks(t, [_attempt(expected="Wohnungen", task="Plural")]) == {(0, 2): 1}
+    assert form_marks(t, [_attempt(expected="den Wohnungen", verdict="almost")]) == {}  # grammar, not the form
+    assert form_marks(t, [_attempt(expected="")]) == {} and form_marks(None, [_attempt(expected="x")]) == {}
+
+
+def test_mistake_segments_mark_the_correction():
+    from app.words import mistake_segments
+    segs = mistake_segments(_attempt(answer="Ich wohne in die Wohnung.", corrected="Ich wohne in der Wohnung."))
+    assert [(s["text"], s.get("kind")) for s in segs if s["text"] != " "] == [
+        ("Ich wohne in", None), ("die", "remove"), ("der", "add"), ("Wohnung.", None)]
+    assert "".join(s["text"] for s in segs) == "Ich wohne in die der Wohnung."
+    form = mistake_segments(_attempt(kind="article", answer="der", expected="das"))
+    assert [(s["text"], s.get("kind")) for s in form] == [("der", "remove"), (" ", None), ("das", "add")]
+    assert mistake_segments(_attempt(answer="Ich wohne hier.")) == [{"text": "Ich wohne hier."}]
+
+
+def test_detail_marks_the_wrong_form_and_shows_the_correction(env):
+    app, store, a, _ = env
+    store.add_word(a, "Haus", "noun", now=NOW)
+    wid = store.words(a)[0].id
+    store.record_attempt_full(a, wid, "usage", "sentence", "p", "Ich wohne in den <Häuser>.", "wrong", now=NOW,
+                              details={"task": "Dativ Plural", "expected": "Häusern",
+                                       "corrected": "Ich wohne in den Häusern.", "rule": "Dativ Plural: -n"})
+    html = client_for(app, "anna").get(f"/words/{wid}").text
+    assert "Fehler markiert" in html and 'aria-label="1× falsch">✗1</span>' in html
+    assert '<span class="ds-inline-mark" data-kind="add">Häusern.</span>' in html
+    assert "Dativ Plural: -n · 21. Oktober 2026" in html
+    assert "<Häuser>" not in html and "&lt;Häuser&gt;" in html  # the stored answer stays escaped
+
+
+
+def test_lookup_highlight_marks_the_forms_only():
+    from app.lookup import highlight
+    from wort.text import normalize
+    segs = highlight("Die Häuser, das Haus.", {normalize("Haus"), normalize("Häuser")})
+    assert [x["text"] for x in segs if x.get("hl")] == ["Häuser", "Haus"]
+    assert "".join(x["text"] for x in segs) == "Die Häuser, das Haus."
+
+
+def test_related_words_share_the_stem_or_none(dictionary):
+    from wort.dictionary.lookup import Entry
+    words = [e.lemma for e in dictionary.related(dictionary.find_lemma("Haus"))]
+    assert "Haus" not in words and all(w.casefold().startswith("haus") for w in words)
+    assert dictionary.related(Entry(0, "gehen", "verb")) == []  # "geh" is too short a stem: nothing, not noise
+
+
+def test_lookup_result_shows_examples_with_the_word_marked(env):
+    app, store, a, _ = env
+    page = client_for(app, "anna").get("/?s=1&q=Haus").text
+    assert 'class="wort-example__word" data-article="das">' in page
+    assert 'class="wort-result__word" id="result-1" tabindex="-1" data-article="das">' in page
+    assert "Nomen · neutral" in page

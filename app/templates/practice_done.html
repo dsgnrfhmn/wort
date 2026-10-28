@@ -8,7 +8,7 @@
     {% for r in rows %}
     {% with cells=[
       {'type': 'text-active-cell', 'content': r.label},
-      {'type': 'text-active-cell', 'content': {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch', 'tip': 'Tipp'}.get(r.verdict, 'nicht bewertet')},
+      {'type': 'text-active-cell', 'content': {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch', 'tip': 'Tipp', 'skipped': 'übersprungen'}.get(r.verdict, 'nicht bewertet')},
       {'type': 'text-active-cell', 'content': (r.score | string) if r.score is not none else '–'},
       {'type': 'text-active-cell', 'content': '%+d' | format(r.delta)}
     ] %}{% include "components/table-row/template.html" %}{% endwith %}

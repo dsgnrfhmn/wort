@@ -8,6 +8,7 @@
   document.addEventListener('ds-nav-bar-theme-toggle', (e) => {
     document.documentElement.dataset.theme = e.detail.theme;
     try { localStorage.setItem(KEY, e.detail.theme); } catch (err) { /* not persisted */ }
+    if (window.wortFavicon) window.wortFavicon(e.detail.theme);
   });
   // nav-bar starts offering "Dark"; if the stored theme is dark, flip it to offer "Light".
   if (stored === 'dark') {
@@ -15,6 +16,7 @@
       const t = document.querySelector('.ds-nav-bar__theme-toggle');
       if (t) t.click();
       document.documentElement.dataset.theme = 'dark';
+      if (window.wortFavicon) window.wortFavicon('dark');
     });
   }
 })();
@@ -660,3 +662,28 @@ document.addEventListener('keydown', (e) => {
   new MutationObserver(measure).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden', 'data-motion'] });
   measure();
 })();
+
+/* Abfrage: the mode radio (dis-system radio) starts a new round in that mode with the same words. */
+(() => {
+  const form = document.querySelector('form[data-abfrage-mode]');
+  if (!form) return;
+  form.addEventListener('ds-radio-change', (e) => {
+    if (!e.detail || form.elements.art.value === e.detail.value) return;
+    form.elements.art.value = e.detail.value;
+    form.requestSubmit();
+  });
+})();
+
+/* Search result: "Weiteres Beispiel zeigen" reveals the next hidden example; gone once all are shown. Runs on the
+   page and on blocks swapped in later (event delegation). */
+document.addEventListener('click', (e) => {
+  const more = e.target instanceof Element ? e.target.closest('[data-more-examples]') : null;
+  if (!more) return;
+  const section = more.closest('[data-examples]');
+  const next = section?.querySelector('.wort-example[hidden]');
+  if (next) next.hidden = false;
+  if (!section?.querySelector('.wort-example[hidden]')) more.remove();
+  const shown = section ? section.querySelectorAll('.wort-example:not([hidden])').length : 0;
+  const info = section?.querySelector('.ds-table-header__info');
+  if (info) info.textContent = info.textContent.replace(/^\d+/, String(shown));
+});

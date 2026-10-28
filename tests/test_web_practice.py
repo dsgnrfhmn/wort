@@ -1,4 +1,5 @@
 import random
+import re
 from datetime import datetime
 
 import pytest
@@ -69,7 +70,7 @@ def test_full_abfrage_session_updates_scores(env, dict_path):
     loc = start(c, store, a, "abfrage")
     sid = int(loc.rsplit("/", 1)[1])
     page = c.get(loc).text
-    assert "Aufgabe 1 / 2" in page
+    assert "Wort 1" in page and "von 2" in page and "Diese Runde" in page and "Noch 1 Wort." in page
     for _ in range(2):
         sess = store.practice(a, sid)
         item = sess["items"][sess["pos"]]
@@ -332,13 +333,15 @@ def test_other_form_shows_richtig_magenta_tip_and_grammar_rows(tmp_path, dict_pa
     assert store.practice(uid, sid)["items"][0]["result"]["verdict"] == "correct"
 
 
-def test_toolbar_and_lookup_side_panel_are_on_signed_in_pages_only(env):
+def test_toolbar_and_lookup_side_panel_are_on_the_practice_pages_only(env):
     app, store, a, _ = env
     anon = TestClient(app, follow_redirects=False, client=("127.0.0.1", 50000))
     html = anon.get("/login").text
     assert "data-side-toggle" not in html and 'id="wort-lookup-side"' not in html
     c = login(app, "anna")
-    for path in ("/", "/ueben"):
+    html = c.get("/").text  # Wörter has its own lookup field (D00h)
+    assert 'class="wort-toolbar"' not in html and "data-side-toggle" not in html and 'id="wort-lookup-side"' not in html
+    for path in ("/ueben",):
         html = c.get(path).text
         assert 'class="wort-toolbar"' in html and "data-side-toggle" in html and 'aria-controls="wort-lookup-side"' in html
         assert 'id="wort-lookup-side" data-resizable' in html and 'class="wort-side__search"' in html
@@ -580,3 +583,67 @@ def test_gesuchte_laden_reads_the_cli_db_read_only_and_only_when_configured(tmp_
     c2 = login(plain, "anna")
     assert ">Gesuchte laden<" not in c2.get("/").text
     assert c2.post("/import/cli", data={"csrf": c2.cookies.get("wort_csrf")}).status_code == 404
+
+
+
+def test_abfrage_modes_one_kind_per_word_and_erklaere_needs_the_ai(env, dict_path):
+    dic = Dictionary(dict_path)
+    words = [(type("W", (), {"id": i})(), dic.find_lemma(l)) for i, l in [(1, "Haus"), (2, "gehen")]]
+    items = practice.build_items("abfrage", words, random.Random(1), mode="bedeutung")
+    assert [i["kind"] for i in items] == ["bedeutung", "bedeutung"] and practice.abfrage_mode(items) == "bedeutung"
+    assert practice.abfrage_mode(practice.build_items("abfrage", words, random.Random(1))) == "gemischt"
+    app, store, a, _ = env
+    c = login(app, "anna")
+    ids = [w.id for w in store.words(a)]
+    r = c.post("/ueben/abfrage", data={"csrf": c.cookies.get("wort_csrf"), "ids": ids, "art": "bedeutung"})
+    sid = int(r.headers["location"].rsplit("/", 1)[1])
+    assert {i["kind"] for i in store.practice(a, sid)["items"]} == {"bedeutung"}
+    page = c.get(r.headers["location"]).text
+    assert 'role="radio" aria-checked="true" tabindex="0" data-value="bedeutung"' in page
+    assert 'data-value="erklaere" data-priority="secondary" data-status="disabled" data-underline="dotted" disabled' in page
+    # AI off: a forged "erklaere" starts nothing; an unknown mode is refused
+    before = store.conn.execute("SELECT COUNT(*) FROM practice_sessions").fetchone()[0]
+    r = c.post("/ueben/abfrage", data={"csrf": c.cookies.get("wort_csrf"), "ids": ids, "art": "erklaere"})
+    assert r.status_code == 303 and r.headers["location"].startswith("/ueben")
+    assert c.post("/ueben/abfrage", data={"csrf": c.cookies.get("wort_csrf"), "ids": ids, "art": "x"}).status_code == 400
+    assert store.conn.execute("SELECT COUNT(*) FROM practice_sessions").fetchone()[0] == before
+
+
+def test_abfrage_skip_leaves_the_score_and_shows_in_the_round(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    loc = start(c, store, a, "abfrage")
+    sid = int(loc.rsplit("/", 1)[1])
+    first = store.word(a, store.practice(a, sid)["items"][0]["word_id"])
+    c.post(f"/ueben/s/{sid}/skip", data={"csrf": c.cookies.get("wort_csrf")})
+    c.post(f"/ueben/s/{sid}/skip", data={"csrf": c.cookies.get("wort_csrf")})  # the second skips the second word
+    assert store.practice(a, sid)["pos"] == 2
+    assert store.word(a, first.id).score is None
+    assert store.conn.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0
+    assert "übersprungen" in c.get(loc).text  # the result page
+
+
+def test_abfrage_doch_falsch_downgrades_once(env, dict_path):
+    from wort.exercises.translate import _de_to_en
+    app, store, a, _ = env
+    c = login(app, "anna")
+    ids = [w.id for w in store.words(a)]
+    loc = c.post("/ueben/abfrage", data={"csrf": c.cookies.get("wort_csrf"), "ids": ids, "art": "bedeutung"}).headers["location"]
+    sid = int(loc.rsplit("/", 1)[1])
+    word = store.word(a, store.practice(a, sid)["items"][0]["word_id"])
+    entry = Dictionary(dict_path).find_lemma(word.lemma, word.pos or None)
+    right = re.split(r"[;,]", _de_to_en(entry).check("zzz").expected)[0].strip()  # one sense of the dictionary's gloss
+    c.post(f"/ueben/s/{sid}/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": right})
+    res = store.practice(a, sid)["items"][0]["result"]
+    assert res["verdict"] == "correct"
+    page = c.get(loc).text
+    assert "Doch falsch" in page and 'data-type="success" data-subtype="passive">richtig' in page
+    c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": c.cookies.get("wort_csrf")})
+    item = store.practice(a, sid)["items"][0]
+    assert item["result"]["verdict"] == "wrong" and item["downgraded"]
+    assert store.conn.execute("SELECT verdict FROM attempts").fetchone()[0] == "wrong"
+    page = c.get(loc).text
+    assert "Doch falsch" not in page and "0 ✓ · 0 ~ · 1 ✗" in page
+    c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": c.cookies.get("wort_csrf")})  # once only: no change
+    assert store.conn.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 1
+    assert c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": "forged"}).status_code == 403

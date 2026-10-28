@@ -56,8 +56,9 @@ compose.**
 3. `nginx.conf` (8456 listener) and `compose.yaml` (`wort-sync`): never started.
 4. Quality of AI verdicts on real mistakes: `spikes/ai_eval.md` is a spec, not run.
 5. Both-theme check (2026-10-23): Wörter, word detail, Üben start and Verlauf at 1440 and 390 px; not every practice state.
-6. The access log: `sanitize.install_log_redaction` empties `record.args`, so uvicorn's access formatter fails and those
-   lines are lost (no leak). Not fixed yet (`src/wort/sanitize.py:144`).
+6. ~~The access log~~ fixed 2026-10-28: `sanitize.install_log_redaction` keeps tuple args (each redacted) so
+   uvicorn's access formatter works; a record whose joined message still matches a secret pattern is collapsed as before
+   (`tests/test_sanitize.py`, mutation-checked).
 
 ## Design audit (2026-10-22): what changed
 

@@ -31,3 +31,15 @@
 - [x] store words from CLI usage to local file. *(user.db, `wort export`)*
 - [ ] add a auto sync the words after close/time of the app
 - [x] connect sync action on the web-view (security: web only reads, local only sends) *(`wort sync`, write-only token)*
+
+## Ideas & inspiration (brainstorm)
+*Other tools to look at for new exercise types and features. Ideas only: their content is not copied.*
+- [ ] **LearningApps.org** (https://learningapps.org/) — a source of exercise *types*, not content *(added 2026-10-28)*
+  - No public API known (not verified); exercises are user-made, so their authors hold the rights; embedding is an
+    iframe to learningapps.org; some exercises export as SCORM.
+  - Not usable directly: an iframe loads an external site (trackers, cookies) in the learner's browser, and the server
+    has no outbound network except the AI API (CLAUDE.md, Security boundaries).
+  - Use instead: rebuild the types natively on wort's own data, graded locally, as Grammatik and Abfrage are —
+    matching pairs, Lückentext, ordering, quiz, crossword, grouping.
+  - Possible later: import one's own exported exercises as a file, treated as untrusted data (same rules as the CLI's
+    JSON import).

@@ -114,6 +114,22 @@ Confirmed by maintainer (date)*.
   (D00d); the server still never reaches the CLI machine.
 - **Confirmed by maintainer:** 2026-10-28
 
+## D00h — Trial: local look changes before they reach dis-system
+
+- **Question:** try a different look in wort without changing dis-system yet.
+- **Decision (2026-10-28, maintainer):** local only, in `app/static/trial.css` (loaded after `layout.css`), as an
+  explicit exception to CLAUDE.md's "layout only" rule, like D00e. Contents: text buttons without an underline at
+  rest, the underline only on hover / keyboard focus (dis-system keeps a permanent one), and no [ ] brackets on hover; the Wörter hero as low as
+  possible; the search result's type and colors (design "Wörter — Suchergebnis": the word in its article color,
+  examples with the word marked, filled section heads). Also (template, not CSS): the toolbar with "Nachschlagen" and
+  its side panel only on Üben. Whether any of it goes into dis-system `main` is open; if not, the file is deleted.
+- **Draft props in the dis-system submodule, local and uncommitted (2026-10-28):** nav-bar `brand` / `brand_href` /
+  `brand_html` (the pixel W from the design canvas "Wort — логотип"; the language dropdown moves right),
+  table-header-actions `outlined`, disclosure `body_html`, radio `disabled`. Not pushed: they wait for the
+  maintainer's OK, then a branch and a PR. The favicon (the W, black on light, white on dark, following the page's
+  theme) is wort's own (`app/static/favicon-*.svg`).
+- **Confirmed by maintainer:** 2026-10-28 (trial)
+
 ## D00e — Temporary local overrides of dis-system components (web UI)
 
 > **Closed 2026-10-23:** every gap below moved into dis-system (branch `dsgnrfhmn/reading-upload-components`):
@@ -202,7 +218,11 @@ Confirmed by maintainer (date)*.
   (`--ds-color-accent-1` and its hover/pressed) and the input focus border (`--ds-color-input-border-focus`) are set to
   `--ds-color-text-active` (white) in `app/static/layout.css`,
   an exception to "no colors in this repo". Move it into dis-system or drop it once decided.
-- **dis-system commit in use (2026-10-28):** `b2ed6ea` on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
+- **dis-system commit in use (2026-10-29):** `8f1d0b4` on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
+  top of `b2ed6ea`. Draft props (D00h): nav-bar `brand` / `brand_href` / `brand_html` and an empty `workspace_label`
+  leaving the dropdown out, table-header-actions `outlined`, disclosure `body_html`, radio `disabled`. Waits for the
+  maintainer's OK before it is pushed (to `dsgnrfhmn/isolated`) and a PR is opened.
+  Previous: `b2ed6ea` (2026-10-28) on the same branch (local, **not pushed**), on
   top of `ab5d22e` (Mono style draft). Adds message `note` / `note_tooltip` / `note_more` / `task`, table-cell `wrap`,
   inline-mark `href` / `current`, textarea `rows`. Push the branch and open a dis-system PR before this pointer is
   pushed, or the submodule commit will be missing for everyone else.

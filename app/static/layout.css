@@ -143,6 +143,31 @@ body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-t
 .wort-lookup__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 560px)); justify-content: center; gap: var(--ds-spacing-6) var(--ds-spacing-7); align-items: start; }
 .wort-lookup__item { display: grid; gap: var(--ds-spacing-4); padding-top: var(--ds-spacing-5); border-top: var(--ds-border-width-thin) solid var(--ds-color-border-table); }
 .wort-lookup h2 { margin: 0; }
+/* Search result (design "Wörter — Suchergebnis"): the bar spans the page, each entry is two columns (the word and
+   its forms | examples and related words) with a rule between; stacked on a narrow window. */
+.wort-lookup:has(.wort-result) { padding: 0; gap: 0; }
+.wort-lookup > .wort-lookup__bar { justify-content: space-between; padding: var(--ds-spacing-3) var(--ds-spacing-5); border-bottom: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-lookup__list:has(.wort-result) { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.wort-lookup__item.wort-result { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; padding: 0; border-top: 0; border-bottom: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-result__main, .wort-result__side { display: grid; gap: var(--ds-spacing-3); align-content: start; padding: var(--ds-spacing-5); }
+.wort-result__side { border-left: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); gap: var(--ds-spacing-7); }
+.wort-result__section { display: grid; gap: 0; }
+.wort-result__status { margin: var(--ds-spacing-2) 0 var(--ds-spacing-4); }
+.wort-example { display: grid; gap: var(--ds-spacing-1); padding: var(--ds-spacing-3) var(--ds-spacing-cell); border-bottom: var(--ds-border-width-thin) solid var(--ds-color-border-table); }
+.wort-example[hidden] { display: none; }
+.wort-result__section > .ds-text-button { justify-self: start; margin-top: var(--ds-spacing-2); }
+.wort-related { margin: 0; padding: var(--ds-spacing-3) var(--ds-spacing-cell); }
+@media (max-width: 720px) {
+  .wort-lookup__item.wort-result { grid-template-columns: minmax(0, 1fr); }
+  .wort-result__side { border-left: 0; border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+}
 .wort-definitions { margin: 0; padding-left: var(--ds-spacing-6); display: grid; gap: var(--ds-spacing-2); }
 .wort-lookup .ds-table-header__title { padding: 0; }
 .wort-conjugation { grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1.4fr)); }
+/* Abfrage (design Üben 6): the word beside this round's results; stacked on a narrow window. */
+.wort-abfrage { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); scroll-margin-top: var(--wort-head-h); }
+.wort-abfrage > .ds-pane + .ds-pane { border-left: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+@media (max-width: 720px) {
+  .wort-abfrage { grid-template-columns: minmax(0, 1fr); }
+  .wort-abfrage > .ds-pane + .ds-pane { border-left: 0; border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+}

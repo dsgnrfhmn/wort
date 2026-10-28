@@ -30,6 +30,63 @@ MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August"
           "November", "Dezember"]
 
 
+def _norm_form(text: str) -> str:
+    return " ".join(text.replace("…", " ").split()).casefold()
+
+
+def form_marks(table, attempts) -> dict[tuple[int, int], int]:
+    """(row, column) of the forms table -> how often that form was asked and answered wrong.
+
+    A wrong attempt marks the one cell that holds its expected form (with or without the article). When the
+    form stands in several cells (der Wohnung: Dat. and Gen.), the asked form (`task`, e.g. "Dativ Plural",
+    "Präsens, ich") picks the cell by its column header and row label (a task without a row, "Plural": the
+    first row); still ambiguous or not found: no mark, never a guess."""
+    marks: dict[tuple[int, int], int] = {}
+    if not table or not table.rows:
+        return marks
+    for a in attempts:
+        want = _norm_form(a.expected) if a.verdict == "wrong" else ""
+        if not want:
+            continue
+        hits = [(r, c) for r, row in enumerate(table.rows) for c, cell in enumerate(row[1:], 1)
+                if want in (_norm_form(cell), _norm_form(cell.split(" ", 1)[-1]))]
+        if len(hits) > 1 and a.task:
+            words = re.findall(r"\w+", a.task.casefold())
+            hits = [(r, c) for r, c in hits if table.headers[c].casefold() in words]
+            named = [(r, c) for r, c in hits
+                     if any(w.startswith(re.split(r"[./]", table.rows[r][0])[0].casefold()) for w in words)]
+            hits = named or [(r, c) for r, c in hits if r == 0]  # "Plural" alone: the first row (Nom.)
+        if len(hits) == 1:
+            marks[hits[0]] = marks.get(hits[0], 0) + 1
+    return marks
+
+
+def mistake_segments(a) -> list[dict]:
+    """The learner's answer as plain / remove / add runs: a word diff against the corrected sentence, or (a
+    form exercise) the wrong answer struck through and the right one beside it. Plain text when neither."""
+    import difflib
+    if a.corrected:
+        old, new = a.answer.split(), a.corrected.split()
+        out: list[dict] = []
+        for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=old, b=new, autojunk=False).get_opcodes():
+            if op == "equal":
+                out.append({"text": " ".join(old[i1:i2])})
+                continue
+            if i2 > i1:
+                out.append({"text": " ".join(old[i1:i2]), "kind": "remove"})
+            if j2 > j1:
+                out.append({"text": " ".join(new[j1:j2]), "kind": "add"})
+        spaced: list[dict] = []
+        for seg in out:  # one space between runs, as in the sentence
+            if spaced:
+                spaced.append({"text": " "})
+            spaced.append(seg)
+        return spaced
+    if a.expected and a.kind != "sentence" and _norm_form(a.expected) != _norm_form(a.answer):
+        return [{"text": a.answer, "kind": "remove"}, {"text": " "}, {"text": a.expected, "kind": "add"}]
+    return [{"text": a.answer}]
+
+
 def short_gloss(glosses: list[str], limit: int = 3) -> str:
     """The first few senses without their parenthetical notes: "квартира · apartment, flat", not a definition."""
     parts: list[str] = []
@@ -221,6 +278,7 @@ def register(app, ctx) -> None:
                 found = bool(page["results"]) and not page["note"].startswith("Nicht")
                 store.add_history(user.id, [(query, found, datetime.now())])
                 page["recent_queries"] = [h.query for h in store.history(user.id)[:3]]
+            page["searches"] = next((h.count for h in store.history(user.id) if h.query.casefold() == query.casefold()), 0)
         page["query"] = query
         return render_page(request, page)
 
@@ -257,10 +315,15 @@ def register(app, ctx) -> None:
         entry = v.entry
         attempts = store.attempts(user.id, word.id)
         queries = [h for h in store.history(user.id) if h.query.casefold() == word.lemma.casefold()]
+        table = lookup.forms_table(entry) if entry else None
         page["detail"] = dict(
-            v=v, table=lookup.forms_table(entry) if entry else None, facts=lexicon.summary(entry) if entry else [],
+            v=v, table=table, facts=lexicon.summary(entry) if entry else [],
             right=sum(1 for a in attempts if a.verdict == "correct"), wrong=sum(1 for a in attempts if a.verdict == "wrong"),
-            mistakes=[a for a in attempts if a.verdict == "wrong"][:20], searches=queries[0].count if queries else 0,
+            mistakes=[{"a": a, "segments": mistake_segments(a), "note": " · ".join(
+                          x for x in (a.rule or a.task or (a.prompt if a.kind != "sentence" else ""),
+                                      german_date(a.created_at)) if x)}
+                      for a in attempts if a.verdict == "wrong" or (a.verdict == "almost" and a.corrected)][:20],
+            marks=form_marks(table, attempts), searches=queries[0].count if queries else 0,
             examples=v.examples[:10],
         )
         return render_page(request, page)

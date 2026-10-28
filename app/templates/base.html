@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}wort{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" id="wort-favicon" href="/static/favicon-light.svg?v=3">
   <script src="/static/theme-init.js"></script>
   <link rel="stylesheet" href="/ds/tokens/output.css">
   {% for href in ds_css %}
@@ -11,31 +12,39 @@
   {% endfor %}
   {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="/static/layout.css">
+  <link rel="stylesheet" href="/static/trial.css">
 </head>
 <body{% block body_attrs %}{% endblock %}>
   {% if user %}
   <header class="wort-head">
-  {% with workspace_label='DE → UK', nav_links=[
+  {# The logo (design canvas "Wort — логотип", D — Піксель): the W alone on the 10×23 grid, strokes and steps three cells wide, the middle four (bolder
+     and wider, garv 2026-10-28), in the text color. #}
+  {% set brand_html %}<svg viewBox="0 0 160 184" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true" focusable="false"><rect x="0" y="0" width="30" height="184"/><rect x="30" y="92" width="30" height="46"/><rect x="60" y="46" width="40" height="46"/><rect x="100" y="92" width="30" height="46"/><rect x="130" y="0" width="30" height="184"/></svg>{% endset %}
+  {% with brand='wort', brand_html=brand_html, brand_href='/', workspace_label='', nav_links=[
     {'label': 'Wörter', 'href': '/', 'current': page in ('words', 'history', 'favorites')},
     {'label': 'Üben', 'href': '/ueben', 'current': page == 'practice'},
     {'label': 'Texte', 'href': '/texte', 'current': page == 'texts'}
   ], right_actions=[
     {'label': 'Abmelden (' ~ user.name ~ ')', 'form_action': '/logout', 'hidden': {'csrf': csrf}}
   ] %}{% include "components/nav-bar/template.html" %}{% endwith %}
-  {# Second header row: settings (to come) on the left, the lookup side panel's toggle on the right. #}
+  {# Second header row: settings (to come) on the left, the lookup side panel's toggle on the right. Only on Üben
+     (garv, 2026-10-28): the Wörter page has its own lookup field. #}
+  {% set side_lookup = page == 'practice' %}
+  {% if side_lookup %}
   <div class="wort-toolbar">
     <div class="wort-row wort-toolbar__settings"></div>
     <div class="wort-row">
       {% with priority='secondary', underline='dotted', label='Nachschlagen', extra_attrs='data-side-toggle aria-controls="wort-lookup-side" aria-expanded="false"' %}{% include "components/text-button/template.html" %}{% endwith %}
     </div>
   </div>
+  {% endif %}
   </header>
   {% endif %}
   <div class="wort-shell">
   <main class="wort-main">
     {% block content %}{% endblock %}
   </main>
-  {% if user %}
+  {% if user and side_lookup %}
   {# Lookup side panel: the same search as on the Wörter page, results fetched in place (app.js). It lies over the
      page (nothing moves): a full-width resizable row (dis-system pane's data-resizable) whose left part is an empty,
      click-through neighbour, then the resize handle, then the panel. #}

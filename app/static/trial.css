@@ -1,0 +1,39 @@
+/* TRIAL, local only (garv, 2026-10-28): tried in wort before deciding whether it goes into dis-system. Until then
+   these are deliberate exceptions to CLAUDE.md's "layout only" rule; remove this file to go back to dis-system's
+   look. DECISIONS.md D00h. */
+
+/* Text buttons: no underline at rest, the underline (dotted or solid, as dis-system draws it) only on hover and
+   keyboard focus. dis-system's convention is a permanent underline (its CLAUDE.md, Interaction conventions). */
+.ds-text-button[data-status] .ds-text-button__text,
+.ds-text-button[data-status] .ds-text-button__label { text-decoration-line: none; }
+.ds-text-button:is([data-status="active"], [data-status="error"]):is(:hover, :focus-visible) .ds-text-button__text,
+.ds-text-button:is([data-status="active"], [data-status="error"]):is(:hover, :focus-visible) .ds-text-button__label {
+  text-decoration-line: underline;
+}
+
+/* No [ ] brackets on hover / focus either: the underline alone says "clickable". dis-system draws them as
+   transparent ::before/::after that take the text color on hover; they stay transparent here, so they still keep
+   their space and nothing shifts. (Specificity one attribute above dis-system's hover rule.) */
+.ds-text-button[data-status][data-status]:is(:hover, :focus-visible)::before,
+.ds-text-button[data-status][data-status]:is(:hover, :focus-visible)::after { color: transparent; }
+
+/* Wörter hero: as low as it gets, the title and the search field close to the nav bar and to the table below. */
+.ds-hero-block[data-fit="content"] { min-height: 0; gap: var(--ds-spacing-2); padding: var(--ds-spacing-3) var(--ds-spacing-cell); }
+.ds-hero-block[data-fit="content"] .ds-hero-block__title { margin: 0; padding: 0; }
+.ds-hero-block[data-fit="content"] .ds-hero-block__search { margin-bottom: 0; }
+
+/* Search result (design "Wörter — Suchergebnis"): type and color of the parts dis-system has no component for yet.
+   Article colors as dis-system's text-button uses them (der accent-1, die / das the row-status texts). */
+.wort-lookup__summary { margin: 0; font-size: var(--ds-font-body-text-size); font-weight: var(--ds-font-body-text-weight); font-style: italic; color: var(--ds-color-text-subactive); }
+.wort-result p { margin: 0; }
+.wort-result__word { margin: 0; font-size: var(--ds-font-heading-2-size); font-weight: var(--ds-font-heading-5-weight); line-height: var(--ds-font-heading-2-line-height); color: var(--ds-color-text-active); }
+.wort-result__translation { font-size: var(--ds-font-heading-5-size); }
+.wort-result__meta { font-family: var(--ds-font-data-family); font-size: var(--ds-font-data-size); font-weight: var(--ds-font-data-weight); color: var(--ds-color-base-750); }
+.wort-result__note { font-style: italic; color: var(--ds-color-text-subactive); }
+.wort-example__translation { color: var(--ds-color-base-750); }
+.wort-example__word { font-weight: var(--ds-font-body-text-medium-weight); }
+:is(.wort-result__word, .wort-example__word)[data-article="der"] { color: var(--ds-color-accent-1); font-weight: inherit; }
+:is(.wort-result__word, .wort-example__word)[data-article="die"] { color: var(--ds-color-row-status-declined-text); font-weight: inherit; }
+:is(.wort-result__word, .wort-example__word)[data-article="das"] { color: var(--ds-color-row-status-approved-text); font-weight: inherit; }
+/* The section heads (Deklination, Beispiele, Verwandte Wörter) as the design's filled bar. */
+.wort-result__section > .ds-table-header { background-color: var(--ds-color-bg-surface-pressed); border: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }

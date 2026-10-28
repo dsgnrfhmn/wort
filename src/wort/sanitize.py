@@ -130,6 +130,24 @@ def redact(value: object) -> str:
 _installed = False
 
 
+def _redact_arg(value: object) -> object:
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else redact(value)
+
+
+def _redact_record(record: logging.LogRecord) -> None:
+    """Redact a record in place. Tuple args stay a tuple of redacted values, because formatters such as
+    uvicorn's access formatter read them by position; if the message they build still looks like it holds
+    a secret (one split between the format string and an argument), the record is collapsed to its
+    redacted message instead."""
+    if isinstance(record.args, tuple) and record.args:
+        msg, args = redact(record.msg), tuple(_redact_arg(a) for a in record.args)
+        full = msg % args
+        if redact(full) == full:
+            record.msg, record.args = msg, args
+            return
+    record.msg, record.args = redact(record.getMessage()), ()
+
+
 def install_log_redaction() -> None:
     """Redact every log record once, at creation (all loggers, all handlers). Idempotent."""
     global _installed
@@ -141,7 +159,7 @@ def install_log_redaction() -> None:
     def factory(*args, **kwargs):
         record = previous(*args, **kwargs)
         try:
-            record.msg, record.args = redact(record.getMessage()), ()
+            _redact_record(record)
         except Exception:  # a broken format string must not break logging
             record.msg, record.args = redact(record.msg), ()
         return record

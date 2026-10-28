@@ -13,8 +13,11 @@ from datetime import datetime
 from pathlib import Path
 
 from app import scoring
+from wort import sanitize
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
+ATTEMPT_DETAILS = ("task", "expected", "corrected", "rule")
+MAX_DETAIL = 300
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -80,7 +83,11 @@ CREATE TABLE IF NOT EXISTS attempts (
     verdict TEXT NOT NULL CHECK (verdict IN ('correct', 'almost', 'wrong')),
     delta INTEGER NOT NULL,
     state_before TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    task TEXT NOT NULL DEFAULT '',
+    expected TEXT NOT NULL DEFAULT '',
+    corrected TEXT NOT NULL DEFAULT '',
+    rule TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS practice_sessions (
     id INTEGER PRIMARY KEY,
@@ -151,6 +158,10 @@ class Attempt:
     verdict: str
     delta: int
     created_at: datetime
+    task: str = ""  # the asked form, e.g. "Dativ Plural" or "Präteritum, ich" (sentence tasks)
+    expected: str = ""  # the right answer or the required form
+    corrected: str = ""  # the corrected sentence
+    rule: str = ""  # the rule behind the mistake, or the checker's first remark
 
 
 @dataclass
@@ -204,6 +215,13 @@ class WebStore:
                 "DROP TABLE practice_sessions_v1;"
             )
 
+    def _migrate_v4(self) -> None:
+        """v4 -> v5: what an attempt asked for and how it was corrected (task, expected, corrected, rule)."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(attempts)")}
+        for col in ATTEMPT_DETAILS:
+            if col not in cols:
+                self.conn.execute(f"ALTER TABLE attempts ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+
     def _migrate(self) -> None:
         version = self.conn.execute("PRAGMA user_version").fetchone()[0]
         legacy = version == 0 and self.conn.execute(
@@ -216,6 +234,8 @@ class WebStore:
             self.conn.executescript(_COPY_V0)
         if version == 1:
             self._migrate_v1()  # v2 -> v3 and v3 -> v4 need no step: SCHEMA adds sync_tokens, grammar_attempts
+        if 0 < version < 5:
+            self._migrate_v4()
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 
@@ -410,8 +430,10 @@ class WebStore:
         return None if out is None else out[1]
 
     def record_attempt_full(self, user_id: int, word_id: int, skill: str, kind: str, prompt: str,
-                            answer: str, verdict: str, now: datetime | None = None) -> tuple[int, int] | None:
-        """Like record_attempt but returns (attempt_id, delta); keeps the pre-answer state for revisions."""
+                            answer: str, verdict: str, now: datetime | None = None,
+                            details: dict[str, str] | None = None) -> tuple[int, int] | None:
+        """Like record_attempt but returns (attempt_id, delta); keeps the pre-answer state for revisions.
+        `details` holds ATTEMPT_DETAILS (task, expected, corrected, rule), each cleaned and capped."""
         now = now or datetime.now()
         w = self.word(user_id, word_id)
         if w is None:
@@ -424,10 +446,12 @@ class WebStore:
             (after.translation, after.form, after.usage, after.streak, _ts(now),
              _ts(scoring.next_due(after, verdict, now)), user_id, word_id),
         )
+        extra = [sanitize.text((details or {}).get(col) or "", MAX_DETAIL) for col in ATTEMPT_DETAILS]
         cur = self.conn.execute(
             "INSERT INTO attempts (user_id, word_id, skill, kind, prompt, answer, verdict, delta, state_before, "
-            "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, word_id, skill, kind, prompt, answer, verdict, delta, json.dumps(asdict(w.state)), _ts(now)),
+            "created_at, task, expected, corrected, rule) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, word_id, skill, kind, prompt, answer, verdict, delta, json.dumps(asdict(w.state)), _ts(now),
+             *extra),
         )
         self.conn.commit()
         return cur.lastrowid, delta
@@ -467,7 +491,7 @@ class WebStore:
         """The user's answers for one word, newest first."""
         return [
             Attempt(r["kind"], r["prompt"], r["answer"], r["verdict"], r["delta"],
-                    datetime.fromisoformat(r["created_at"]))
+                    datetime.fromisoformat(r["created_at"]), *(r[col] for col in ATTEMPT_DETAILS))
             for r in self.conn.execute(
                 "SELECT * FROM attempts WHERE user_id = ? AND word_id = ? ORDER BY created_at DESC, id DESC",
                 (user_id, word_id),

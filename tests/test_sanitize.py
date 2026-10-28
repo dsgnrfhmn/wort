@@ -84,3 +84,28 @@ def test_log_records_are_redacted_everywhere(caplog):
     with caplog.at_level(logging.INFO):
         logging.getLogger("x").warning("failed with key %s", "sk-ant-api03-SECRETSECRETSECRET")
     assert "SECRETSECRET" not in caplog.text and "[redacted-key]" in caplog.text
+
+
+def test_log_redaction_keeps_positional_args_for_the_access_formatter():
+    from uvicorn.logging import AccessFormatter
+    s.install_log_redaction()
+    record = logging.getLogger("uvicorn.access").makeRecord(
+        "uvicorn.access", logging.INFO, __file__, 1, '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:5000", "GET", "/sync?token=wsync_abcdefghijkl", "1.1", 200), None)
+    line = AccessFormatter('%(client_addr)s - "%(request_line)s" %(status_code)s', use_colors=False).format(record)
+    assert line == '127.0.0.1:5000 - "GET /sync?token=[redacted] HTTP/1.1" 200 OK'
+
+
+@pytest.mark.parametrize("msg,args,secret", [
+    ("%s: %s", ("token", "abcdefghijkl"), "abcdefghijkl"),           # each arg clean, the joined line is not
+    ("Authorization: %s", ("abcdefghijkl",), "abcdefghijkl"),         # secret split between format and arg
+    ("token=%s", ("plainvalue12",), "plainvalue12"),                    # the format string itself matches
+    ("key %s", ("sk-ant-api03-SECRETSECRETSECRET",), "SECRETSECRET"),
+])
+def test_log_redaction_never_leaks_through_args(caplog, msg, args, secret):
+    s.install_log_redaction()
+    with caplog.at_level(logging.INFO):
+        logging.getLogger("x").warning(msg, *args)
+    record = caplog.records[-1]
+    assert secret not in caplog.text and secret not in record.getMessage()
+    assert all(secret not in str(a) for a in (record.args or ()))

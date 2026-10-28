@@ -7,6 +7,8 @@ added to the word list here; the page offers "Zu Wörtern hinzufügen" per entry
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from wort.dictionary import grammar as g
@@ -41,6 +43,9 @@ class Result:
     table: FormsTable | None = None
     examples: list[tuple[str, str]] = field(default_factory=list)
     definitions: list[str] = field(default_factory=list)  # German, from dictionary-de.db when it is installed
+    meta: str = ""  # "Nomen · feminin · Pl. die Entwicklungen · /ɛntˈvɪklʊŋ/"
+    sample: list[dict] = field(default_factory=list)  # examples: {"segments": [{text, hl?}], "translation"}
+    related: list[dict] = field(default_factory=list)  # {"label", "article", "pos", "q"}
 
 
 def declension(entry: Entry) -> list[list[str]]:
@@ -70,7 +75,30 @@ def forms_table(entry: Entry) -> FormsTable | None:
     return None
 
 
-def result(entry: Entry, uk: Ukrainian | None, owned: set[tuple[str, str]], de=None) -> Result:
+MAX_EXAMPLES = 6
+
+
+def highlight(sentence: str, forms: set[str]) -> list[dict]:
+    """The sentence as runs, the ones that are a form of the word marked `hl` (plain text, never markup)."""
+    from wort.text import normalize
+    out: list[dict] = []
+    for part in re.split(r"([\wÄÖÜäöüß]+)", sentence):
+        if part:
+            out.append({"text": part, "hl": True} if normalize(part) in forms else {"text": part})
+    return out
+
+
+def sample(entry: Entry, translate: Callable[[str], str] | None = None) -> list[dict]:
+    """Up to MAX_EXAMPLES examples with the word marked; the translation is `translate`'s (Ukrainian, offline) when
+    it has one, else the dataset's English."""
+    from app.checking import lemma_forms
+    forms = lemma_forms(entry)
+    return [{"segments": highlight(de, forms), "translation": (translate(de) if translate else "") or en}
+            for de, en in entry.examples[:MAX_EXAMPLES]]
+
+
+def result(entry: Entry, uk: Ukrainian | None, owned: set[tuple[str, str]], de=None,
+           translate: Callable[[str], str] | None = None, dictionary: Dictionary | None = None) -> Result:
     article = g.ARTICLES[entry.gender]["nominative"] if entry.pos == "noun" and entry.gender in g.ARTICLES else ""
     caption = POS_LABEL.get(entry.pos, entry.pos.capitalize())
     if article:
@@ -81,7 +109,20 @@ def result(entry: Entry, uk: Ukrainian | None, owned: set[tuple[str, str]], de=N
         " · ".join(p for p in (uk_words, en_words) if p) or "–", "\n".join(p for p in (en_words, uk_words) if p),
         (entry.lemma.casefold(), entry.pos) in owned, forms_table(entry), list(entry.examples[:2]),
         de.definitions(entry.lemma, entry.pos) if de else [],
+        meta=" · ".join(x for x in (caption, plural_label(entry), f"/{entry.ipa.strip('/')}/" if entry.ipa else "") if x),
+        sample=sample(entry, translate),
+        related=[{"label": v_label(r), "article": g.ARTICLES[r.gender]["nominative"]
+                  if r.pos == "noun" and r.gender in g.ARTICLES else "",
+                  "pos": "" if r.pos == "noun" else POS_LABEL.get(r.pos, r.pos.capitalize()), "q": r.lemma}
+                 for r in (dictionary.related(entry) if dictionary else [])],
     )
+
+
+def plural_label(entry: Entry) -> str:
+    if entry.pos != "noun":
+        return ""
+    form = g.noun_form(entry, "nominative", "plural")
+    return f"Pl. {g.with_article(entry, form, 'nominative', 'plural')}" if form else ""
 
 
 def search(dictionary: Dictionary, uk: Ukrainian | None, query: str,
@@ -95,4 +136,9 @@ def search(dictionary: Dictionary, uk: Ukrainian | None, query: str,
             note = "Ein Ergebnis pro Wort" + "".join(f" · {a} → {b}" for a, b in fixes)
     if not entries and (suggested := dictionary.suggest(query.strip(), limit=3)):
         entries, note = suggested, "Nicht gefunden. Meintest du:"
-    return [result(e, uk, owned, de) for e in entries], note
+    # The first entry is the one shown in full: its examples translated (offline, slow on a small server) and its
+    # related words; the others stay short.
+    from app import mt
+    first = lambda text: mt.translate(text, "uk")
+    return [result(e, uk, owned, de, first if i == 0 else None, dictionary if i == 0 else None)
+            for i, e in enumerate(entries)], note

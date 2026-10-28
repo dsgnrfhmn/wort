@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from wort.dictionary.grammar import ARTICLES
 from wort.dictionary.lookup import Dictionary, Entry
 from wort.exercises import TYPES, pick_exercise
 from wort.exercises.sentence import targets
@@ -27,7 +28,7 @@ from wort.dictionary.ukrainian import Ukrainian
 from app.checking import CheckResult, check_sentence, lemma_forms
 from wort.text import normalize
 from app.db import User, UserWord, WebStore
-from app.words import german_date, short_gloss, uk_text, v_label
+from app.words import GENDER_LABEL, POS_LABEL, german_date, short_gloss, uk_text, v_label
 
 KINDS = {"saetze": "Sätze bilden", "abfrage": "Abfrage", "regel": "Regel üben", "grammatik": "Grammatik"}
 TABS = ("saetze", "abfrage", "grammatik")  # the start page's tabs; grammar sessions start from a topic
@@ -35,6 +36,9 @@ CREATABLE = ("saetze", "abfrage")  # "regel" sessions only come from "Diese Rege
 SKILL = {"translate": "translation", "article": "form", "forms": "form", "question": "form", "sentence": "usage",
          "bedeutung": "translation", "erklaere": "translation"}
 AI_ANSWER_KINDS = ("bedeutung", "erklaere")
+# Abfrage's modes: the local drills mixed (plus free answers when the AI grades them), or one kind for every word.
+# "erklaere" can only be graded by the AI; "bedeutung" falls back to the dictionary's glosses.
+ABFRAGE_MODES = {"gemischt": "Gemischt", "bedeutung": "Was bedeutet …?", "erklaere": "Auf Deutsch erklären"}
 MAX_OBJECTION = 300
 RULE_TASKS = 5
 GRADE = {"richtig": "correct", "teilweise": "almost", "falsch": "wrong"}
@@ -62,9 +66,9 @@ class Graded:
 
 
 def build_items(kind: str, pairs: list[tuple[UserWord, Entry]], rng: random.Random,
-                ai_answers: bool = False, topic: str = questions.ALL) -> list[dict]:
+                ai_answers: bool = False, topic: str = questions.ALL, mode: str = "gemischt") -> list[dict]:
     """One item per task. Sätze bilden: round-robin over the words, 5-10 tasks, each with a question from
-    `topic` that fits its word (questions.pick_for); Abfrage: one per word."""
+    `topic` that fits its word (questions.pick_for); Abfrage: one per word, of the kinds `mode` names."""
     if kind == "saetze":
         usable = [(w, e, targets(e)) for w, e in pairs]
         usable = [u for u in usable if u[2]]
@@ -81,6 +85,8 @@ def build_items(kind: str, pairs: list[tuple[UserWord, Entry]], rng: random.Rand
             items.append({"word_id": w.id, "kind": "sentence", "index": pool[(i // len(usable)) % len(pool)],
                           "question": ref, "topic": topic})
         return items
+    if mode in AI_ANSWER_KINDS:  # one kind for every word that has glosses to compare with
+        return [{"word_id": w.id, "kind": mode} for w, e in pairs[:MAX_ITEMS * 2] if e.glosses]
     items = []
     for w, e in pairs[:MAX_ITEMS * 2]:
         if ai_answers and e.glosses and rng.random() < 0.5:  # free answers need the AI to grade them
@@ -103,6 +109,12 @@ def apply_ai_tasks(items: list[dict], lemmas: dict[int, str], tasks: TaskSet) ->
         if item["kind"] == "sentence" and queue:
             t = queue.pop(0)
             item.update({"ai_prompt": t.prompt, "tr_uk": t.translation_uk, "tr_en": t.translation_en})
+
+
+def abfrage_mode(items: list[dict]) -> str:
+    """The mode a session was started in, read from its items (sessions store no mode of their own)."""
+    kinds = {i["kind"] for i in items}
+    return next(iter(kinds)) if len(kinds) == 1 and kinds <= set(AI_ANSWER_KINDS) else "gemischt"
 
 
 def question_text(item: dict) -> str:
@@ -232,6 +244,15 @@ def grade_free_answer(item: dict, entry: Entry, answer: str, prompt: str, ai: Ai
     return Graded(None, expected, "Diese Aufgabe braucht die KI und wurde nicht bewertet.")  # no score
 
 
+def attempt_details(item: dict, entry: Entry, graded: Graded, answer: str) -> dict[str, str]:
+    """What the word detail needs to show a mistake later: the asked form, the right answer, the corrected
+    sentence (only when it differs) and the rule (the AI's, else the checker's first remark)."""
+    task = targets(entry)[item["index"]][0] if item["kind"] == "sentence" and not item.get("free") else ""
+    rule = graded.rule or next((r.get("message") or "" for r in graded.remarks or [] if r.get("message")), "")
+    corrected = graded.corrected if graded.corrected and graded.corrected != answer else ""
+    return {"task": task, "expected": graded.expected, "corrected": corrected, "rule": rule}
+
+
 def grade_item(item: dict, entry: Entry, answer: str, checker, ai: AiService | None = None,
                user_id: int = 0, notes: list[str] | None = None) -> Graded:
     answer = sanitize.text(answer, MAX_ANSWER)
@@ -336,10 +357,15 @@ def register(app, ctx) -> None:
 
     @app.post("/ueben/{kind}")
     def create(request: Request, kind: str, csrf: str = Form(...), ids: list[int] = Form(default=[]),
-               preset: str = Form(""), thema: str = Form(questions.ALL), user: User = Depends(current_user)):
+               preset: str = Form(""), thema: str = Form(questions.ALL), art: str = Form("gemischt"),
+               user: User = Depends(current_user)):
         ctx.verify_csrf(request, csrf)
         if kind not in CREATABLE:
             raise HTTPException(404, "unknown exercise")
+        if art not in ABFRAGE_MODES:
+            raise HTTPException(400, "unknown mode")
+        if art == "erklaere" and not ai.uses("answer"):  # the page offers it disabled; a forged post lands here
+            return ctx.redirect("/ueben?neu=1&modus=abfrage", "„Auf Deutsch erklären“ braucht die KI, sie ist aus.")
         if preset == "weakest":
             from app.words import order
             chosen = order(store.words(user.id), "score", False)[:5]
@@ -350,7 +376,7 @@ def register(app, ctx) -> None:
         dic = dictionary()
         pairs = [(w, e) for w in chosen if (e := dic.find_lemma(w.lemma, w.pos or None))]
         items = build_items(kind, pairs, random.Random(), ai_answers=ai.uses("answer"),
-                            topic=questions.topic_or_all(thema))
+                            topic=questions.topic_or_all(thema), mode=art if kind == "abfrage" else "gemischt")
         if items and kind == "saetze" and ai.uses("tasks"):
             try:  # one call per session: task wording for these words (only the lemmas are sent)
                 apply_ai_tasks(items, {w.id: w.lemma for w, _ in pairs},
@@ -379,6 +405,8 @@ def register(app, ctx) -> None:
         current = turn(user, dic, tr, pos, item, opened)
         if current is None:
             raise HTTPException(404, "word is gone")
+        if sess["kind"] == "abfrage":
+            return abfrage_page(request, user, sess, current)
         # The chat: every task up to the current one (an earlier one whose word is gone is left out), then, once the
         # current task is answered, the next task's prompt; the pinned input answers that next task.
         turns = [t for i in range(pos) if (t := turn(user, dic, tr, i, items[i], opened))] + [current]
@@ -401,6 +429,58 @@ def register(app, ctx) -> None:
                   in grammar.TOPICS else
                   [w.lemma for i in items if "word_id" in i and (w := store.word(user.id, i["word_id"]))][:12]),
         )
+
+    def abfrage_page(request: Request, user: User, sess: dict, current: dict):
+        """Abfrage (design Üben 6): one word at a time on the left, this round's results on the right."""
+        items, pos = sess["items"], sess["pos"]
+        word = store.word(user.id, items[pos]["word_id"])
+        entry = dictionary().find_lemma(word.lemma, word.pos or None)
+        rows = summary(user, items[:pos + 1] if "result" in items[pos] else items[:pos])
+        count = {v: sum(1 for r in rows if r["verdict"] == v) for v in ("correct", "almost", "wrong")}
+        res = items[pos].get("result") or {}
+        tr_uk, tr_en = translator().parts(entry)
+        return ctx.render(
+            request, "practice_abfrage.html", user=user, page="practice", sess=sess, t=current, pos=pos,
+            total=len(items), kinds=KINDS, batch=batch_of(user, sess), rows=rows, count=count,
+            left=sum(1 for i in items if "result" not in i) - (0 if "result" in items[pos] else 1),
+            mode=abfrage_mode(items), modes=ABFRAGE_MODES, erklaere_ok=ai.uses("answer"),
+            pos_label=POS_LABEL.get(entry.pos, entry.pos.capitalize())
+            + (f" · {GENDER_LABEL[entry.gender]}" if entry.pos == "noun" and entry.gender in GENDER_LABEL else ""),
+            article=ARTICLES[entry.gender]["nominative"] if entry.pos == "noun" and entry.gender in ARTICLES else "",
+            lemma=entry.lemma, translations=" · ".join(x for x in (tr_uk, tr_en) if x),
+            example=entry.examples[0][0] if entry.examples else "",
+            can_downgrade=res.get("verdict") in ("correct", "almost") and bool(res.get("attempt_id"))
+            and not items[pos].get("downgraded"),
+        )
+
+    @app.post("/ueben/s/{sid}/skip")
+    def skip(request: Request, sid: int, csrf: str = Form(...), user: User = Depends(current_user)):
+        """Abfrage "Überspringen": the current word is left out of this round, no score change."""
+        ctx.verify_csrf(request, csrf)
+        sess = get_session(user, sid)
+        items, pos = sess["items"], sess["pos"]
+        if sess["kind"] == "abfrage" and pos < len(items) and "result" not in items[pos]:
+            items[pos]["result"] = asdict(Graded(None, feedback="Übersprungen.")) | {"delta": None, "skipped": True}
+            store.save_practice(user.id, sid, items, pos + 1)
+        return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
+
+    @app.post("/ueben/s/{sid}/doch-falsch")
+    def downgrade(request: Request, sid: int, csrf: str = Form(...), user: User = Depends(current_user)):
+        """Abfrage "Doch falsch": the learner marks an answer the check accepted as wrong (once, only downwards,
+        only while it is the word's latest answer: store.revise_attempt)."""
+        ctx.verify_csrf(request, csrf)
+        sess = get_session(user, sid)
+        items, pos = sess["items"], sess["pos"]
+        item = items[pos] if pos < len(items) else None
+        res = (item or {}).get("result") or {}
+        if (sess["kind"] == "abfrage" and res.get("verdict") in ("correct", "almost") and res.get("attempt_id")
+                and not item.get("downgraded")):
+            delta = store.revise_attempt(user.id, res["attempt_id"], "wrong")
+            if delta is not None:
+                res.update(verdict="wrong", delta=delta, feedback="Von dir als falsch markiert.")
+                item["downgraded"] = True
+                store.save_practice(user.id, sid, items, pos)
+        return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
 
     def turn(user: User, dic: Dictionary, translate, index: int, item: dict, opened: dict | None = None) -> dict | None:
         """One task of the chat: its prompt and, once answered, the answer with its feedback. None: word gone.
@@ -539,7 +619,8 @@ def register(app, ctx) -> None:
             delta = attempt_id = None  # an ungraded answer (grammar not checked) changes no score
             if graded.verdict is not None:
                 attempt_id, delta = store.record_attempt_full(user.id, word.id, SKILL[item["kind"]], item["kind"],
-                                                              rebuild(item, entry)[0], cleaned, graded.verdict)
+                                                              rebuild(item, entry)[0], cleaned, graded.verdict,
+                                                              details=attempt_details(item, entry, graded, cleaned))
             item["result"] = {**asdict(graded), "delta": delta, "attempt_id": attempt_id}
             item["answer"] = cleaned
             item["ai_note"] = notes[0] if notes else ""
@@ -688,7 +769,9 @@ def register(app, ctx) -> None:
                              "delta": 0, "score": None})
                 continue
             w = store.word(user.id, it["word_id"])
-            rows.append({"label": w.lemma if w else "?", "verdict": "tip" if res.get("tip") and res.get("verdict") is None else res.get("verdict"),
+            verdict = ("skipped" if res.get("skipped") else
+                       "tip" if res.get("tip") and res.get("verdict") is None else res.get("verdict"))
+            rows.append({"label": w.lemma if w else "?", "verdict": verdict,
                          "delta": res.get("delta") or 0,
                          "score": w.score if w else None})
         return rows

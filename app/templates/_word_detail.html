@@ -31,12 +31,13 @@
        searched) is left out, e.g. for a verb the dictionary knows little about. #}
     {% if d.table and d.table.rows %}
     <section class="wort-section" aria-labelledby="forms-title">
-      {% with type='title-info', title=d.table.title, info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+      {% with type='title-info', title=d.table.title, info='Fehler markiert' if d.marks else '' %}{% include "components/table-header/template.html" %}{% endwith %}
       <div class="wort-table {{ 'wort-conjugation' if d.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ d.table.title }}">
         {% for h in d.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
         {% for row in d.table.rows %}
+        {% set r = loop.index0 %}
         {% set cells = [{'type': 'text-passive-cell', 'content': row[0]}] %}
-        {% for c in row[1:] %}{% set _ = cells.append({'type': 'text-active-cell', 'content': c}) %}{% endfor %}
+        {% for c in row[1:] %}{% set n = d.marks.get((r, loop.index)) %}{% set _ = cells.append({'type': 'text-active-cell', 'content': c, 'mark': ('✗' ~ n) if n else none, 'mark_label': (n ~ '× falsch') if n else none}) %}{% endfor %}
         {% with cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
         {% endfor %}
       </div>
@@ -51,9 +52,10 @@
       {% with title='Beispiele', caption=(d.examples | length) ~ ' von ' ~ (v.examples | length), items=ex_items, open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
       {% endif %}
       {% if d.mistakes %}
-      {% set err_items = [] %}
-      {% for a in d.mistakes %}{% set _ = err_items.append(a.prompt ~ ' → ' ~ a.answer ~ ' · ' ~ german_date(a.created_at)) %}{% endfor %}
-      {% with title='Deine Fehler', caption='✓' ~ d.right ~ ' ✗' ~ d.wrong, items=err_items, open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
+      {# Each mistake as the design shows it: the answer with the wrong run struck through and the right one
+         beside it, then the rule (or the asked form) and the date. #}
+      {% set body_html %}{% for m in d.mistakes %}{% with variant='answer', label=none, segments=m.segments, text=m.a.answer, note=m.note, note_tooltip=none %}{% include "components/message/template.html" %}{% endwith %}{% endfor %}{% endset %}
+      {% with title='Deine Fehler', caption='✓' ~ d.right ~ ' ✗' ~ d.wrong, body_html=body_html, items=none, open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
       {% endif %}
     </section>
     {% endif %}

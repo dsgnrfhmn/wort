@@ -159,6 +159,8 @@ Keep README and this file in sync after each session.
 - `src/wort/` — CLI + TUI (stays; fully local; command `wort`; Python package `wort`)
 - `app/` — FastAPI app, routes, templates
 - `app/auth.py`, `app/words.py`, `app/practice.py`, `app/scoring.py` — login, word list, practice, score formula
+  (Üben › Abfrage has its own page, `practice_abfrage.html`: one word at a time beside "Diese Runde"; modes
+  Gemischt / Was bedeutet …? / Auf Deutsch erklären (AI only); "Überspringen" and "Doch falsch" (downgrade only))
 - `app/questions.py` + `app/questions.json` — topic questions for "Sätze bilden" (hand-edited list, picked at random,
   no AI; the file is validated at startup)
 - `app/ai/` — AI layer (interface, schemas, daily cap, fake provider, Anthropic provider; off until the key is set)
@@ -179,7 +181,8 @@ Keep README and this file in sync after each session.
   loopback only)
 - `app/importer.py`, `app/sync_app.py` — CLI export import, `POST /sync` (own process); `app/ui_terms.py` — EN/UK
   tooltips for the German button labels
-- `app/db.py` — web.db schema v3 + migrations
+- `app/db.py` — web.db schema v5 + migrations (v5: an attempt keeps its asked form, expected answer, correction
+  and rule, for the word detail's marked forms table and "Deine Fehler")
 - `app/ocr.py` — image validation + Tesseract **[post-MVP]**, not written yet
 - `scripts/adduser.py`, `scripts/synctoken.py` — admin user and sync-token creation; `scripts/fetch_data.py` —
   downloads (the CLI never downloads); `scripts/dev.sh` — https dev server on the LAN
