@@ -126,9 +126,49 @@ Confirmed by maintainer (date)*.
 - **Draft props in the dis-system submodule, local and uncommitted (2026-10-28):** nav-bar `brand` / `brand_href` /
   `brand_html` (the pixel W from the design canvas "Wort — логотип"; the language dropdown moves right),
   table-header-actions `outlined`, disclosure `body_html`, radio `disabled`. Not pushed: they wait for the
-  maintainer's OK, then a branch and a PR. The favicon (the W, black on light, white on dark, following the page's
-  theme) is wort's own (`app/static/favicon-*.svg`).
+  maintainer's OK, then a branch and a PR. The favicon (the W) is wort's own (`app/static/favicon.svg`); since 2026-10-29 one magenta W
+  (`#C614E1`, dis-system `accent.secondary`) without a border for both themes (garv).
 - **Confirmed by maintainer:** 2026-10-28 (trial)
+
+## D00i — Üben: one task at a time, retries, one open session per tab
+
+- **Decision (2026-10-29, maintainer, in session):**
+  - A practice session shows **one task at a time**; tabs on top (dis-system header-tab) switch between the answered
+    tasks and the current one; the next task opens only with "Nächste Aufgabe". A sidebar lists the session's words;
+    a word keeps the tabs to its tasks.
+  - **"Nochmal antworten"** on any answered sentence task: graded and corrected like the first answer, shown under it
+    as "Versuch N". **Only the first answer counts** (no attempt row, no score change). No cap (garv, 2026-10-29); an AI check still counts against the daily AI cap.
+  - The feedback ends with **"So wäre es richtig"**: the corrected sentence (and the AI's more natural one).
+  - **One open session per Üben tab** (Sätze bilden incl. "Regel üben", Abfrage, Grammatik): every Üben page shows the
+    three tabs; a tab resumes its open session; a new session closes only its own tab's old one (answers kept). The
+    current batch of words is the latest *word* session's, so a grammar session does not lose it.
+  - A sentence mistake links to its **Grammatik topic** without the AI (`grammar.TOPIC_FOR_MISTAKE`: article →
+    Präpositionen und Kasus, adjective/predicative → Adjektivdeklination; other kinds get no link).
+  - Navigation per the design "open-projects" (Figma node 391:23146): the three modes are equal dis-system page-heads
+    in the header under the nav bar; pages with the word sidebar and the Grammatik pages run the full window width.
+  - **Draft prop in the dis-system submodule, local and uncommitted (2026-10-29):** page-head `title_href` / `current`
+    (the title as a link, aria-current on the mode on show). Waits for the maintainer's OK, then a branch and a PR.
+  - (later the same day) Messages carry a tail (task left, answer right); Send shows the answer at once with a
+    progress bar; the feedback is a dis-system disclosure that can be folded; the session's words are dis-system's
+    sidebar-list as in the other apps; the session page is light grey (trial.css, light theme only, base-150).
+    **Draft props in the dis-system submodule, local and uncommitted:** message `tail`, sidebar-list items `caption` /
+    `muted`.
+- **Open:** sentence mistakes do not count toward a topic's progress yet; Abfrage keeps its own page (not one view).
+- **Confirmed by maintainer:** 2026-10-29
+
+## D00j — Interface language: English, switchable to German
+
+- **Decision (2026-10-29, maintainer, in session):** the web interface is **English by default** and switchable to
+  German with a dropdown in the nav bar. Words, forms, tasks and questions, examples, grammar explanations
+  ("Merke", rule tables) and the verdicts **richtig / fast richtig / falsch** stay German in both languages.
+- **How:** own catalog `app/i18n.py` (English source text → German; `_()` in templates, `t()` in Python), no new
+  dependency. The language is stored **only in the profile** (`users.ui_lang`, schema v6); the login page is English.
+  A middleware sets it per request. A feedback text stored with an answer keeps the language it was written in.
+  `tests/test_i18n.py` fails on any interface text without a German entry. The English/Ukrainian tooltips for German
+  labels (`ui_terms.py`) are shown with the German interface only.
+- **Draft prop in the dis-system submodule, local and uncommitted:** nav-bar `workspace_items` / `workspace_name` (the
+  right-hand switcher wired to a dropdown-menu). Waits for the maintainer's OK, then a branch and a PR.
+- **Confirmed by maintainer:** 2026-10-29
 
 ## D00e — Temporary local overrides of dis-system components (web UI)
 
@@ -289,6 +329,13 @@ Confirmed by maintainer (date)*.
 - Confirmed by maintainer: _
 
 ### D4 — LanguageTool on the server (Step 6, post-MVP)
+
+- **Dev machine (2026-10-29, not the server):** `scripts/languagetool.sh` runs `erikvl87/languagetool:6.5` (pinned by
+  digest) in rootless podman on `127.0.0.1:8081` only; the app reaches it at its default `WORT_LT_URL`, LAN clients see
+  the results through the app. Tag 6.6 does not start (Java 11 runtime, Java 17 build). Measured here (3.7 GB RAM
+  machine): ~640 MB after start, first check 1.5 s. Catches article/adjective agreement (`den Haus`, `ein schöne
+  Haus`), verb agreement (`Er gehen`) and haben/sein (`habe … gegangen`); misses a wrong case of an object
+  (`Ich sehe der Hund`, `Ich gebe der Mann`). Server numbers below are still open.
 
 - Server model / total RAM: _
 - Setup tried (Java / Docker), unix user: _

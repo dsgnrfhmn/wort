@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Texte · wort{% endblock %}
+{% block title %}{{ _('Texts') }} · wort{% endblock %}
 {% block content %}
 <section class="wort-section">
-  {% with type='title-info', title='Texte', info='noch nicht verfügbar' %}{% include "components/table-header/template.html" %}{% endwith %}
-  {% with message='Text aus Foto (OCR) und Wort-Tooltips kommen später. Für diese Funktion werden Fotos nie an eine API gesendet.' %}{% include "components/empty-state/template.html" %}{% endwith %}
-  {% with priority='secondary', underline='solid', label='Zu den Wörtern', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+  {% with type='title-info', title=_('Texts'), info=_('not available yet') %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with message=_('Text from a photo (OCR) and word tooltips come later. Photos are never sent to an API for this.') %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with priority='secondary', underline='solid', label=_('To the words'), href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
 </section>
 {% endblock %}

@@ -17,6 +17,8 @@ from wort.dictionary.ukrainian import Ukrainian
 from wort import sanitize
 
 from app.db import User, UserWord, WebStore
+from app import i18n
+from app.i18n import t
 from app.scoring import level
 
 PAGE = 20
@@ -28,6 +30,8 @@ SCORE_TAG = {"new": "neutral", "weak": "danger", "medium": "warning", "strong": 
 GENDER_LABEL = {"m": "maskulin", "f": "feminin", "n": "neutral"}
 MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
           "November", "Dezember"]
+MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+             "November", "December"]
 
 
 def _norm_form(text: str) -> str:
@@ -109,7 +113,12 @@ def uk_text(uk: Ukrainian | None, entry: Entry | None, lemma: str, pos: str | No
 
 
 def german_date(value: datetime | None) -> str:
-    return f"{value.day}. {MONTHS[value.month - 1]} {value.year}" if value else "–"
+    """A date in the interface language: "29. Oktober 2026" / "29 October 2026"."""
+    if not value:
+        return "–"
+    if i18n.current() == "de":
+        return f"{value.day}. {MONTHS[value.month - 1]} {value.year}"
+    return f"{value.day} {MONTHS_EN[value.month - 1]} {value.year}"
 
 
 @dataclass
@@ -275,7 +284,7 @@ def register(app, ctx) -> None:
             owned = {(w.lemma.casefold(), w.pos) for w in page["all_words"]}
             page["results"], page["note"] = lookup.search(page["dic"], page["uk"], query, owned, german_or_none())
             if s == "1":  # typed into the search field; reloads and the return after "add" are not new lookups
-                found = bool(page["results"]) and not page["note"].startswith("Nicht")
+                found = bool(page["results"]) and page["note"] != t(lookup.SUGGESTED)
                 store.add_history(user.id, [(query, found, datetime.now())])
                 page["recent_queries"] = [h.query for h in store.history(user.id)[:3]]
             page["searches"] = next((h.count for h in store.history(user.id) if h.query.casefold() == query.casefold()), 0)
@@ -297,10 +306,11 @@ def register(app, ctx) -> None:
         dic = dictionary_or_none()
         entry = dic.find_lemma(lemma, pos or None) if dic else None
         if entry is None or (pos and entry.pos != pos):
-            return ctx.redirect(back, "Dieses Wort steht nicht im Wörterbuch.")
+            return ctx.redirect(back, t("This word is not in the dictionary."))
         added = store.add_word(user.id, entry.lemma, entry.pos, added_from="lookup")
         label = v_label(entry)
-        return ctx.redirect(back, f"„{label}“ ist jetzt in deinen Wörtern." if added else f"„{label}“ ist schon in deinen Wörtern.")
+        return ctx.redirect(back, t("“{word}” is now in your words.", word=label) if added
+                            else t("“{word}” is already in your words.", word=label))
 
     @app.get("/words/{word_id}", response_class=HTMLResponse)
     def word_detail(request: Request, word_id: int, sort: str = "added", dir: str = "desc", limit: int = PAGE,
@@ -335,13 +345,14 @@ def register(app, ctx) -> None:
         query = sanitize.text(query, 200)
         dic = dictionary_or_none()
         if dic is None:
-            return ctx.redirect("/history", "Kein Wörterbuch gefunden: importiere zuerst das Wörterbuch.")
+            return ctx.redirect("/history", t("No dictionary found: import the dictionary first."))
         entry = resolve_query(dic, query) if query else None
         if entry is None:
-            return ctx.redirect("/history", "Dieses Wort steht nicht im Wörterbuch.")
+            return ctx.redirect("/history", t("This word is not in the dictionary."))
         added = store.add_word(user.id, entry.lemma, entry.pos, added_from="lookup")
         label = v_label(entry)
-        return ctx.redirect("/history", f"„{label}“ ist jetzt in deinen Wörtern." if added else f"„{label}“ ist schon in deinen Wörtern.")
+        return ctx.redirect("/history", t("“{word}” is now in your words.", word=label) if added
+                            else t("“{word}” is already in your words.", word=label))
 
     @app.post("/words/{word_id}/translation")
     def set_translation(request: Request, word_id: int, csrf: str = Form(...), text: str = Form(""),
@@ -372,6 +383,7 @@ def register(app, ctx) -> None:
     @app.post("/words/{word_id}/delete")
     def delete_word(request: Request, word_id: int, csrf: str = Form(...), user: User = Depends(current_user)):
         ctx.verify_csrf(request, csrf)
-        if not store.delete_word(user.id, word_id):
+        word = store.word(user.id, word_id)
+        if word is None or not store.delete_word(user.id, word_id):
             raise HTTPException(404, "no such word")
-        return RedirectResponse("/", status_code=303)
+        return ctx.redirect("/", t("“{word}” was removed.", word=word.lemma))

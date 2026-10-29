@@ -193,6 +193,12 @@ def _kind(rule: str, category: str, fragment: str, right: str) -> str:
     return ""
 
 
+def mistake_kind(remark: dict) -> str:
+    """The local kind of a checker remark (article, adjective, verb, …; "" when unknown, e.g. an AI remark)."""
+    return _kind(remark.get("rule") or "", remark.get("category") or "", remark.get("fragment", ""),
+                 (remark.get("replacements") or [""])[0])
+
+
 def _noun_gender(dic: Dictionary | None, words: list[str]) -> str:
     if dic is None:
         return ""

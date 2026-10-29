@@ -12,6 +12,7 @@ from wort import sanitize
 
 from app.ai.schemas import AiInvalid, SentenceCheck
 from app.db import WebStore
+from app.i18n import t
 
 log = logging.getLogger("wort.ai")
 
@@ -85,15 +86,15 @@ class AiService:
         try:
             self.limit.take(user_id, datetime.now())
         except LimitReached:
-            raise AiUnavailable("Das Tageslimit für KI-Anfragen ist erreicht.") from None
+            raise AiUnavailable(t("The daily limit for AI requests is reached.")) from None
         try:
             result = clean_reply(call(self.provider))
         except AiInvalid:
             log.warning("ai %s: invalid reply", name)  # counts only; never log user text or replies
-            raise AiUnavailable("Die KI-Antwort war ungültig. Es wurde nichts bewertet.") from None
+            raise AiUnavailable(t("The AI reply was invalid. Nothing was graded.")) from None
         except AiError as e:
             log.warning("ai %s: %s", name, e)
-            raise AiUnavailable("Die KI ist gerade nicht erreichbar. Es wurde nichts bewertet.") from None
+            raise AiUnavailable(t("The AI is not reachable right now. Nothing was graded.")) from None
         return result
 
 

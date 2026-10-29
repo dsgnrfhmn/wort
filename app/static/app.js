@@ -1,3 +1,21 @@
+/* Interface texts the page hands to this script (base.html #wort-i18n), already in the user's language. */
+const wortText = (() => {
+  let texts = {};
+  try { texts = JSON.parse(document.getElementById('wort-i18n')?.textContent || '{}'); } catch (e) { /* none */ }
+  return (key) => texts[key] || key;
+})();
+
+/* The header's language switch (nav-bar's switcher): the pick is posted with the hidden #wort-lang-form, which
+   stores it in the profile and comes back to this page. */
+document.addEventListener('ds-dropdown-select', (e) => {
+  const form = document.getElementById('wort-lang-form');
+  if (!form || !e.target.closest('.ds-nav-bar__switcher') || !e.detail || !e.detail.value) return;
+  if (form.elements.lang.value === e.detail.value) return;
+  form.elements.lang.value = e.detail.value;
+  form.elements.next.value = window.location.pathname + window.location.search;
+  form.submit();
+});
+
 /* Theme switch glue for dis-system's nav-bar: remembers the theme (same key as dis-system's site). The stored
    theme is already applied by theme-init.js in <head>, before the first paint. */
 (() => {
@@ -8,7 +26,6 @@
   document.addEventListener('ds-nav-bar-theme-toggle', (e) => {
     document.documentElement.dataset.theme = e.detail.theme;
     try { localStorage.setItem(KEY, e.detail.theme); } catch (err) { /* not persisted */ }
-    if (window.wortFavicon) window.wortFavicon(e.detail.theme);
   });
   // nav-bar starts offering "Dark"; if the stored theme is dark, flip it to offer "Light".
   if (stored === 'dark') {
@@ -16,7 +33,6 @@
       const t = document.querySelector('.ds-nav-bar__theme-toggle');
       if (t) t.click();
       document.documentElement.dataset.theme = 'dark';
-      if (window.wortFavicon) window.wortFavicon('dark');
     });
   }
 })();
@@ -89,7 +105,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   table.addEventListener('ds-table-header-cell-sort', (e) => {
-    const labels = { 'Wort': 'word', 'Erstellt': 'added', 'Score': 'score' };
+    const labels = { Word: 'word', Wort: 'word', Added: 'added', Erstellt: 'added', Score: 'score' };  // EN / DE
     const label = e.target.closest('.ds-table-header-cell')?.textContent.trim();
     const sort = labels[label];
     if (!sort) return;
@@ -587,7 +603,7 @@ document.addEventListener('keydown', (e) => {
       const res = await fetch(url, { ...init, credentials: 'same-origin', headers: { Accept: 'text/html' } });
       if (!res.ok) throw new Error(String(res.status));
       doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-    } catch (err) { if (mine === token) message('Nachschlagen fehlgeschlagen. Bitte noch einmal versuchen.'); return; }
+    } catch (err) { if (mine === token) message(wortText('lookup_failed')); return; }
     if (mine !== token) return;
     const block = doc.querySelector('.wort-lookup');
     if (!block) { results.replaceChildren(); return; }
@@ -687,3 +703,111 @@ document.addEventListener('click', (e) => {
   const info = section?.querySelector('.ds-table-header__info');
   if (info) info.textContent = info.textContent.replace(/^\d+/, String(shown));
 });
+
+/* Wörter: the row context menu (dis-system context-menu, #wort-word-menu): open the word, practise it alone, or remove
+   it after the confirmation popup (#wort-delete-confirm), since removing also deletes its score and answers. */
+(() => {
+  const confirmBox = document.getElementById('wort-delete-confirm');
+  const deleteForm = document.getElementById('wort-delete-form');
+  const opener = document.getElementById('wort-delete-open');
+  let pending = null;  // the word id waiting for the confirmation
+  document.addEventListener('ds-context-menu-select', (e) => {
+    const row = e.detail && e.detail.host;
+    const id = row && row.dataset.wordId;
+    if (!id || !/^\d+$/.test(id)) return;
+    const link = row.querySelector('a[href]');
+    if (e.detail.value === 'open' && link) {
+      link.click();
+    } else if (e.detail.value === 'practice') {
+      const csrf = document.querySelector('#practice-form input[name="csrf"]');
+      if (!csrf) return;
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.action = '/ueben/saetze';
+      form.hidden = true;
+      for (const [name, value] of [['csrf', csrf.value], ['ids', id]]) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
+    } else if (e.detail.value === 'delete' && confirmBox && deleteForm && opener) {
+      pending = id;
+      const text = confirmBox.querySelector('.ds-popup__body p');
+      const word = (link ? link.textContent : '').trim();
+      if (text && word) text.textContent = wortText('delete_named').replace('{word}', word);
+      opener.click();
+    }
+  });
+  confirmBox?.addEventListener('ds-popup-before-close', (e) => {
+    const button = e.detail && e.detail.button;
+    if (!pending || !button || !button.hasAttribute('data-popup-confirm')) { pending = null; return; }
+    deleteForm.action = `/words/${pending}/delete`;
+    pending = null;
+    deleteForm.submit();
+  });
+})();
+
+/* Üben: Send shows the answer at once with a progress bar while the server checks it (the next page brings the
+   result in steps); the composer's buttons are disabled so it is sent once. "Next task" shows the progress bar too.
+   "Show feedback" brings a hidden feedback out from under its answer, with fade-in. */
+(() => {
+  const pending = document.getElementById('wort-pending');
+  const chat = document.querySelector('.wort-chat');
+  const WAIT = 30000;  // ms; a check with LanguageTool or the AI takes a few seconds
+  document.querySelectorAll('.wort-composer form').forEach((form) => {
+    form.addEventListener('submit', () => {
+      if (!pending || !chat || form.dataset.sent) return;
+      form.dataset.sent = 'true';
+      const node = pending.content.firstElementChild.cloneNode(true);
+      const text = form.querySelector('textarea, input[name="text"]');
+      const bubble = node.querySelector('[data-pending-answer]');
+      if (text && text.value.trim()) {
+        bubble.querySelector('.ds-message__text').textContent = text.value.trim();
+      } else {
+        bubble.remove();  // "Next task": only the progress bar
+      }
+      node.classList.add('ds-fade-in');
+      (document.getElementById('jetzt') || chat).appendChild(node);
+      node.scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      // After this event: disabling the submitter first would drop it from the form data.
+      const controls = () => form.querySelectorAll('button, textarea, input:not([type="hidden"])');
+      setTimeout(() => controls().forEach((el) => { el.disabled = true; }), 0);
+      // A request that never comes back (the server restarted, the network dropped) must not leave the page stuck:
+      // after WAIT the answer can be sent again, with a message.
+      setTimeout(() => {
+        if (!node.isConnected) return;
+        node.remove();
+        delete form.dataset.sent;
+        controls().forEach((el) => { el.disabled = false; });
+        if (window.dsToast) window.dsToast.show({ message: wortText('send_stalled'), status: 'error' });
+      }, WAIT);
+    });
+  });
+  // Back to this page from the browser's history (bfcache): the pending state of the earlier Send is not real.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    document.querySelectorAll('.wort-pending').forEach((n) => n.remove());
+    document.querySelectorAll('.wort-composer form').forEach((form) => {
+      delete form.dataset.sent;
+      form.querySelectorAll('button, textarea, input:not([type="hidden"])').forEach((el) => { el.disabled = false; });
+    });
+  });
+  // "Show feedback" / "Hide feedback" under an answer: the feedback block below it comes out from under the bubble.
+  document.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-feedback-toggle]');
+    const box = button && document.getElementById(button.getAttribute('aria-controls'));
+    if (!box) return;
+    const show = box.hidden;
+    box.hidden = !show;
+    button.setAttribute('aria-expanded', String(show));
+    button.textContent = wortText(show ? 'hide_feedback' : 'explain_more');
+    if (show && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      box.classList.add('ds-fade-in');
+      box.addEventListener('animationend', () => box.classList.remove('ds-fade-in'), { once: true });
+    }
+  });
+})();

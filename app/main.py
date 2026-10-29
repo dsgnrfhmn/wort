@@ -8,7 +8,7 @@ import random
 import secrets
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
@@ -19,7 +19,7 @@ from wort.dictionary.lookup import Dictionary
 from wort.exercises import grammar_check
 from wort.exercises.sentence import targets
 
-from app import auth, ds, lexicon, practice, ui_terms, words
+from app import auth, ds, i18n, lexicon, practice, ui_terms, words
 from app.ai import config as ai_config
 from app.ai import service as ai_service
 from types import SimpleNamespace
@@ -58,6 +58,8 @@ def create_app(
     check = checker or grammar_check.check
     templates = Jinja2Templates(env=ds.make_env())
     templates.env.globals["ui_glossary"] = ui_terms.glossary()
+    templates.env.globals["_"] = i18n.t
+    templates.env.globals["ui_langs"] = i18n.LANGS
     if secure_cookies is None:  # behind the TLS front; WORT_INSECURE_COOKIES=1 only for plain-http dev
         secure_cookies = os.environ.get("WORT_INSECURE_COOKIES") != "1"
     throttle = throttle or auth.LoginThrottle()
@@ -83,6 +85,13 @@ def create_app(
                     "WORT_INSECURE_COOKIES=1 serves 127.0.0.1 / ::1 only. For the LAN use scripts/dev.sh (https).",
                     status_code=403)
             return await call_next(request)
+
+    @app.middleware("http")
+    async def interface_language(request: Request, call_next):
+        """The signed-in user's interface language for this request (app/i18n.py); English without a session."""
+        token = request.cookies.get(auth.SESSION_COOKIE, "")
+        i18n.use((store.lang_for_session(auth.token_hash(token)) if token else None) or i18n.DEFAULT)
+        return await call_next(request)
 
     @app.middleware("http")
     async def revalidate_assets(request: Request, call_next):
@@ -112,7 +121,8 @@ def create_app(
         flash = request.cookies.get(FLASH_COOKIE)
         if flash and not ctx.get("message"):
             ctx["message"] = sanitize.text(unquote(flash), MAX_FLASH)
-        response = templates.TemplateResponse(request, name, {"csrf": token, **ctx}, status_code=status)
+        response = templates.TemplateResponse(request, name, {"csrf": token, "lang": i18n.current(), **ctx},
+                                              status_code=status)
         response.set_cookie(CSRF_COOKIE, token, httponly=True, samesite="strict", secure=secure_cookies)
         if flash:
             response.delete_cookie(FLASH_COOKIE)
@@ -131,6 +141,19 @@ def create_app(
         if not cookie or not hmac.compare_digest(cookie, token):
             raise HTTPException(403, "invalid CSRF token")
 
+    @app.post("/settings/lang")
+    def set_language(request: Request, csrf: str = Form(...), lang: str = Form(...), next: str = Form("/"),
+                     user: User = Depends(current_user)):
+        """The header's language dropdown: store the interface language in the profile, back to the same page."""
+        verify_csrf(request, csrf)
+        if lang not in i18n.LANGS:
+            raise HTTPException(400, "unknown language")
+        store.set_ui_lang(user.id, lang)
+        parts = urlsplit(next)
+        local = not parts.scheme and not parts.netloc and next.startswith("/") and next.isprintable() and "\\" not in next
+        back = next if local and len(next) <= 500 else "/"
+        return RedirectResponse(back, status_code=303)
+
     @app.get("/login", response_class=HTMLResponse)
     def login_form(request: Request):
         return render(request, "login.html", user=None)
@@ -141,11 +164,11 @@ def create_app(
         name = sanitize.text(name, auth.MAX_FIELD)
         key = name.casefold()
         if throttle.blocked(key):
-            return render(request, "login.html", 429, user=None, error="Too many attempts. Try again in a few minutes.")
+            return render(request, "login.html", 429, user=None, error=i18n.t("Too many attempts. Try again in a few minutes."))
         found = store.user_by_name(name)
         if not auth.verify_password(found[1] if found else None, password) or not found:
             throttle.fail(key)
-            return render(request, "login.html", 401, user=None, error="Wrong name or password.")
+            return render(request, "login.html", 401, user=None, error=i18n.t("Wrong name or password."))
         throttle.reset(key)
         token, now = auth.new_token(), datetime.now()
         store.create_session(found[0].id, auth.token_hash(token), now, auth.session_expiry(now))
@@ -204,11 +227,12 @@ def create_app(
             result = import_export(store, user.id, raw)
         except ValueError as e:
             return render(request, "history.html", 400, rows=store.history(user.id), user=user,
-                          message=f"Import failed: {sanitize.text(str(e), 150)}", message_status="error")
-        msg = (f"Imported {result.queries_new} new of {result.queries_total} queries, "
-               f"{result.words_new} new of {result.words_total} words.")
+                          message=i18n.t("Import failed: {error}", error=sanitize.text(str(e), 150)), message_status="error")
+        msg = i18n.t("Imported {q_new} new of {q_total} queries, {w_new} new of {w_total} words.",
+                     q_new=result.queries_new, q_total=result.queries_total, w_new=result.words_new,
+                     w_total=result.words_total)
         if result.words_total == 0:
-            return redirect("/history", msg + " Der Export enthält nur den Verlauf: füge Wörter hier mit „Lernen“ hinzu.")
+            return redirect("/history", msg + " " + i18n.t("The export holds only the history: add words here with “Learn”."))
         return redirect("/", msg)
 
     @app.post("/import/cli")
@@ -226,7 +250,7 @@ def create_app(
         if source is None:
             raise HTTPException(404, "WORT_CLI_DB is not set")
         if not source.is_file():
-            return redirect("/", f"CLI-Datenbank nicht gefunden: {sanitize.text(str(source), 150)}")
+            return redirect("/", i18n.t("CLI database not found: {path}", path=sanitize.text(str(source), 150)))
         ro = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
         copy = sqlite3.connect(":memory:", check_same_thread=False)
         try:
@@ -239,11 +263,12 @@ def create_app(
         try:
             result = import_export(store, user.id, json.dumps(export_words(cli)).encode())
         except ValueError as e:
-            return redirect("/", f"Laden fehlgeschlagen: {sanitize.text(str(e), 150)}")
+            return redirect("/", i18n.t("Loading failed: {error}", error=sanitize.text(str(e), 150)))
         finally:
             copy.close()
-        return redirect("/", f"Aus dem CLI geladen: {result.queries_new} neue von {result.queries_total} Suchen, "
-                             f"{result.words_new} neue von {result.words_total} Wörtern.")
+        return redirect("/", i18n.t("Loaded from the CLI: {q_new} new of {q_total} searches, {w_new} new of {w_total} words.",
+                                    q_new=result.queries_new, q_total=result.queries_total, w_new=result.words_new,
+                                    w_total=result.words_total))
 
     @app.post("/favorites/toggle")
     def toggle(request: Request, csrf: str = Form(...), lemma: str = Form(...), pos: str = Form(""), next: str = Form("/history"),

@@ -157,7 +157,7 @@ def test_start_page_tabs_are_links_and_modus_is_whitelisted(env):
     app, store, a, _ = env
     c = login(app, "anna")
     html = c.get("/ueben?modus=abfrage").text
-    assert 'href="/ueben?neu=1&amp;modus=saetze"' in html and 'action="/ueben/abfrage"' in html
+    assert 'href="/ueben?modus=saetze"' in html and 'action="/ueben/abfrage"' in html
     html = c.get("/ueben?modus=evil\"><x").text
     assert 'action="/ueben/saetze"' in html and "evil" not in html
 
@@ -251,15 +251,17 @@ def test_tip_answer_changes_no_score_and_shows_tipp(tmp_path, dict_path):
     assert ">Tipp<" in html and "Verwende:" in html and "richtig" not in html.split("Feedback", 1)[1].split("Grammatik")[0]
     assert ">Grammatik<" in html and ">falsch<" in html and ">1 Fehler, siehe unten.<" in html
     assert 'data-kind="remove">der<' in html  # the wrong article is marked
-    assert ">Korrigiert<" in html and ">Ich sehe den Garten dort<" in html  # the details table: label | text
-    assert ">Fehler 1<" in html and "«der» → den: Falscher Artikel" in html
-    # only the "Korrigiert" message carries the marks; the task and the answer stay plain text
+    # the right sentence in green under the marked answer; each mistake explained in the hidden feedback
+    assert 'data-tone="success">Ich sehe den Garten dort<' in html
+    assert ">Fehler 1<" in html and "«der» → den" in html and "<p>Falscher Artikel" in html
+    assert 'class="wort-review" id="fb-0-1" hidden' in html and ">Mehr erklären<" in html
+    # once checked, one bubble: the corrected version carries the marks, no separate "Deine Antwort" beside it
     assert html.count('data-kind="remove">der<') == 1
-    assert "Ich sehe der Garten dort</div>" in html.replace("\n", "").replace("  ", "")
+    assert "Korrigiert</div>" in html and "Deine Antwort</div>" not in html.split('<template id="wort-pending">')[0]
     assert store.words(uid)[0].score == before
 
 
-def test_chat_input_answers_the_next_task_and_keeps_earlier_ones_on_the_page(env):
+def test_one_task_at_a_time_next_opens_the_next_and_tabs_switch_back(env):
     app, store, a, _ = env
     c = login(app, "anna")
     loc = start(c, store, a, "saetze")
@@ -267,19 +269,27 @@ def test_chat_input_answers_the_next_task_and_keeps_earlier_ones_on_the_page(env
     csrf = c.cookies.get("wort_csrf")
     html = c.get(loc).text
     assert 'name="at" value="0"' in html and f'action="/ueben/s/{sid}/next"' not in html
+    assert html.count(f'href="/ueben/s/{sid}?a=') == 1  # only the current task has a tab
     r = c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": "Das ist ein Satz hier", "at": 0})
     assert r.headers["location"] == f"/ueben/s/{sid}#jetzt"
     html = c.get(loc).text
-    assert "Aufgabe 2" in html and 'name="at" value="1"' in html  # the next prompt, and the input answers it
-    assert html.count("Deine Antwort</div>") == 1
+    # answered: the next task is not shown yet, "Nächste Aufgabe" opens it
+    assert "Aufgabe 2" not in html and f'action="/ueben/s/{sid}/next"' in html and ">Nächste Aufgabe<" in html
+    assert 'name="at"' not in html.split('class="wort-composer"')[1]
+    c.post(f"/ueben/s/{sid}/next", data={"csrf": csrf})
+    html = c.get(loc).text
+    assert store.practice(a, sid)["pos"] == 1 and 'name="at" value="1"' in html
+    chat = html.split('<template id="wort-pending">')[0]  # the template holds the pending answer of the next Send
+    assert html.count(f'href="/ueben/s/{sid}?a=') == 2 and chat.count("Deine Antwort</div>") == 0  # one task shown
+    # the first task's tab shows it again, read-only apart from the retry, with a way back
+    old = c.get(f"{loc}?a=0").text
+    assert "Das ist ein Satz hier" in old and ">Zur aktuellen Aufgabe (2)<" in old and 'action="/ueben/s/%d/answer"' % sid not in old
+    assert 'aria-selected="true"' in old.split("Aufgabe 1</span>")[0].rsplit("<a", 1)[1]
+    # a tab beyond the current task falls back to the current one
+    assert 'name="at" value="1"' in c.get(f"{loc}?a=4").text
     # a stale form (the first task again) changes nothing
     c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": "Noch ein Satz hier", "at": 0})
-    assert store.practice(a, sid)["pos"] == 0
-    c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": "Noch ein Satz hier", "at": 1})
-    sess = store.practice(a, sid)
-    assert sess["pos"] == 1 and sess["items"][1]["answer"] == "Noch ein Satz hier"
-    html = c.get(loc).text
-    assert html.count("Deine Antwort</div>") == 2 and "Aufgabe 1" in html and "Aufgabe 3" in html
+    assert store.practice(a, sid)["pos"] == 1 and "result" not in store.practice(a, sid)["items"][1]
 
 
 def test_chat_last_task_answered_offers_the_result(env):
@@ -401,7 +411,8 @@ def test_only_the_latest_result_is_held_for_its_entrance(env):
         c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": f"Das ist Satz Nummer {i}", "at": i})
     html = c.get(loc).text
     assert html.count('data-result-step="0"') == 1 and html.count('data-result-step="2"') == 1
-    assert 'id="jetzt" data-fade-hold data-result-step="3"' in html
+    assert 'class="wort-row wort-retry" data-fade-hold data-result-step="3"' in html
+    assert "data-result-step" not in c.get(f"{loc}?a=0").text  # an earlier task does not arrive again
 
 
 def test_ueben_returns_to_the_running_session_and_keeps_the_batch_until_a_new_one(env):
@@ -647,3 +658,170 @@ def test_abfrage_doch_falsch_downgrades_once(env, dict_path):
     c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": c.cookies.get("wort_csrf")})  # once only: no change
     assert store.conn.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 1
     assert c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": "forged"}).status_code == 403
+
+
+def test_answer_again_keeps_the_first_answer_adds_an_attempt_and_changes_no_score(tmp_path, dict_path):
+    issue = Issue("Falscher Artikel", 9, 3, ["den"])
+    app = create_app(db_path=tmp_path / "web.db", dict_path=dict_path, secure_cookies=False,
+                     checker=lambda s: [issue] if "der Garten" in s else [])
+    store = WebStore(tmp_path / "web.db")
+    uid = store.create_user("anna", auth.hash_password(PASSWORD)).id
+    store.create_user("ben", auth.hash_password(PASSWORD))
+    store.add_word(uid, "Haus", "noun")
+    c = login(app, "anna")
+    loc = start(c, store, uid, "saetze")
+    sid = int(loc.rsplit("/", 1)[1])
+    csrf = c.cookies.get("wort_csrf")
+    assert ">Nochmal antworten<" not in c.get(loc).text  # nothing answered yet
+    c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": "Ich sehe der Garten dort", "at": 0})
+    word = store.words(uid)[0]
+    score, attempts = word.score, len(store.attempts(uid, word.id))
+    html = c.get(loc).text
+    assert ">Nochmal antworten<" in html and 'href="?a=0&amp;nochmal=1#jetzt"' in html
+    retry_page = c.get(loc + "?a=0&nochmal=1").text
+    assert f'action="/ueben/s/{sid}/again"' in retry_page and "Nochmal: Aufgabe 1" in retry_page
+    assert ">Nochmal antworten<" not in retry_page and "data-fade-hold" not in retry_page.split('class="wort-chat"')[1]
+    # an empty retry grades nothing and keeps the retry composer
+    r = c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": "", "at": 0})
+    assert r.headers["location"].endswith("?a=0&nochmal=1#jetzt") and "retries" not in store.practice(uid, sid)["items"][0]
+    r = c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": "Ich sehe den Garten dort", "at": 0})
+    assert r.headers["location"] == f"/ueben/s/{sid}?a=0#jetzt"
+    item = store.practice(uid, sid)["items"][0]
+    assert item["answer"] == "Ich sehe der Garten dort" and item["result"]["grammar"] == "errors"  # first kept
+    assert [x["answer"] for x in item["retries"]] == ["Ich sehe den Garten dort"]
+    assert item["retries"][0]["result"]["grammar"] == "ok" and item["retries"][0]["result"]["delta"] is None
+    assert store.words(uid)[0].score == score  # only the first answer counts
+    assert len(store.attempts(uid, word.id)) == attempts
+    html = c.get(loc).text
+    assert "Aufgabe 1 · Versuch 2 · Deine Antwort" in html and "Feedback · Versuch 2" in html and "ohne Score" in html
+    assert html.count('data-kind="remove">der<') == 1  # the first correction is still on the page
+    # the first attempt's correction comes first; the clean retry is shown as written
+    assert html.index('data-kind="remove">der<') < html.index(">Ich sehe den Garten dort<")
+    assert "Aufgabe 1 · Versuch 2 · Deine Antwort" in html
+    # no cap: as many attempts as the learner likes; a forged token and another user change nothing
+    for i in range(8):
+        c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": f"Ich sehe das Haus Nummer {i}", "at": 0})
+    assert len(store.practice(uid, sid)["items"][0]["retries"]) == 9
+    assert ">Nochmal antworten<" in c.get(loc).text
+    assert c.post(f"/ueben/s/{sid}/again", data={"csrf": "forged", "text": "x", "at": 0}).status_code == 403
+    b = login(app, "ben")
+    assert b.post(f"/ueben/s/{sid}/again", data={"csrf": b.cookies.get("wort_csrf"), "text": "Ich sehe das Haus", "at": 0}).status_code == 404
+
+
+def test_answer_again_on_an_earlier_task_but_not_ahead_or_in_abfrage(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    loc = start(c, store, a, "saetze")
+    sid = int(loc.rsplit("/", 1)[1])
+    csrf = c.cookies.get("wort_csrf")
+    c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": "Das ist ein Satz hier", "at": 0})
+    c.post(f"/ueben/s/{sid}/next", data={"csrf": csrf})
+    c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": "Ein dritter Satz hier", "at": 0})
+    c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": "Zu weit voraus hier", "at": 2})
+    c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": "Noch offen hier", "at": 1})  # not answered yet
+    items = store.practice(a, sid)["items"]
+    assert [x["answer"] for x in items[0]["retries"]] == ["Ein dritter Satz hier"]
+    assert all("retries" not in i for i in items[1:])
+    html = c.get(f"{loc}?a=0").text
+    assert "Versuch 2" in html and ">2×<" in html  # the tab counts the attempts
+    # an Abfrage session has no retry
+    loc2 = start(c, store, a, "abfrage")
+    sid2 = int(loc2.rsplit("/", 1)[1])
+    c.post(f"/ueben/s/{sid2}/answer", data={"csrf": csrf, "text": "x"})
+    c.post(f"/ueben/s/{sid2}/again", data={"csrf": csrf, "text": "y", "at": 0})
+    assert all("retries" not in i for i in store.practice(a, sid2)["items"])
+
+
+def test_sidebar_lists_the_session_words_and_a_word_keeps_the_tabs_to_its_tasks(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    loc = start(c, store, a, "saetze")
+    sid = int(loc.rsplit("/", 1)[1])
+    csrf = c.cookies.get("wort_csrf")
+    items = store.practice(a, sid)["items"]
+    first, second = items[0]["word_id"], items[1]["word_id"]
+    assert first != second  # round robin over the two words
+    html = c.get(loc).text
+    assert 'aria-label="Wörter dieser Übung"' in html and ">Alle Aufgaben<" in html and ">das Haus<" in html
+    assert f"?w={second}" not in html  # its first task comes later: muted, no link yet
+    for i in range(3):
+        c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": f"Das ist Satz Nummer {i}", "at": i})
+    html = c.get(f"{loc}?w={first}").text
+    tabs = re.findall(r'href="/ueben/s/\d+\?a=(\d+)&amp;w=(\d+)#jetzt"', html)
+    assert [int(i) for i, _ in tabs] == [i for i, it in enumerate(items[:3]) if it["word_id"] == first]
+    assert {int(x) for _, x in tabs} == {first} and 'data-active="true"' in html
+    # a task of another word drops the filter; an unknown word is ignored
+    assert "&amp;w=" not in c.get(f"{loc}?w={first}&a=1").text
+    assert "&amp;w=" not in c.get(f"{loc}?w=999").text
+    # a grammar session has no word sidebar
+    assert "Wörter dieser Übung" not in c.get("/ueben?neu=1&modus=grammatik").text
+
+
+def test_each_tab_keeps_its_own_open_session_and_the_word_batch_survives_grammar(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    csrf = c.cookies.get("wort_csrf")
+    saetze = int(start(c, store, a, "saetze").rsplit("/", 1)[1])
+    c.post(f"/ueben/s/{saetze}/answer", data={"csrf": csrf, "text": "Das ist ein Satz hier", "at": 0})
+    abfrage = int(start(c, store, a, "abfrage").rsplit("/", 1)[1])
+    grammar = int(c.post("/ueben/grammatik/modalverben", data={"csrf": csrf}).headers["location"].rsplit("/", 1)[1])
+    # every tab resumes its own session; the newest open one is the default
+    assert c.get("/ueben?modus=saetze").headers["location"] == f"/ueben/s/{saetze}#jetzt"
+    assert c.get("/ueben?modus=abfrage").headers["location"] == f"/ueben/s/{abfrage}#jetzt"
+    assert c.get("/ueben?modus=grammatik").headers["location"] == f"/ueben/s/{grammar}#jetzt"
+    assert c.get("/ueben").headers["location"] == f"/ueben/s/{grammar}#jetzt"
+    # every Üben page shows the three tabs, an open session with its progress
+    html = c.get(f"/ueben/s/{grammar}").text
+    for key in ("saetze", "abfrage", "grammatik"):
+        assert f'href="/ueben?modus={key}"' in html
+    assert '<span class="ds-page-head__meta">1 / ' in html.split('href="/ueben?modus=saetze"')[1].split("</div>")[0]
+    assert 'href="/ueben?modus=grammatik" aria-current="page"' in html
+    # the start page (neu) offers to resume this tab's session, and still the words of the last word session
+    page = c.get("/ueben?neu=1&modus=saetze").text
+    assert f'href="/ueben/s/{saetze}#jetzt"' in page and "fortsetzen" in page and "mit denselben Wörtern" in page
+    # a new session of a tab closes that tab's old one, not the others
+    start(c, store, a, "saetze")
+    assert store.practice(a, saetze)["pos"] == len(store.practice(a, saetze)["items"])
+    assert store.practice(a, saetze)["items"][0]["answer"] == "Das ist ein Satz hier"  # answers kept
+    assert store.practice(a, abfrage)["pos"] == 0 and store.practice(a, grammar)["pos"] == 0
+    # another user's open sessions never show up
+    b = login(app, "ben")
+    assert b.get("/ueben?modus=saetze").status_code == 200
+
+
+def test_a_sentence_mistake_links_to_its_grammar_topic_without_the_ai(tmp_path, dict_path):
+    from app import grammar, hints
+    article = {"fragment": "der Garten", "message": "m", "replacements": ["den Garten"], "rule": "DE_AGREEMENT",
+               "category": "GRAMMAR"}
+    assert grammar.topic_for(hints.mistake_kind(article)) == "praepositionen"
+    assert grammar.topic_for(hints.mistake_kind({"fragment": "x", "replacements": ["y"]})) is None  # AI remark
+    assert grammar.topic_for("spelling") is None
+    issue = Issue("Falscher Artikel", 9, 3, ["den"], "DE_AGREEMENT", "GRAMMAR")
+    app = create_app(db_path=tmp_path / "web.db", dict_path=dict_path, secure_cookies=False, checker=lambda s: [issue])
+    store = WebStore(tmp_path / "web.db")
+    uid = store.create_user("anna", auth.hash_password(PASSWORD)).id
+    store.add_word(uid, "Haus", "noun")
+    c = login(app, "anna")
+    loc = start(c, store, uid, "saetze")
+    sid = loc.rsplit("/", 1)[1]
+    c.post(f"/ueben/s/{sid}/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": "Ich sehe der Garten dort"})
+    html = c.get(loc).text
+    assert html.count('href="/grammatik/praepositionen"') == 1  # once, in the explained mistake
+    assert html.count(">Thema üben: Präpositionen und Kasus<") == 1
+    pane = c.get(f"{loc}?fehler=0-1").text
+    assert ">Thema üben: Präpositionen und Kasus<" in pane
+
+
+def test_feedback_is_always_hidden_under_its_answer_behind_explain_more(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    loc = start(c, store, a, "saetze")
+    sid = int(loc.rsplit("/", 1)[1])
+    csrf = c.cookies.get("wort_csrf")
+    c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": "Das ist ein Satz hier", "at": 0})
+    feedback = lambda html: re.findall(r'<div class="wort-review" id="fb-0-\d+"( hidden)?>', html)
+    for i in range(2):
+        html = c.get(loc).text
+        assert feedback(html) == [" hidden"] * (i + 1)  # every attempt's feedback starts hidden
+        assert html.count('aria-expanded="false">Mehr erklären<') == i + 1
+        c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": f"Noch ein Satz Nummer {i}", "at": 0})

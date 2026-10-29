@@ -20,7 +20,8 @@ shares its lexicon/scoring code, see `PLAN.md`.)
 A self-hosted web tool for learning German (target language for the
 learner's notes: English). Multi-user, invite-only. Runs on a small
 self-hosted server (e.g. a Raspberry Pi). Ordered execution plan:
-`PLAN.md`. Measured decisions: `DECISIONS.md`. This file holds facts and rules; procedures go in Skills,
+`PLAN.md`. Measured decisions: `DECISIONS.md`. General UI rules, written without wort context so they can move
+into dis-system: `UX-Decisions.md`. This file holds facts and rules; procedures go in Skills,
 not here.
 
 MVP features:
@@ -159,6 +160,8 @@ Keep README and this file in sync after each session.
 - `src/wort/` — CLI + TUI (stays; fully local; command `wort`; Python package `wort`)
 - `app/` — FastAPI app, routes, templates
 - `app/auth.py`, `app/words.py`, `app/practice.py`, `app/scoring.py` — login, word list, practice, score formula
+  (Üben: one open session per tab Sätze bilden / Abfrage / Grammatik, the modes as page-heads under the nav bar in `base.html` (dis-system draft prop `title_href`); a session shows
+  one task at a time with task tabs, a word sidebar and "Nochmal antworten" retries without score, DECISIONS D00i)
   (Üben › Abfrage has its own page, `practice_abfrage.html`: one word at a time beside "Diese Runde"; modes
   Gemischt / Was bedeutet …? / Auf Deutsch erklären (AI only); "Überspringen" and "Doch falsch" (downgrade only))
 - `app/questions.py` + `app/questions.json` — topic questions for "Sätze bilden" (hand-edited list, picked at random,
@@ -179,6 +182,8 @@ Keep README and this file in sync after each session.
 - `app/hints.py` — Üben tooltip texts (what a task's form means, the corrected word's forms, Ukrainian rule glosses)
 - `app/checking.py` — sentence checks (required form; LanguageTool client is `src/wort/exercises/grammar_check.py`,
   loopback only)
+- `app/i18n.py` — interface language (English default, German; catalog English → German, `_()` / `t()`), stored in
+  `users.ui_lang`; words and exercises stay German, the EN/UK label tooltips show with German only (DECISIONS D00j)
 - `app/importer.py`, `app/sync_app.py` — CLI export import, `POST /sync` (own process); `app/ui_terms.py` — EN/UK
   tooltips for the German button labels
 - `app/db.py` — web.db schema v5 + migrations (v5: an attempt keeps its asked form, expected answer, correction

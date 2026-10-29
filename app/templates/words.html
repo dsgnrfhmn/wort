@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Wörter · wort{% endblock %}
+{% block title %}{{ _('Words') }} · wort{% endblock %}
 {% block body_attrs %} data-layout="full"{% endblock %}
 {% block head_extra %}
 <link rel="stylesheet" href="/ds/local-components/hero-block/style.css">
@@ -7,12 +7,15 @@
 {% block content %}
 {# Hero: the lookup field only (the name "wort" is the nav bar's brand). dis-system's staged local-components/hero-block
    markup, sized to its content (data-fit). #}
-<section class="ds-hero-block" data-fit="content" aria-label="Nachschlagen">
+<section class="ds-hero-block" data-fit="content" aria-label="{{ _('Look up') }}">
   <form class="ds-hero-block__search" method="get" action="/" role="search">
     <input type="hidden" name="s" value="1">
-    {% with name='q', label='Wort oder Satz nachschlagen', value=query, placeholder='Wort auf Deutsch oder Englisch', fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+    {% with name='q', label=_('Look up a word or sentence'), value=query, placeholder=_('A word in German or English'), fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
   </form>
 </section>
+{# The hero ends in a dis-system divider; nav bar → field, field → divider and divider → the content below are the
+   same space (garv, 2026-10-29; layout.css / trial.css). #}
+<div class="wort-hero-divider">{% include "components/divider/template.html" %}</div>
 
 {% if query %}
 {# Search result (design "Wörter — Suchergebnis"): a bar with the query, then per entry the word with its forms on
@@ -29,16 +32,16 @@
 {% endmacro %}
 <section class="wort-lookup" aria-live="polite" aria-labelledby="results-title">
   <div class="wort-row wort-lookup__bar">
-    <h2 class="wort-lookup__summary" id="results-title">Ergebnis für „{{ query }}“ · {{ results | length }} Treffer{% if searches %} · {{ searches }}× gesucht{% endif %}{% if note %} · {{ note }}{% endif %}</h2>
+    <h2 class="wort-lookup__summary" id="results-title">{{ _('Result for “{query}” · {n} hits', query=query, n=results | length) }}{% if searches %} · {{ _('searched {n}×', n=searches) }}{% endif %}{% if note %} · {{ note }}{% endif %}</h2>
     <div class="wort-row">
-      {% if results | length == 1 and not results[0].owned %}{{ add_form(results[0], 'Zur Wortliste', true) }}{% endif %}
-      {% with priority='secondary', underline='solid', label='Schließen', href='/', outlined=true %}{% include "components/text-button/template.html" %}{% endwith %}
+      {% if results | length == 1 and not results[0].owned %}{{ add_form(results[0], _('Add to my words'), true) }}{% endif %}
+      {% with priority='secondary', underline='solid', label=_('Close'), href='/', outlined=true %}{% include "components/text-button/template.html" %}{% endwith %}
     </div>
   </div>
   {% if not has_dictionary %}
-  {% with message='Das Wörterbuch ist nicht importiert (wort import --file …).' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with message=_('The dictionary is not imported (wort import --file …).') %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% elif not results %}
-  {% with message='Nichts gefunden für „' ~ query ~ '“.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with message=_('Nothing found for “{query}”.', query=query) %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% endif %}
   <div class="wort-lookup__list">
   {% for r in results %}
@@ -49,16 +52,16 @@
       {% if r.meta %}<p class="wort-result__meta">{{ r.meta }}</p>{% endif %}
       <div class="wort-row wort-result__status">
         {% if r.owned %}
-        {% with type='success', subtype='passive', label='in deinen Wörtern' %}{% include "components/tag/template.html" %}{% endwith %}
+        {% with type='success', subtype='passive', label=_('in your words') %}{% include "components/tag/template.html" %}{% endwith %}
         {% else %}
         {% with type='neutral', subtype='passive', label='–' %}{% include "components/tag/template.html" %}{% endwith %}
-        <span class="wort-result__note">Noch nicht in deiner Liste</span>
-        {% if results | length > 1 %}{{ add_form(r, 'Zur Wortliste', false) }}{% endif %}
+        <span class="wort-result__note">{{ _('Not in your list yet') }}</span>
+        {% if results | length > 1 %}{{ add_form(r, _('Add to my words'), false) }}{% endif %}
         {% endif %}
       </div>
       {% if r.definitions %}
       {# German definitions; every word in them shows its translation on hover (app.js). #}
-      <ol class="wort-definitions" aria-label="Bedeutung">{% for d in r.definitions %}<li>{{ d }}</li>{% endfor %}</ol>
+      <ol class="wort-definitions" aria-label="{{ _('Meaning') }}">{% for d in r.definitions %}<li>{{ d }}</li>{% endfor %}</ol>
       {% endif %}
       {% if r.table %}
       <section class="wort-result__section">
@@ -67,7 +70,7 @@
           {% for h in r.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
           {% for row in r.table.rows %}
           {% set cells = [{'type': 'text-passive-cell', 'content': row[0]}] %}
-          {% for c in row[1:] %}{% set _ = cells.append({'type': 'text-active-cell', 'content': c}) %}{% endfor %}
+          {% for c in row[1:] %}{% set _x = cells.append({'type': 'text-active-cell', 'content': c}) %}{% endfor %}
           {% with cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
           {% endfor %}
         </div>
@@ -78,7 +81,7 @@
     <div class="wort-result__side">
       {% if r.sample %}
       <section class="wort-result__section" data-examples>
-        {% with type='title-info', title='Beispiele', info=([3, r.sample | length] | min) ~ ' von ' ~ (r.sample | length) %}{% include "components/table-header/template.html" %}{% endwith %}
+        {% with type='title-info', title=_('Examples'), info=_('{shown} of {total}', shown=[3, r.sample | length] | min, total=r.sample | length) %}{% include "components/table-header/template.html" %}{% endwith %}
         {% for ex in r.sample %}
         <div class="wort-example"{% if loop.index > 3 %} hidden{% endif %}>
           <p>{% for seg in ex.segments %}{% if seg.hl %}<span class="wort-example__word"{% if r.article %} data-article="{{ r.article }}"{% endif %}>{{ seg.text }}</span>{% else %}{{ seg.text }}{% endif %}{% endfor %}</p>
@@ -86,13 +89,13 @@
         </div>
         {% endfor %}
         {% if r.sample | length > 3 %}
-        {% with priority='secondary', underline='dotted', label='Weiteres Beispiel zeigen', extra_attrs='data-more-examples' %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% with priority='secondary', underline='dotted', label=_('Show another example'), extra_attrs='data-more-examples' %}{% include "components/text-button/template.html" %}{% endwith %}
         {% endif %}
       </section>
       {% endif %}
       {% if r.related %}
       <section class="wort-result__section">
-        {% with type='title', title='Verwandte Wörter' %}{% include "components/table-header/template.html" %}{% endwith %}
+        {% with type='title', title=_('Related words') %}{% include "components/table-header/template.html" %}{% endwith %}
         <p class="wort-related">{% for w in r.related %}{% if not loop.first %} · {% endif %}{% with priority='secondary', underline='solid', label=w.label, article=w.article, href='/?s=1&q=' ~ (w.q | urlencode) %}{% include "components/text-button/template.html" %}{% endwith %}{% if w.pos %} <span class="wort-result__note">{{ w.pos }}</span>{% endif %}{% endfor %}</p>
       </section>
       {% endif %}
@@ -106,18 +109,18 @@
 
 <section class="wort-section">
   {# "Gesuchte laden" (dev only, WORT_CLI_DB set): the CLI's searches and words from this machine's user.db. #}
-  {% set actions = [{'label': 'Importieren', 'href': '/history', 'underline': 'solid'}] + ([{'label': 'Gesuchte laden', 'submit': true, 'underline': 'dotted'}] if cli_import else []) %}
+  {% set actions = [{'label': _('Import'), 'href': '/history', 'underline': 'solid'}] + ([{'label': _('Load searches'), 'submit': true, 'underline': 'dotted'}] if cli_import else []) %}
   <form method="post" action="/import/cli" class="wort-cli-import">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% with title='Wörter', actions_left=actions, meta_text=total ~ ' Wörter · ' ~ this_week ~ ' diese Woche' ~ (' · zuletzt ' ~ last_added if last_added else ''), actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
+  {% with title=_('Words'), actions_left=actions, meta_text=_('{n} words · {week} this week', n=total, week=this_week) ~ (' · ' ~ _('last {date}', date=last_added) if last_added else ''), actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
   </form>
-  {% with layout='bulk', search=true, search_placeholder='Wort oder Übersetzung', actions=[
-    {'label': 'Sätze bilden', 'priority': 'primary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/saetze" data-needs-selection'},
-    {'label': 'Abfrage', 'priority': 'secondary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/abfrage" data-needs-selection'},
-    {'label': 'Auswahl aufheben', 'priority': 'secondary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'extra_attrs': 'data-clear-selection data-needs-selection'}
+  {% with layout='bulk', search=true, search_placeholder=_('Word or translation'), actions=[
+    {'label': _('Build sentences'), 'priority': 'primary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/saetze" data-needs-selection'},
+    {'label': _('Quiz'), 'priority': 'secondary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/abfrage" data-needs-selection'},
+    {'label': _('Clear selection'), 'priority': 'secondary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'extra_attrs': 'data-clear-selection data-needs-selection'}
   ], more_actions=[
-    {'label': '10 schwächste', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="weakest"'},
-    {'label': 'Letzte 20', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="latest"'}
+    {'label': _('10 weakest'), 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="weakest"'},
+    {'label': _('Last 20'), 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="latest"'}
   ] %}{% include "components/header-block/template.html" %}{% endwith %}
   <form id="preset-form" method="get" action="/" hidden></form>
   <form id="practice-form" method="post" action="/ueben/saetze" hidden>
@@ -130,12 +133,12 @@
      and close the word in place (no reload). #}
   <div class="wort-split-list" id="wort-table"{% if detail %} data-open="true"{% endif %}>
   <div class="wort-split-list__table">
-  <div class="wort-table wort-words wort-word-table" role="table" aria-label="Wörter" data-checkbox-group data-sort-group data-word-table>
+  <div class="wort-table wort-words wort-word-table" role="table" aria-label="{{ _('Words') }}" data-checkbox-group data-sort-group data-word-table>
     {% with type='checkbox-cell', checkbox_role='select-all' %}{% include "components/table-cell/template.html" %}{% endwith %}
-    {% with label='Wort', sortable=true, sort_dir=(dir if sort == 'word' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Übersetzung' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Erstellt', sortable=true, sort_dir=(dir if sort == 'added' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Score', sortable=true, sort_dir=(dir if sort == 'score' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label=_('Word'), sortable=true, sort_dir=(dir if sort == 'word' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label=_('Translation') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label=_('Added'), sortable=true, sort_dir=(dir if sort == 'added' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+    {% with label=_('Score'), sortable=true, sort_dir=(dir if sort == 'score' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
     {% for r in rows %}
     {% set href = '/words/' ~ r.id ~ '?' ~ list_params ~ '#detail' %}
     {% set cells = [
@@ -143,24 +146,39 @@
       {'type': 'link', 'content': r.label, 'href': href, 'article': r.article, 'plain': true},
       {'type': 'text-active-cell', 'content': r.translation}
     ] %}
-    {% set _ = cells.append({'type': 'date', 'content': german_date(r.word.added_at)}) %}
-    {% set _ = cells.append({'type': 'tag', 'content': (r.word.score | string) if r.word.score is not none else '–', 'tag_type': r.score_type, 'tag_subtype': 'passive'}) %}
-    {% with selected=(r.id in selected), href=href, extra_attrs='data-word-id="' ~ r.id ~ '"' ~ (' aria-current="true"' if detail and detail.v.id == r.id else ''), cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+    {% set _x = cells.append({'type': 'date', 'content': german_date(r.word.added_at)}) %}
+    {% set _x = cells.append({'type': 'tag', 'content': (r.word.score | string) if r.word.score is not none else '–', 'tag_type': r.score_type, 'tag_subtype': 'passive'}) %}
+    {% with selected=(r.id in selected), href=href, extra_attrs='data-word-id="' ~ r.id ~ '" data-context-menu="wort-word-menu"' ~ (' aria-current="true"' if detail and detail.v.id == r.id else ''), cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
     {% endfor %}
   </div>
   {% if total > rows | length %}
   <div class="ds-table-footer">
-    {% with priority='secondary', underline='dotted', label='20 weitere laden', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ (limit + 20) %}{% include "components/text-button/template.html" %}{% endwith %}
-    {% with priority='secondary', underline='dotted', label='Alle ' ~ total ~ ' laden', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ total %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='dotted', label=_('Load 20 more'), href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ (limit + 20) %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='dotted', label=_('Load all {n}', n=total), href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ total %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
   {% endif %}
   </div>
+  {# Right click (or Menu / Shift+F10) on a row: open, practise or remove that word (app.js). Removing asks first:
+     it deletes the word's score and answers too. #}
+  {% with id='wort-word-menu', label=_('Word actions'), items=[
+    {'value': 'open', 'label': _('Open')},
+    {'value': 'practice', 'label': _('Build sentences')},
+    {'divider': true},
+    {'value': 'delete', 'label': _('Remove word')}
+  ] %}{% include "components/context-menu/template.html" %}{% endwith %}
+  {% with popup_id='wort-delete-confirm', type='text', size='small', title=_('Remove this word?'),
+          paragraphs=[_('The word, its score and your answers to it are removed. This cannot be undone.')],
+          bottom_actions=[{'label': _('Cancel')}, {'label': _('Remove'), 'status': 'error', 'confirm': true}] %}{% include "components/popup/template.html" %}{% endwith %}
+  <button type="button" id="wort-delete-open" data-popup-open="wort-delete-confirm" hidden></button>
+  <form id="wort-delete-form" method="post" action="/" hidden>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+  </form>
   <div class="wort-split-list__side" id="wort-side">{% if detail %}{% with d=detail %}{% include "_word_detail.html" %}{% endwith %}{% endif %}</div>
   </div>
   {% else %}
-  {% with message='Noch keine Wörter. Füge Wörter aus deinem Verlauf hinzu („Lernen“) oder importiere eine Export-Datei.' %}{% include "components/empty-state/template.html" %}{% endwith %}
+  {% with message=_('No words yet. Add words from your history (“Learn”) or import an export file.') %}{% include "components/empty-state/template.html" %}{% endwith %}
   <div class="wort-row">
-    {% with priority='primary', underline='solid', label='Aus Verlauf hinzufügen', href='/history' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='primary', underline='solid', label=_('Add from history'), href='/history' %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
   {% endif %}
 </section>

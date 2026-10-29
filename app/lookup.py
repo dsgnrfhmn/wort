@@ -16,6 +16,7 @@ from wort.dictionary.lookup import Dictionary, Entry
 from wort.dictionary.ukrainian import Ukrainian
 
 from app.words import GENDER_LABEL, POS_LABEL, short_gloss, uk_text, v_label
+from app.i18n import t
 
 MAX_QUERY = 200
 MAX_RESULTS = 5  # entries for a single word
@@ -125,6 +126,9 @@ def plural_label(entry: Entry) -> str:
     return f"Pl. {g.with_article(entry, form, 'nominative', 'plural')}" if form else ""
 
 
+SUGGESTED = "Not found. Did you mean:"  # the note for close matches only (app/words.py: not a hit)
+
+
 def search(dictionary: Dictionary, uk: Ukrainian | None, query: str,
            owned: set[tuple[str, str]], de=None) -> tuple[list[Result], str]:
     """(results, note). The note says when a sentence was split into words and which typos were fixed."""
@@ -133,9 +137,9 @@ def search(dictionary: Dictionary, uk: Ukrainian | None, query: str,
     if not entries and " " in query.strip():
         entries, fixes = dictionary.lookup_words(query, MAX_SENTENCE_WORDS)
         if entries:
-            note = "Ein Ergebnis pro Wort" + "".join(f" · {a} → {b}" for a, b in fixes)
+            note = t("One result per word") + "".join(f" · {a} → {b}" for a, b in fixes)
     if not entries and (suggested := dictionary.suggest(query.strip(), limit=3)):
-        entries, note = suggested, "Nicht gefunden. Meintest du:"
+        entries, note = suggested, t(SUGGESTED)
     # The first entry is the one shown in full: its examples translated (offline, slow on a small server) and its
     # related words; the others stay short.
     from app import mt

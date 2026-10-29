@@ -23,6 +23,7 @@ from wort import sanitize
 
 from app.ai.schemas import AnswerGrade, SentenceCheck, TaskSet
 from app import grammar, hints, mt, questions
+from app.i18n import t
 from app.ai.service import AiService, AiUnavailable
 from wort.dictionary.ukrainian import Ukrainian
 from app.checking import CheckResult, check_sentence, lemma_forms
@@ -30,15 +31,19 @@ from wort.text import normalize
 from app.db import User, UserWord, WebStore
 from app.words import GENDER_LABEL, POS_LABEL, german_date, short_gloss, uk_text, v_label
 
-KINDS = {"saetze": "Sätze bilden", "abfrage": "Abfrage", "regel": "Regel üben", "grammatik": "Grammatik"}
+# English source names; templates show them through _() (app/i18n.py).
+KINDS = {"saetze": "Build sentences", "abfrage": "Quiz", "regel": "Practise the rule", "grammatik": "Grammar"}
 TABS = ("saetze", "abfrage", "grammatik")  # the start page's tabs; grammar sessions start from a topic
 CREATABLE = ("saetze", "abfrage")  # "regel" sessions only come from "Diese Regel üben"
+# The Üben tabs and the session kinds behind each: one open session per kind; a "regel" session belongs to Sätze bilden.
+MODES = {"saetze": ("saetze", "regel"), "abfrage": ("abfrage",), "grammatik": ("grammatik",)}
+WORD_KINDS = ("saetze", "abfrage", "regel")  # sessions with words: the latest one's words are the current batch
 SKILL = {"translate": "translation", "article": "form", "forms": "form", "question": "form", "sentence": "usage",
          "bedeutung": "translation", "erklaere": "translation"}
 AI_ANSWER_KINDS = ("bedeutung", "erklaere")
 # Abfrage's modes: the local drills mixed (plus free answers when the AI grades them), or one kind for every word.
 # "erklaere" can only be graded by the AI; "bedeutung" falls back to the dictionary's glosses.
-ABFRAGE_MODES = {"gemischt": "Gemischt", "bedeutung": "Was bedeutet …?", "erklaere": "Auf Deutsch erklären"}
+ABFRAGE_MODES = {"gemischt": "Mixed", "bedeutung": "What does … mean?", "erklaere": "Explain in German"}
 MAX_OBJECTION = 300
 RULE_TASKS = 5
 GRADE = {"richtig": "correct", "teilweise": "almost", "falsch": "wrong"}
@@ -171,7 +176,8 @@ def correction_segments(answer: str, remarks: list[dict] | None,
         # The tooltip on the correction: why (the checker's message), the right form, and the corrected word's
         # forms as a small table when the dictionary knows it.
         rows = table(reps[0]) if table and reps else []
-        right = [f"Richtig: {reps[0]}"] + ([f"Auch möglich: {' / '.join(reps[1:3])}"] if len(reps) > 1 else []) if reps else []
+        right = [t("Correct: {text}", text=reps[0])] + ([t("Also possible: {text}", text=" / ".join(reps[1:3]))]
+                                                         if len(reps) > 1 else []) if reps else []
         uk = hints.rule_uk(r.get("rule") or "", r.get("category") or "")
         why = (r.get("message") or "") + (f" ({uk})" if uk else "")
         tip = "\n".join([x for x in (why,) if x] + right + ([""] + rows if rows else []))
@@ -200,12 +206,13 @@ def grade_sentence(sentence: str, required: list[str], checker, forms: set[str] 
     grammar = "unchecked" if not r.checked else ("errors" if remarks else "ok")
     by_grammar = None if not r.checked else ("almost" if remarks else "correct")
     if r.missing and not r.used:
-        tip = "Verwende: " + " ".join(r.missing)
+        tip = t("Use: {words}", words=" ".join(r.missing))
         return Graded(None, expected, tip, r.corrected, remarks, r.missing, checked=r.checked, tip=tip,
                       word_ok=False, grammar=grammar)
     asked = f" ({task})" if task else ""
-    tip = f"«{' '.join(required)}»{asked} statt «{' '.join(r.used)}»." if r.missing else ""
-    return Graded(by_grammar, expected, "Wort richtig verwendet.", r.corrected if remarks else sentence, remarks,
+    tip = t("«{want}»{asked} instead of «{used}».", want=" ".join(required), asked=asked, used=" ".join(r.used)) \
+        if r.missing else ""
+    return Graded(by_grammar, expected, t("Word used correctly."), r.corrected if remarks else sentence, remarks,
                   r.missing, checked=r.checked, tip=tip, word_ok=True, grammar=grammar)
 
 
@@ -215,9 +222,9 @@ def graded_from_ai(check: SentenceCheck, required: list[str], sentence: str) -> 
     forms = {normalize(w) for w in required}
     target_bad = any(not r.ok for r in check.word_results if normalize(r.word) in forms)
     if target_bad:
-        verdict, note = "wrong", "Die Zielform ist nicht richtig verwendet."
+        verdict, note = "wrong", t("The target form is not used correctly.")
     elif remarks:
-        verdict, note = "almost", "Zielform richtig, aber der Satz hat Fehler."
+        verdict, note = "almost", t("Target form right, but the sentence has mistakes.")
     else:
         verdict, note = "correct", "Richtig."
     return Graded(verdict, " … ".join(required), note, check.corrected or sentence, remarks, [], rule=check.rule,
@@ -229,7 +236,7 @@ def grade_free_answer(item: dict, entry: Entry, answer: str, prompt: str, ai: Ai
     """Abfrage "Was bedeutet …?" / "Erkläre auf Deutsch": the AI grades it; bedeutung has a local fallback."""
     expected = "; ".join(entry.glosses[:3])
     if not answer:
-        return Graded(None, "", "Gib eine Antwort ein.", final=False)
+        return Graded(None, "", t("Enter an answer."), final=False)
     if ai is not None and ai.uses("answer"):
         try:  # only the question, the answer and the dictionary glosses leave the server
             g: AnswerGrade = ai.grade_answer(user_id, prompt, answer, expected)
@@ -241,7 +248,7 @@ def grade_free_answer(item: dict, entry: Entry, answer: str, prompt: str, ai: Ai
         from wort.exercises.translate import _de_to_en  # same comparison the CLI uses
         res = _de_to_en(entry).check(answer)
         return Graded(res.verdict, res.expected, res.feedback)
-    return Graded(None, expected, "Diese Aufgabe braucht die KI und wurde nicht bewertet.")  # no score
+    return Graded(None, expected, t("This task needs the AI and was not graded."))  # no score
 
 
 def attempt_details(item: dict, entry: Entry, graded: Graded, answer: str) -> dict[str, str]:
@@ -278,7 +285,7 @@ def grade_item(item: dict, entry: Entry, answer: str, checker, ai: AiService | N
             return grade_sentence(answer, required, checker, forms, task)  # fall back to the local check
         return graded_from_ai(check, required, answer)
     if not answer:
-        return Graded(None, "", "Gib eine Antwort ein.", final=False)
+        return Graded(None, "", t("Enter an answer."), final=False)
     res = ex.check(answer)
     return Graded(res.verdict, res.expected, res.feedback)
 
@@ -316,18 +323,21 @@ def register(app, ctx) -> None:
         return sess
 
     @app.get("/ueben", response_class=HTMLResponse)
-    def start(request: Request, modus: str = "saetze", thema: str = questions.ALL, neu: str = "",
+    def start(request: Request, modus: str = "", thema: str = questions.ALL, neu: str = "",
               user: User = Depends(current_user)):
-        """Üben: back to the running session (the chosen words stay until a new batch is started); `neu` or a
-        finished session shows the start page, which offers the last batch again."""
-        last = store.latest_practice(user.id)
-        if last and last["pos"] < len(last["items"]) and not neu:
-            return RedirectResponse(f"/ueben/s/{last['id']}#jetzt", status_code=303)
+        """Üben: back to the open session (of tab `modus`, else the newest open one); `neu`, or nothing open, shows
+        the start page, which offers the current batch of words (the latest word session's) again."""
+        if not neu:
+            last = store.latest_practice(user.id, MODES.get(modus, ()), open_only=True)
+            if last:
+                return RedirectResponse(f"/ueben/s/{last['id']}#jetzt", status_code=303)
         modus = modus if modus in TABS else "saetze"
         progress = store.grammar_progress(user.id)
         return ctx.render(request, "practice_start.html", user=user, page="practice", modus=modus, kinds=KINDS,
                           tabs=TABS, count=len(store.words(user.id)), thema=questions.topic_or_all(thema),
-                          themen=questions.LABELS, batch=batch_of(user, last),
+                          themen=questions.LABELS, batch=batch_of(user, store.latest_practice(user.id, WORD_KINDS)),
+                          resume=store.latest_practice(user.id, MODES[modus], open_only=True),
+                          ueben_tabs=mode_tabs(user, modus),
                           topics=[{"id": k, **t, "progress": progress.get(k)} for k, t in grammar.TOPICS.items()])
 
     @app.get("/grammatik/{topic}", response_class=HTMLResponse)
@@ -336,6 +346,7 @@ def register(app, ctx) -> None:
         if topic not in grammar.TOPICS:
             raise HTTPException(404, "no such topic")
         return ctx.render(request, "grammar_topic.html", user=user, page="practice", topic_id=topic,
+                          ueben_tabs=mode_tabs(user, "grammatik"),
                           topic=grammar.TOPICS[topic], progress=store.grammar_progress(user.id).get(topic))
 
     @app.post("/ueben/grammatik/{topic}")
@@ -344,7 +355,27 @@ def register(app, ctx) -> None:
         if topic not in grammar.TOPICS:
             raise HTTPException(404, "no such topic")
         items = grammar.build_items(topic, random.Random())
+        close_open(user, MODES["grammatik"])
         return RedirectResponse(f"/ueben/s/{store.create_practice(user.id, 'grammatik', items)}", status_code=303)
+
+    def mode_tabs(user: User, active: str) -> list[dict]:
+        """The Üben tabs on every Üben page: each resumes its open session (its progress as the count) or opens its
+        start page."""
+        out = []
+        for key in TABS:
+            sess = store.latest_practice(user.id, MODES[key], open_only=True)
+            out.append({"label": t(KINDS[key]), "href": f"/ueben?modus={key}", "active": key == active,
+                        "count": f"{sess['pos'] + 1} / {len(sess['items'])}" if sess else None})
+        return out
+
+    def mode_of(kind: str) -> str:
+        return next((m for m, kinds in MODES.items() if kind in kinds), "saetze")
+
+    def close_open(user: User, kinds: tuple[str, ...]) -> None:
+        """A new session replaces the open one of its kinds: the old one is closed (its position set to the end, so
+        it counts as finished; answered tasks keep their results)."""
+        for sess in store.open_practices(user.id, kinds):
+            store.save_practice(user.id, sess["id"], sess["items"], len(sess["items"]))
 
     def batch_of(user: User, sess: dict | None) -> dict | None:
         """The words of a session as the current batch: ids (still in the word list) and their lemmas."""
@@ -365,7 +396,7 @@ def register(app, ctx) -> None:
         if art not in ABFRAGE_MODES:
             raise HTTPException(400, "unknown mode")
         if art == "erklaere" and not ai.uses("answer"):  # the page offers it disabled; a forged post lands here
-            return ctx.redirect("/ueben?neu=1&modus=abfrage", "„Auf Deutsch erklären“ braucht die KI, sie ist aus.")
+            return ctx.redirect("/ueben?neu=1&modus=abfrage", t("“Explain in German” needs the AI; it is off."))
         if preset == "weakest":
             from app.words import order
             chosen = order(store.words(user.id), "score", False)[:5]
@@ -384,16 +415,19 @@ def register(app, ctx) -> None:
             except AiUnavailable:
                 pass  # the local task wording stays
         if not items:
-            return ctx.redirect("/", "Für diese Wörter gibt es keine Übungen.")
+            return ctx.redirect("/", t("There are no exercises for these words."))
+        close_open(user, MODES[kind])
         return RedirectResponse(f"/ueben/s/{store.create_practice(user.id, kind, items)}", status_code=303)
 
     @app.get("/ueben/s/{sid}", response_class=HTMLResponse)
-    def show(request: Request, sid: int, fehler: str = "", user: User = Depends(current_user)):
+    def show(request: Request, sid: int, fehler: str = "", nochmal: str = "", a: int = -1, w: int = 0,
+             user: User = Depends(current_user)):
         sess = get_session(user, sid)
         items, pos = sess["items"], sess["pos"]
         if pos >= len(items):
             return ctx.render(request, "practice_done.html", user=user, page="practice", sess=sess,
-                              rows=summary(user, items), kinds=KINDS, batch=batch_of(user, sess))
+                              rows=summary(user, items), kinds=KINDS, batch=batch_of(user, sess),
+                              ueben_tabs=mode_tabs(user, mode_of(sess["kind"])))
         dic = dictionary()
         item = items[pos]
         tr = translator()
@@ -407,18 +441,31 @@ def register(app, ctx) -> None:
             raise HTTPException(404, "word is gone")
         if sess["kind"] == "abfrage":
             return abfrage_page(request, user, sess, current)
-        # The chat: every task up to the current one (an earlier one whose word is gone is left out), then, once the
-        # current task is answered, the next task's prompt; the pinned input answers that next task.
-        turns = [t for i in range(pos) if (t := turn(user, dic, tr, i, items[i], opened))] + [current]
-        upcoming = None
-        if "result" in item and pos + 1 < len(items):
-            upcoming = turn(user, dic, tr, pos + 1, items[pos + 1])
-            if upcoming is None:
-                raise HTTPException(404, "word is gone")
-        target = upcoming or (current if "result" not in item else None)
+        # One task at a time; tabs on top switch between the answered tasks and the current one (?a=<index>; a
+        # "Fehler erklären" link opens its own task). The next task opens only with "Nächste Aufgabe" (/next).
+        # The sidebar: this session's words; ?w=<word id> keeps the tabs to that word's tasks.
+        words = session_words(user, dic, items, pos)
+        reachable = {x["id"]: x["reachable"] for x in words}
+        if not reachable.get(w):
+            w = 0
+        view = a if a >= 0 else (next(iter(opened)) if opened else (reachable[w][0] if w else pos))
+        if not 0 <= view <= pos:
+            view = pos
+        if w and view not in reachable[w]:
+            w = 0
+        shown = current if view == pos else turn(user, dic, tr, view, items[view], opened)
+        if shown is None:
+            raise HTTPException(404, "word is gone")
+        tabs = [{"index": i, "attempts": 1 + len(items[i].get("retries") or []) if "result" in items[i] else 0}
+                for i in (reachable[w] if w else range(pos + 1))]
+        # ?nochmal=1: the composer answers the shown, already answered sentence task again (a retry).
+        retry = bool(nochmal) and can_retry(items[view])
+        target = shown if retry or (view == pos and "result" not in item) else None
         return ctx.render(
             request, "practice.html", user=user, page="practice", sess=sess, item=item, pos=pos,
-            total=len(items), turns=turns, upcoming=upcoming, target=target, kinds=KINDS,
+            total=len(items), shown=shown, view=view, tabs=tabs, words=words, w=w, target=target, kinds=KINDS,
+            retry=retry, ueben_tabs=mode_tabs(user, mode_of(sess["kind"])),
+            can_retry=can_retry(items[view]),
             erklaert=explained(user, sess, fehler, dic, tr),
             ai_on=ai.available, ai_left=ai.remaining(user.id),
             ai_check=ai.uses("check") and item["kind"] == "sentence",
@@ -442,6 +489,7 @@ def register(app, ctx) -> None:
         return ctx.render(
             request, "practice_abfrage.html", user=user, page="practice", sess=sess, t=current, pos=pos,
             total=len(items), kinds=KINDS, batch=batch_of(user, sess), rows=rows, count=count,
+            ueben_tabs=mode_tabs(user, "abfrage"),
             left=sum(1 for i in items if "result" not in i) - (0 if "result" in items[pos] else 1),
             mode=abfrage_mode(items), modes=ABFRAGE_MODES, erklaere_ok=ai.uses("answer"),
             pos_label=POS_LABEL.get(entry.pos, entry.pos.capitalize())
@@ -477,7 +525,7 @@ def register(app, ctx) -> None:
                 and not item.get("downgraded")):
             delta = store.revise_attempt(user.id, res["attempt_id"], "wrong")
             if delta is not None:
-                res.update(verdict="wrong", delta=delta, feedback="Von dir als falsch markiert.")
+                res.update(verdict="wrong", delta=delta, feedback=t("Marked wrong by you."))
                 item["downgraded"] = True
                 store.save_practice(user.id, sid, items, pos)
         return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
@@ -509,18 +557,72 @@ def register(app, ctx) -> None:
             "explanation": item.get("explanation"), "ai_note": item.get("ai_note", ""),
             "translations": [t for t in (item.get("tr_uk"), item.get("tr_en")) if t],
             "details": details(item, result, ctx.facts(entry) if result else [], index),
+            "mistakes": mistakes((result or {}).get("remarks"), dic, translate),
             "input": "textarea" if item["kind"] in ("sentence", "erklaere") else "text",
+            "retries": [retry_turn(dic, translate, index, item, n, r, v_label(entry))
+                        for n, r in enumerate(item.get("retries") or [], 2)],
         }
+
+    def session_words(user: User, dic: Dictionary, items: list[dict], pos: int) -> list[dict]:
+        """The session's words in task order: label, its tasks up to the current one (`reachable`) and how many of
+        its tasks are answered. Empty for a grammar session (no words)."""
+        out: dict[int, dict] = {}
+        for i, it in enumerate(items):
+            if "word_id" not in it:
+                continue
+            x = out.get(it["word_id"])
+            if x is None:
+                word = store.word(user.id, it["word_id"])
+                entry = dic.find_lemma(word.lemma, word.pos or None) if word else None
+                if entry is None:
+                    continue
+                x = out[it["word_id"]] = {"id": it["word_id"], "label": v_label(entry), "reachable": [], "answered": 0,
+                                          "total": 0}
+            x["total"] += 1
+            x["answered"] += "result" in it
+            if i <= pos:
+                x["reachable"].append(i)
+        return list(out.values())
+
+    def can_retry(item: dict) -> bool:
+        """"Nochmal antworten": any answered sentence task, as often as the learner likes (no cap, garv 2026-10-29;
+        an AI check still counts against the daily AI cap)."""
+        return item["kind"] == "sentence" and "result" in item
+
+    def retry_turn(dic: Dictionary, translate, index: int, item: dict, attempt: int, r: dict, word_label: str) -> dict:
+        """Attempt `attempt` (2, 3, …) of task `index`, shaped like a turn for the reply macro. No links to the
+        explanation pane (it explains the first attempt), no word facts or translations (shown with the first)."""
+        own = {"answer": r["answer"], "ai_note": r.get("ai_note", "")}
+        return {
+            "index": index, "attempt": attempt, "result": r["result"], "answer": r["answer"], "word_label": word_label,
+            "segments": correction_segments(r["answer"], r["result"].get("remarks"),
+                                            lambda word: hints.correction_table(dic, word, translate)),
+            "details": [(label, text, "") for label, text, _ in details(own, r["result"], [], index)],
+            "mistakes": mistakes(r["result"].get("remarks"), dic, translate),
+            "explanation": None,
+        }
+
+    def mistakes(remarks: list[dict] | None, dic: Dictionary, translate) -> list[dict]:
+        """"Explain more": each mistake in full, from the local explanation (hints.explain: what was wrong, the
+        right form, the rule table with the right cell marked, Merke, Ukrainian) and its Grammatik topic."""
+        out = []
+        for n, r in enumerate(remarks or [], 1):
+            view = hints.explain(r, dic, translate)
+            topic = grammar.topic_for(view.get("kind", ""))
+            uk = hints.rule_uk(r.get("rule") or "", r.get("category") or "")
+            out.append({**view, "n": n, "uk_rule": uk,
+                        "topic": {"id": topic, "title": grammar.TOPICS[topic]["title"]} if topic else None})
+        return out
 
     def grammar_turn(dic: Dictionary, translate, index: int, item: dict, opened: dict) -> dict:
         """A grammar exercise as a chat turn: the exercise as the question, its type as the instruction."""
         ex = grammar.exercise(item)
         result = item.get("result")
         topic = grammar.TOPICS.get(item.get("topic"), {})
-        extra = [("Regel", ex.get("why", "")), ("Українською", ex.get("uk", ""))] if result and ex else []
+        extra = [(t("Rule"), ex.get("why", "")), (t("In Ukrainian"), ex.get("uk", ""))] if result and ex else []
         return {
             "index": index, "kind": "grammar", "prompt": grammar.TYPES.get(ex.get("type"), ""),
-            "question": ex.get("prompt", "Diese Aufgabe gibt es nicht mehr."), "hint": "",
+            "question": ex.get("prompt", t("This task no longer exists.")), "hint": "",
             "choices": ex.get("choices"), "notice": item.get("notice", ""), "result": result,
             "answer": item.get("answer", ""), "word_label": topic.get("title", ""), "facts": [],
             "segments": correction_segments(item.get("answer", ""), (result or {}).get("remarks"),
@@ -560,7 +662,9 @@ def register(app, ctx) -> None:
                     if same and len(similar) < 3:
                         similar.append({"segments": correction_segments(it["answer"], [r], table),
                                         "text": it["answer"], "date": german_date(past["created_at"])})
+        topic = grammar.topic_for(view.get("kind", ""))
         return {**view, "index": index, "n": n, "total": len(remarks),
+                "topic": {"id": topic, "title": grammar.TOPICS[topic]["title"]} if topic else None,
                 "segments": correction_segments(item.get("answer", ""), [remark], table),
                 "ai": item.get("explanation"), "similar": similar}
 
@@ -569,25 +673,19 @@ def register(app, ctx) -> None:
         a mistake's label links to its explanation."""
         if not result:
             return []
-        answer, rows = item.get("answer", ""), []
-        if result.get("corrected") and result["corrected"] != answer:
-            rows.append(("Korrigiert", result["corrected"]))
-        if result.get("natural") and result["natural"] != result.get("corrected"):
-            rows.append(("Natürlicher", result["natural"]))
+        rows = []  # the corrected sentence is the answer bubble's green line
         if result.get("verdict") == "wrong" and result.get("expected"):
-            rows.append(("Erwartet", result["expected"]))
-        for n, r in enumerate(result.get("remarks") or [], 1):
-            reps = ", ".join(r.get("replacements") or [])
-            uk = hints.rule_uk(r.get("rule") or "", r.get("category") or "")
-            text = f"«{r.get('fragment', '')}»" + (f" → {reps}" if reps else "") + f": {r.get('message', '')}"
-            rows.append((f"Fehler {n}", text + (f" ({uk})" if uk else ""), f"?fehler={item_index}-{n}#jetzt"))
+            rows.append((t("Expected"), result["expected"]))
+        # The mistakes themselves are explained one by one in their own sections ("Explain more", mistakes()).
+        if result.get("natural") and result["natural"] != result.get("corrected"):
+            rows.append((t("More natural"), result["natural"]))
         if result.get("verdict") != "correct":
-            rows += [("Zum Wort" if i == 0 else "", f) for i, f in enumerate(facts)]
+            rows += [(t("About the word") if i == 0 else "", f) for i, f in enumerate(facts)]
         if item.get("ai_note"):
-            rows.append(("Hinweis", item["ai_note"]))
+            rows.append((t("Hint"), item["ai_note"]))
         if ex := item.get("explanation"):
-            rows += [(f"Erklärung", f"{ex.get('rule', '')}: {ex.get('explanation', '')}".strip(": ")),
-                     ("Merke", ex.get("merke", "")), ("Українською", ex.get("explanation_uk", ""))]
+            rows += [(t("Explanation"), f"{ex.get('rule', '')}: {ex.get('explanation', '')}".strip(": ")),
+                     (t("Remember"), ex.get("merke", "")), (t("In Ukrainian"), ex.get("explanation_uk", ""))]
         tr = [t for t in (item.get("tr_uk"), item.get("tr_en")) if t]
         if tr:
             rows.append(("Übersetzung", " · ".join(tr)))
@@ -700,11 +798,11 @@ def register(app, ctx) -> None:
             delta = store.revise_attempt(user.id, res["attempt_id"], graded.verdict)
             if delta is not None:
                 item["result"] = {**asdict(graded), "delta": delta, "attempt_id": res["attempt_id"]}
-                item["ai_note"] = "Die Bewertung wurde nach deinem Einwand geändert."
+                item["ai_note"] = t("The assessment was changed after your objection.")
             else:
-                item["ai_note"] = "Die Bewertung kann nicht mehr geändert werden."
+                item["ai_note"] = t("The assessment can no longer be changed.")
         else:
-            item["ai_note"] = "Die KI bleibt bei der Bewertung."
+            item["ai_note"] = t("The AI keeps its assessment.")
         store.save_practice(user.id, sid, items, pos)
         return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
 
@@ -726,6 +824,7 @@ def register(app, ctx) -> None:
             return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
         new = [{"word_id": item["word_id"], "kind": "sentence", "index": 0, "free": True, "ai_prompt": t.prompt,
                 "tr_uk": t.translation_uk, "tr_en": t.translation_en} for t in tasks.tasks[:RULE_TASKS]]
+        close_open(user, ("regel",))  # the Sätze session it came from stays open
         return RedirectResponse(f"/ueben/s/{store.create_practice(user.id, 'regel', new)}", status_code=303)
 
     @app.post("/ueben/s/{sid}/frage")
@@ -750,6 +849,34 @@ def register(app, ctx) -> None:
                                               random.Random(), avoid=avoid)
         store.save_practice(user.id, sid, items, pos)
         return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
+
+    @app.post("/ueben/s/{sid}/again")
+    def answer_again(request: Request, sid: int, csrf: str = Form(...), text: str = Form(""), at: int = Form(...),
+                     w: int = Form(0), user: User = Depends(current_user)):
+        """Answer an answered sentence task (`at`: the current one or an earlier one) once more: graded and corrected
+        like the first answer, kept as the next attempt under it. Only the first answer counts: a retry records no
+        attempt and changes no score."""
+        ctx.verify_csrf(request, csrf)
+        sess = get_session(user, sid)
+        items, pos = sess["items"], sess["pos"]
+        if not (0 <= at <= pos < len(items)) or not can_retry(items[at]):
+            return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
+        item = items[at]
+        word = store.word(user.id, item["word_id"])
+        entry = dictionary().find_lemma(word.lemma, word.pos or None) if word else None
+        if entry is None:
+            raise HTTPException(404, "word is gone")
+        notes: list[str] = []
+        graded = grade_item(item, entry, text, ctx.checker, ai, user.id, notes)
+        if not graded.final:  # nothing to grade (e.g. empty): stay in the retry composer, change nothing
+            return RedirectResponse(f"/ueben/s/{sid}?a={at}{f'&w={w}' if w else ''}&nochmal=1#jetzt", status_code=303)
+        item.setdefault("retries", []).append({
+            "answer": sanitize.text(text, MAX_ANSWER),
+            "result": {**asdict(graded), "delta": None, "attempt_id": None},
+            "ai_note": notes[0] if notes else "",
+        })
+        store.save_practice(user.id, sid, items, pos)
+        return RedirectResponse(f"/ueben/s/{sid}?a={at}{f'&w={w}' if w else ''}#jetzt", status_code=303)
 
     @app.post("/ueben/s/{sid}/next")
     def advance(request: Request, sid: int, csrf: str = Form(...), user: User = Depends(current_user)):

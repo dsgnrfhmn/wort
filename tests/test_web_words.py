@@ -410,3 +410,21 @@ def test_lookup_result_shows_examples_with_the_word_marked(env):
     assert 'class="wort-example__word" data-article="das">' in page
     assert 'class="wort-result__word" id="result-1" tabindex="-1" data-article="das">' in page
     assert "Nomen · neutral" in page
+
+
+def test_rows_open_a_context_menu_and_removing_asks_first_and_takes_the_answers_too(env):
+    app, store, a, _ = env
+    store.add_word(a, "Haus", "noun", now=NOW)
+    store.add_word(a, "gehen", "verb", now=NOW)
+    wid = next(w.id for w in store.words(a) if w.lemma == "Haus")
+    store.record_attempt(a, wid, "form", "article", "p", "der", "wrong")
+    c = client_for(app, "anna")
+    html = c.get("/").text
+    assert html.count('data-context-menu="wort-word-menu"') == 2  # every row
+    assert 'id="wort-word-menu"' in html and 'role="menu"' in html and 'data-value="delete"' in html
+    assert 'id="wort-delete-confirm"' in html and "data-popup-confirm" in html and 'id="wort-delete-form"' in html
+    r = c.post(f"/words/{wid}/delete", data={"csrf": c.cookies.get("wort_csrf")})
+    assert r.status_code == 303 and r.headers["location"] == "/"
+    assert "Haus" in c.get("/").text.split('data-flash')[1][:200]  # "„Haus“ wurde entfernt."
+    assert [w.lemma for w in store.words(a)] == ["gehen"] and store.attempts(a, wid) == []
+    assert c.post(f"/words/{wid}/delete", data={"csrf": "forged"}).status_code == 403

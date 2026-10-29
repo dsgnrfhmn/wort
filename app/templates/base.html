@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="en" data-theme="light" data-tooltip-mode="layer" data-tooltip-delay="500">
+<html lang="{{ lang | default('en') }}" data-theme="light" data-tooltip-mode="layer" data-tooltip-delay="500">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}wort{% endblock %}</title>
-  <link rel="icon" type="image/svg+xml" id="wort-favicon" href="/static/favicon-light.svg?v=3">
+  {# One magenta W for both themes. Bump ?v= when the icon changes: browsers cache a favicon by its URL. #}
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=4">
   <script src="/static/theme-init.js"></script>
   <link rel="stylesheet" href="/ds/tokens/output.css">
   {% for href in ds_css %}
@@ -20,13 +21,30 @@
   {# The logo (design canvas "Wort — логотип", D — Піксель): the W alone on the 10×23 grid, strokes and steps three cells wide, the middle four (bolder
      and wider, garv 2026-10-28), in the text color. #}
   {% set brand_html %}<svg viewBox="0 0 160 184" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true" focusable="false"><rect x="0" y="0" width="30" height="184"/><rect x="30" y="92" width="30" height="46"/><rect x="60" y="46" width="40" height="46"/><rect x="100" y="92" width="30" height="46"/><rect x="130" y="0" width="30" height="184"/></svg>{% endset %}
-  {% with brand='wort', brand_html=brand_html, brand_href='/', workspace_label='', nav_links=[
-    {'label': 'Wörter', 'href': '/', 'current': page in ('words', 'history', 'favorites')},
-    {'label': 'Üben', 'href': '/ueben', 'current': page == 'practice'},
-    {'label': 'Texte', 'href': '/texte', 'current': page == 'texts'}
+  {# The interface language (app/i18n.py): nav-bar's switcher (draft prop workspace_items); app.js posts the pick
+     through the form below. Words and exercises stay German in both languages. #}
+  {% set lang_items = [] %}{% for code, name in ui_langs.items() %}{% set _x = lang_items.append({'value': code, 'label': name}) %}{% endfor %}
+  {% with brand='wort', brand_html=brand_html, brand_href='/', workspace_label=ui_langs[lang], workspace_items=lang_items, workspace_name=_('Interface language'), nav_links=[
+    {'label': _('Words'), 'href': '/', 'current': page in ('words', 'history', 'favorites')},
+    {'label': _('Practice'), 'href': '/ueben', 'current': page == 'practice'},
+    {'label': _('Texts'), 'href': '/texte', 'current': page == 'texts'}
   ], right_actions=[
-    {'label': 'Abmelden (' ~ user.name ~ ')', 'form_action': '/logout', 'hidden': {'csrf': csrf}}
+    {'label': _('Sign out ({name})', name=user.name), 'form_action': '/logout', 'hidden': {'csrf': csrf}}
   ] %}{% include "components/nav-bar/template.html" %}{% endwith %}
+  <form id="wort-lang-form" method="post" action="/settings/lang" hidden>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="lang" value="{{ lang }}">
+    <input type="hidden" name="next" value="/">{# app.js puts the current path here on submit: the page never echoes its own URL #}
+  </form>
+  {# Üben (design "open-projects" 391:23146): the three modes as equal page-heads under the nav bar; each title links
+     to its mode (practice.mode_tabs: resumes its open session, whose progress is the caption). #}
+  {% if page == 'practice' and ueben_tabs is defined %}
+  <nav class="wort-modes" aria-label="{{ _('Kind of practice') }}">
+    {% for m in ueben_tabs %}
+    {% with title=m.label, title_href=m.href, current=m.active, meta_text=m.count, actions_left=[], actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
+    {% endfor %}
+  </nav>
+  {% endif %}
   {# Second header row: settings (to come) on the left, the lookup side panel's toggle on the right. Only on Üben
      (garv, 2026-10-28): the Wörter page has its own lookup field. #}
   {% set side_lookup = page == 'practice' %}
@@ -34,7 +52,7 @@
   <div class="wort-toolbar">
     <div class="wort-row wort-toolbar__settings"></div>
     <div class="wort-row">
-      {% with priority='secondary', underline='dotted', label='Nachschlagen', extra_attrs='data-side-toggle aria-controls="wort-lookup-side" aria-expanded="false"' %}{% include "components/text-button/template.html" %}{% endwith %}
+      {% with priority='secondary', underline='dotted', label=_('Look up'), extra_attrs='data-side-toggle aria-controls="wort-lookup-side" aria-expanded="false"' %}{% include "components/text-button/template.html" %}{% endwith %}
     </div>
   </div>
   {% endif %}
@@ -50,15 +68,15 @@
      click-through neighbour, then the resize handle, then the panel. #}
   <aside class="wort-side ds-split" id="wort-lookup-side" data-resizable data-min-size="320" data-min-rest="240" hidden>
     <div class="wort-side__rest" aria-hidden="true"></div>
-    <div class="ds-split__handle" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Breite der Seitenleiste ändern"></div>
+    <div class="ds-split__handle" role="separator" aria-orientation="vertical" tabindex="0" aria-label="{{ _('Resize the side panel') }}"></div>
     {% set body_html %}
     <form class="wort-side__search" method="get" action="/" role="search">
       <input type="hidden" name="s" value="1">
-      {% with name='q', label='Wort oder Satz nachschlagen', placeholder='Wort oder Satz: Deutsch oder Englisch …', fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+      {% with name='q', label=_('Look up a word or sentence'), placeholder=_('Word or sentence: German or English …'), fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
     </form>
     <div class="wort-side__results" aria-live="polite"></div>
     {% endset %}
-    {% with id='wort-lookup-side', title='Nachschlagen', caption='', action='Schließen', emphasis=true %}{% include "components/pane/template.html" %}{% endwith %}
+    {% with id='wort-lookup-side', title=_('Look up'), caption='', action=_('Close'), emphasis=true %}{% include "components/pane/template.html" %}{% endwith %}
   </aside>
   {% endif %}
   </div>
@@ -66,7 +84,9 @@
   {% for src in ds_js %}
   <script src="{{ src }}"></script>
   {% endfor %}
-  <script type="application/json" id="wort-glossary">{{ ui_glossary | tojson }}</script>
+  {# English / Ukrainian tooltips for the German labels: only with the German interface. #}
+  {% if lang == 'de' %}<script type="application/json" id="wort-glossary">{{ ui_glossary | tojson }}</script>{% endif %}
+  <script type="application/json" id="wort-i18n">{{ {'lookup_failed': _('Lookup failed. Please try again.'), 'delete_named': _('“{word}” will be removed with its score and your answers. This cannot be undone.'), 'explain_more': _('Explain more'), 'hide_feedback': _('Hide explanation'), 'send_stalled': _('No answer from the server. Please send again.')} | tojson }}</script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -105,7 +105,7 @@ def test_legacy_v0_db_is_migrated_and_adopted_by_first_user(tmp_path):
     """)
     old.commit(); old.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 6
     u = web.create_user("anna", "h")
     assert [r.query for r in web.history(u.id)] == ["Haus"]
     assert [f.lemma for f in web.favorites(u.id)] == ["Haus"]
@@ -176,7 +176,7 @@ def test_v1_database_is_migrated_to_current(tmp_path):
     """)
     con.commit(); con.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 6
     assert web.practice(1, 1)["kind"] == "saetze"
     assert web.create_practice(1, "regel", []) > 0  # new kind accepted
     assert {"state_before", "task", "expected", "corrected", "rule"} <= {
@@ -210,6 +210,7 @@ def test_v4_database_gets_the_attempt_details(tmp_path):
     con.executescript("""
         ALTER TABLE attempts DROP COLUMN task; ALTER TABLE attempts DROP COLUMN expected;
         ALTER TABLE attempts DROP COLUMN corrected; ALTER TABLE attempts DROP COLUMN rule;
+        ALTER TABLE users DROP COLUMN ui_lang;
         INSERT INTO users VALUES (1, 'anna', 'h', '2026-10-01T00:00:00');
         INSERT INTO user_words (id, user_id, lemma, pos, added_at) VALUES (1, 1, 'Haus', 'noun', '2026-10-01T00:00:00');
         INSERT INTO attempts (user_id, word_id, skill, kind, prompt, answer, verdict, delta, created_at)
@@ -218,9 +219,10 @@ def test_v4_database_gets_the_attempt_details(tmp_path):
     """)
     con.commit(); con.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 6
     old = web.attempts(1, 1)[0]
     assert (old.answer, old.task, old.expected, old.corrected, old.rule) == ("der", "", "", "", "")
+    assert web.conn.execute("SELECT ui_lang FROM users WHERE id = 1").fetchone()[0] == "en"  # v5 -> v6
     web.record_attempt_full(1, 1, "form", "sentence", "p", "Ich sehe der Haus.", "wrong",
                             details={"task": "Akkusativ Singular", "expected": "das … Haus",
                                      "corrected": "Ich sehe das Haus.", "rule": "x" * 999})

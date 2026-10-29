@@ -1,14 +1,15 @@
 {% extends "base.html" %}
-{% block title %}{{ topic.title }} · Grammatik · wort{% endblock %}
+{% block title %}{{ topic.title }} · {{ _('Grammar') }} · wort{% endblock %}
+{% block body_attrs %} data-layout="wide"{% endblock %}
 {% block content %}
 <section class="wort-section">
-  {% with type='title-info', title=topic.title, info=topic.level ~ ((' · ' ~ progress[0] ~ ' / ' ~ progress[1] ~ ' richtig') if progress else '') %}{% include "components/table-header/template.html" %}{% endwith %}
+  {% with type='title-info', title=topic.title, info=topic.level ~ ((' · ' ~ _('{right} / {total} correct', right=progress[0], total=progress[1])) if progress else '') %}{% include "components/table-header/template.html" %}{% endwith %}
   <div class="wort-row">
     <form method="post" action="/ueben/grammatik/{{ topic_id }}">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      {% with priority='primary', underline='dotted', label='Üben (' ~ (topic.exercises | length) ~ ' Aufgaben)', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+      {% with priority='primary', underline='dotted', label=_('Practise ({n} tasks)', n=topic.exercises | length), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
     </form>
-    {% with priority='secondary', underline='solid', label='Alle Themen', href='/ueben?neu=1&modus=grammatik' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='solid', label=_('All topics'), href='/ueben?neu=1&modus=grammatik' %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
   <p class="wort-grammar__lead">{{ topic.summary }}</p>
 </section>
@@ -24,7 +25,7 @@
     {% for h in s.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
     {% for row in s.table.rows %}
     {% set cells = [] %}
-    {% for c in row %}{% set _ = cells.append({'type': 'text-passive-cell' if loop.first else 'text-active-cell', 'content': c, 'wrap': true}) %}{% endfor %}
+    {% for c in row %}{% set _x = cells.append({'type': 'text-passive-cell' if loop.first else 'text-active-cell', 'content': c, 'wrap': true}) %}{% endfor %}
     {% with selected=false, cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
     {% endfor %}
   </div>
@@ -35,7 +36,7 @@
 <section class="wort-section">
   <form class="wort-row" method="post" action="/ueben/grammatik/{{ topic_id }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% with priority='primary', underline='dotted', label='Jetzt üben', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='primary', underline='dotted', label=_('Practise now'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
   </form>
 </section>
 {% endblock %}

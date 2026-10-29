@@ -1,29 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Ergebnis · wort{% endblock %}
+{% block title %}{{ _('Result') }} · wort{% endblock %}
 {% block content %}
 <section class="wort-section">
-  {% with type='title-info', title='Ergebnis', info=kinds[sess.kind] ~ ' · ' ~ (rows | length) ~ ' Aufgaben' %}{% include "components/table-header/template.html" %}{% endwith %}
-  <div class="wort-table wort-results" role="table" aria-label="Ergebnis">
-    {% for label in ('Wort', 'Ergebnis', 'Score', 'Änderung') %}{% with label=label %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+  {% with type='title-info', title=_('Result'), info=_(kinds[sess.kind]) ~ ' · ' ~ _('{n} tasks', n=rows | length) %}{% include "components/table-header/template.html" %}{% endwith %}
+  <div class="wort-table wort-results" role="table" aria-label="{{ _('Result') }}">
+    {% for label in (_('Word'), _('Result'), _('Score'), _('Change')) %}{% with label=label %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
     {% for r in rows %}
     {% with cells=[
       {'type': 'text-active-cell', 'content': r.label},
-      {'type': 'text-active-cell', 'content': {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch', 'tip': 'Tipp', 'skipped': 'übersprungen'}.get(r.verdict, 'nicht bewertet')},
+      {'type': 'text-active-cell', 'content': {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch', 'tip': _('Tip'), 'skipped': _('skipped')}.get(r.verdict, _('not graded'))},
       {'type': 'text-active-cell', 'content': (r.score | string) if r.score is not none else '–'},
       {'type': 'text-active-cell', 'content': '%+d' | format(r.delta)}
     ] %}{% include "components/table-row/template.html" %}{% endwith %}
     {% endfor %}
   </div>
   <div class="wort-row">
-    {% with priority='primary', underline='solid', label='Zu den Wörtern', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
-    {% with priority='secondary', underline='solid', label='Neue Wörter wählen', href='/ueben?neu=1' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='primary', underline='solid', label=_('To the words'), href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='solid', label=_('Choose new words'), href='/ueben?neu=1' %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
   {% if batch %}
   {# Another round with the same words: they stay the current batch until a new one is chosen. #}
   <form class="wort-row" method="post" action="/ueben/{{ batch.kind }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% for id in batch.ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
-    {% with priority='primary', underline='dotted', label='Noch eine Runde mit denselben Wörtern', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='primary', underline='dotted', label=_('Another round with the same words'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
   </form>
   {% endif %}
 </section>

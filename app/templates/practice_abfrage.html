@@ -1,85 +1,81 @@
 {% extends "base.html" %}
-{% block title %}Abfrage · wort{% endblock %}
+{% block title %}{{ _('Quiz') }} · wort{% endblock %}
 {# Abfrage (design Üben 6): one word at a time on the left, this round's results on the right. #}
 {% block content %}
 {% set result = t.result %}
 <section class="wort-section">
-  <div class="wort-tabs" role="tablist" aria-label="Übungsart">
-    {% with active=false, label=kinds['saetze'], count=none, href='/ueben?neu=1&modus=saetze' %}{% include "components/header-tab/template.html" %}{% endwith %}
-    {% with active=true, label=kinds['abfrage'], count=(pos + 1) ~ ' / ' ~ total, href=none %}{% include "components/header-tab/template.html" %}{% endwith %}
-  </div>
-  <div class="wort-row">
+    <div class="wort-row">
     {# The mode starts a new round with the same words (app.js submits this form on ds-radio-change). #}
     <form method="post" action="/ueben/abfrage" data-abfrage-mode>
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="art" value="{{ mode }}">
       {% for id in (batch.ids if batch else []) %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
       {% set options = [] %}
-      {% for key, name in modes.items() %}{% set _ = options.append({'value': key, 'label': name, 'checked': key == mode, 'disabled': key == 'erklaere' and not erklaere_ok}) %}{% endfor %}
-      {% with options=options, label='Modus' %}{% include "components/radio/template.html" %}{% endwith %}
+      {% for key, name in modes.items() %}{% set _x = options.append({'value': key, 'label': _(name), 'checked': key == mode, 'disabled': key == 'erklaere' and not erklaere_ok}) %}{% endfor %}
+      {% with options=options, label=_('Mode') %}{% include "components/radio/template.html" %}{% endwith %}
     </form>
-    {% if not erklaere_ok %}<span>„Auf Deutsch erklären“ braucht die KI (aus).</span>{% endif %}
-    {% with priority='secondary', underline='solid', label='Neue Wörter wählen', href='/ueben?neu=1&modus=abfrage' %}{% include "components/text-button/template.html" %}{% endwith %}
-    {% with priority='secondary', underline='solid', label='Beenden', href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% if not erklaere_ok %}<span>{{ _('“Explain in German” needs the AI (off).') }}</span>{% endif %}
+    {% with priority='secondary', underline='solid', label=_('Choose new words'), href='/ueben?neu=1&modus=abfrage' %}{% include "components/text-button/template.html" %}{% endwith %}
+    {% with priority='secondary', underline='solid', label=_('Finish'), href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
   </div>
-  {% with value=(100 * (total - left) / total) if total else 0, label='Fortschritt' %}{% include "components/progress-bar/template.html" %}{% endwith %}
+  {% with value=(100 * (total - left) / total) if total else 0, label=_('Progress') %}{% include "components/progress-bar/template.html" %}{% endwith %}
 </section>
 
 <div class="wort-abfrage" id="jetzt">
   {% set body_html %}
   <div class="wort-detail">
     {% with variant='task', label=pos_label, text=(article ~ ' ' if article else '') ~ lemma, note=t.prompt, note_tooltip=none, segments=none %}{% include "components/message/template.html" %}{% endwith %}
-    {% if t.hint %}{% with message='Hinweis: ' ~ t.hint %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
-    {% if t.choices and not result %}{% with message='Antworte mit einer Nummer oder dem Wort: ' ~ (t.choices | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+    {% if t.hint %}{% with message=_('Hint: {text}', text=t.hint) %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
+    {% if t.choices and not result %}{% with message=_('Answer with a number or the word: {choices}', choices=t.choices | join(' · ')) %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
     {% if t.notice %}{% with message=t.notice %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
     {% if not result %}
     <form class="wort-form wort-answer" method="post" action="/ueben/s/{{ sess.id }}/answer">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="at" value="{{ pos }}">
-      {% with type=t.input, name='text', label='Deine Antwort', rows=2, fill='filled', required=true, placeholder='Deine Antwort' %}{% include "components/input/template.html" %}{% endwith %}
+      {% with type=t.input, name='text', label=_('Your answer'), rows=2, fill='filled', required=true, placeholder=_('Your answer') %}{% include "components/input/template.html" %}{% endwith %}
       <div class="wort-row">
-        {% with priority='secondary', underline='dotted', label='Überspringen', submit=true, extra_attrs='form="abfrage-skip" formnovalidate' %}{% include "components/text-button/template.html" %}{% endwith %}
-        {% with priority='primary', underline='dotted', label='Senden', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% with priority='secondary', underline='dotted', label=_('Skip'), submit=true, extra_attrs='form="abfrage-skip" formnovalidate' %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% with priority='primary', underline='dotted', label=_('Send'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
       </div>
     </form>
     <form id="abfrage-skip" method="post" action="/ueben/s/{{ sess.id }}/skip" hidden><input type="hidden" name="csrf" value="{{ csrf }}"></form>
     {% else %}
-    {% set vlabel = {'correct': 'richtig', 'almost': 'teilweise', 'wrong': 'falsch'}.get(result.verdict, 'nicht bewertet') %}
-    {% with variant='answer', label='Deine Antwort', text=t.answer, segments=none, note=none %}{% include "components/message/template.html" %}{% endwith %}
+    {% set vlabel = {'correct': 'richtig', 'almost': 'teilweise', 'wrong': 'falsch'}.get(result.verdict, _('not graded')) %}
+    {% with variant='answer', label=_('Your answer'), text=t.answer, segments=none, note=none %}{% include "components/message/template.html" %}{% endwith %}
     <div class="wort-row">
       {% with type={'correct': 'success', 'almost': 'warning', 'wrong': 'danger'}.get(result.verdict, 'neutral'), subtype='passive', label=vlabel %}{% include "components/tag/template.html" %}{% endwith %}
       {% if result.delta is not none %}<span>Score {{ '%+d' | format(result.delta) }}</span>{% endif %}
     </div>
-    {% with variant='prompt', label='Kommentar', text=result.feedback or vlabel, segments=none, note=([translations, example] | select | join(' · ')) or none, note_tooltip=none %}{% include "components/message/template.html" %}{% endwith %}
+    {% with variant='prompt', label=_('Comment'), text=result.feedback or vlabel, segments=none, note=([translations, example] | select | join(' · ')) or none, note_tooltip=none %}{% include "components/message/template.html" %}{% endwith %}
     {% if t.ai_note %}{% with message=t.ai_note %}{% include "components/empty-state/template.html" %}{% endwith %}{% endif %}
     <div class="wort-row">
       {% if can_downgrade %}
       <form method="post" action="/ueben/s/{{ sess.id }}/doch-falsch">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        {% with priority='secondary', status='error', underline='dotted', label='Doch falsch', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% with priority='secondary', status='error', underline='dotted', label=_('Actually wrong'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
       </form>
       {% endif %}
       <form method="post" action="/ueben/s/{{ sess.id }}/next">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        {% with priority='primary', underline='dotted', label='Weiter' if pos + 1 < total else 'Ergebnis ansehen', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% with priority='primary', underline='dotted', label=_('Next') if pos + 1 < total else _('See the result'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
       </form>
     </div>
     {% endif %}
   </div>
   {% endset %}
-  {% with id='abfrage-wort', title='Wort ' ~ (pos + 1), caption='von ' ~ total, no_action=true, emphasis=true, body_html=body_html %}{% include "components/pane/template.html" %}{% endwith %}
+  {% with id='abfrage-wort', title=_('Word {n}', n=pos + 1), caption=_('of {total}', total=total), no_action=true, emphasis=true, body_html=body_html %}{% include "components/pane/template.html" %}{% endwith %}
 
   {% set body_html %}
-  {% set tags = {'correct': ('success', 'richtig'), 'almost': ('warning', 'teilweise'), 'wrong': ('danger', 'falsch'), 'skipped': ('neutral', 'übersprungen')} %}
+  {% set tags = {'correct': ('success', 'richtig'), 'almost': ('warning', 'teilweise'), 'wrong': ('danger', 'falsch'), 'skipped': ('neutral', _('skipped'))} %}
   {% for r in rows %}
-  {% set tag = tags.get(r.verdict, ('neutral', 'nicht bewertet')) %}
+  {% set tag = tags.get(r.verdict, ('neutral', _('not graded'))) %}
   {% with selected=loop.last and result, cells=[
     {'type': 'text-active-cell', 'content': r.label},
     {'type': 'tag', 'content': tag[1], 'tag_type': tag[0]}
   ] %}{% include "components/table-row/template.html" %}{% endwith %}
   {% endfor %}
-  {% with selected=false, cells=[{'type': 'empty-state', 'content': ('Noch ' ~ left ~ (' Wort.' if left == 1 else ' Wörter.')) if left else 'Letztes Wort.'}] %}{% include "components/table-row/template.html" %}{% endwith %}
+  {% with selected=false, cells=[{'type': 'empty-state', 'content': (_('1 word left.') if left == 1 else _('{n} words left.', n=left)) if left else _('Last word.')}] %}{% include "components/table-row/template.html" %}{% endwith %}
   {% endset %}
-  {% with id='abfrage-runde', title='Diese Runde', caption=count.correct ~ ' ✓ · ' ~ count.almost ~ ' ~ · ' ~ count.wrong ~ ' ✗', no_action=true, body_html=body_html %}{% include "components/pane/template.html" %}{% endwith %}
+  {% with id='abfrage-runde', title=_('This round'), caption=count.correct ~ ' ✓ · ' ~ count.almost ~ ' ~ · ' ~ count.wrong ~ ' ✗', no_action=true, body_html=body_html %}{% include "components/pane/template.html" %}{% endwith %}
 </div>
 {% endblock %}

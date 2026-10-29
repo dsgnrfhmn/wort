@@ -24,6 +24,8 @@ from wort import sanitize
 from wort.dictionary.lookup import Dictionary
 from wort.text import normalize
 
+from app.i18n import t
+
 PATH = Path(__file__).parent / "grammar.json"
 TYPES = {"luecke": "Lückentext: Ergänze die Lücke.", "mc": "Wähle die richtige Form.",
          "umbau": "Schreibe den Satz um.", "eigen": "Schreibe einen eigenen Satz."}
@@ -58,6 +60,16 @@ def _load(path: Path) -> dict[str, dict]:
 
 
 TOPICS = _load(PATH)
+
+
+# A mistake's local kind (hints.mistake_kind) -> the Grammatik topic that practises it. Kinds without a topic (verb
+# agreement, spelling, casing, …) get no link.
+TOPIC_FOR_MISTAKE = {"article": "praepositionen", "adjective": "adjektive", "predicative": "adjektive"}
+
+
+def topic_for(kind: str) -> str | None:
+    topic = TOPIC_FOR_MISTAKE.get(kind)
+    return topic if topic in TOPICS else None
 
 
 def exercise(item: dict) -> dict:
@@ -135,9 +147,9 @@ def grade(item: dict, answer: str, checker, dic: Dictionary | None):
     ex = exercise(item)
     answer = sanitize.text(answer, MAX_ANSWER)
     if not ex:
-        return None, "", "Diese Aufgabe gibt es nicht mehr.", [], "", True
+        return None, "", t("This task no longer exists."), [], "", True
     if not answer:
-        return None, "", "Gib eine Antwort ein.", [], "", False
+        return None, "", t("Enter an answer."), [], "", False
     expected = " / ".join(ex.get("answers", [])) or ex.get("example", "")
     kind = ex["type"]
     if kind in ("luecke", "mc"):
@@ -145,7 +157,7 @@ def grade(item: dict, answer: str, checker, dic: Dictionary | None):
         if kind == "mc" and answer.strip().isdigit() and 1 <= int(answer) <= len(ex["choices"]):
             given = ex["choices"][int(answer) - 1]
         right = _plain(given) in {_plain(a) for a in ex["answers"]}
-        return ("correct" if right else "wrong"), expected, ("Richtig." if right else "Leider nicht richtig."), [], "", True
+        return ("correct" if right else "wrong"), expected, ("Richtig." if right else t("Not right, unfortunately.")), [], "", True
     if kind == "umbau" and _plain(answer) in {_plain(a) for a in ex["answers"]}:
         return "correct", expected, "Richtig.", [], "", True
     result = check_sentence(answer, [], checker)
@@ -160,6 +172,6 @@ def grade(item: dict, answer: str, checker, dic: Dictionary | None):
     if problems:
         return "wrong", ex.get("example", ""), " ".join(problems), remarks, corrected, True
     if not result.checked:
-        return None, ex.get("example", ""), "Struktur richtig, Grammatik nicht geprüft: kein Score.", [], answer, True
+        return None, ex.get("example", ""), t("Structure right, grammar not checked: no score."), [], answer, True
     return ("almost" if remarks else "correct"), ex.get("example", ""), \
-        ("Struktur richtig, aber Hinweise zur Grammatik." if remarks else "Richtig."), remarks, corrected, True
+        (t("Structure right, but there are grammar notes.") if remarks else "Richtig."), remarks, corrected, True

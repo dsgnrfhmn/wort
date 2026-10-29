@@ -17,8 +17,14 @@
 .ds-text-button[data-status][data-status]:is(:hover, :focus-visible)::before,
 .ds-text-button[data-status][data-status]:is(:hover, :focus-visible)::after { color: transparent; }
 
-/* Wörter hero: as low as it gets, the title and the search field close to the nav bar and to the table below. */
-.ds-hero-block[data-fit="content"] { min-height: 0; gap: var(--ds-spacing-2); padding: var(--ds-spacing-3) var(--ds-spacing-cell); }
+/* Practice session: a slightly grey page so the answers and the feedback (white, framed) stand apart (garv,
+   2026-10-29). Light theme only, like the other apps' page fill (base-150); dark keeps dis-system's surface. */
+:root:not([data-theme="dark"]) body[data-view="session"] .wort-practice__main { background-color: var(--ds-color-base-150); }
+body[data-view="session"] .wort-review { background-color: var(--ds-color-bg-surface); }
+
+/* Wörter hero: as low as it gets; the field sits the same space (spacing-6) below the nav bar and above the divider
+   that closes the hero (garv, 2026-10-29; the divider's space to the content below is in layout.css). */
+.ds-hero-block[data-fit="content"] { min-height: 0; gap: var(--ds-spacing-2); padding: var(--ds-spacing-6) var(--ds-spacing-cell); }
 .ds-hero-block[data-fit="content"] .ds-hero-block__title { margin: 0; padding: 0; }
 .ds-hero-block[data-fit="content"] .ds-hero-block__search { margin-bottom: 0; }
 

@@ -87,7 +87,7 @@ def test_grammar_tab_topic_page_and_a_session(tmp_path, dict_path):
     c.get("/login")
     c.post("/login", data={"csrf": c.cookies.get("wort_csrf"), "name": "anna", "password": PASSWORD})
     start = c.get("/ueben?modus=grammatik").text
-    assert 'href="/ueben?neu=1&amp;modus=grammatik"' in start and 'href="/grammatik/modalverben"' in start
+    assert 'href="/ueben?modus=grammatik"' in start and 'href="/grammatik/modalverben"' in start
     page = c.get("/grammatik/modalverben").text
     assert ">Modalverben<" in page and ">möchtest<" in page and 'action="/ueben/grammatik/modalverben"' in page
     assert c.get("/grammatik/nope").status_code == 404

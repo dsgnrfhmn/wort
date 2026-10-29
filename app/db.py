@@ -15,7 +15,7 @@ from pathlib import Path
 from app import scoring
 from wort import sanitize
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 ATTEMPT_DETAILS = ("task", "expected", "corrected", "rule")
 MAX_DETAIL = 300
 
@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL UNIQUE COLLATE NOCASE,
     password_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    ui_lang TEXT NOT NULL DEFAULT 'en'
 );
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
@@ -132,6 +133,7 @@ DROP TABLE favorites_v0;
 class User:
     id: int
     name: str
+    ui_lang: str = "en"  # the interface language (app/i18n.py); words and exercises stay German
 
 
 @dataclass
@@ -222,6 +224,12 @@ class WebStore:
             if col not in cols:
                 self.conn.execute(f"ALTER TABLE attempts ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
 
+    def _migrate_v5(self) -> None:
+        """v5 -> v6: users.ui_lang, the interface language (English unless chosen)."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(users)")}
+        if "ui_lang" not in cols:
+            self.conn.execute("ALTER TABLE users ADD COLUMN ui_lang TEXT NOT NULL DEFAULT 'en'")
+
     def _migrate(self) -> None:
         version = self.conn.execute("PRAGMA user_version").fetchone()[0]
         legacy = version == 0 and self.conn.execute(
@@ -236,6 +244,8 @@ class WebStore:
             self._migrate_v1()  # v2 -> v3 and v3 -> v4 need no step: SCHEMA adds sync_tokens, grammar_attempts
         if 0 < version < 5:
             self._migrate_v4()
+        if 0 < version < 6:
+            self._migrate_v5()
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 
@@ -271,10 +281,21 @@ class WebStore:
         self.conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (_ts(now),))
         self.conn.commit()  # an open implicit transaction would keep the write lock between requests
         r = self.conn.execute(
-            "SELECT u.id, u.name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
+            "SELECT u.id, u.name, u.ui_lang FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
             (token_hash,),
         ).fetchone()
-        return User(r["id"], r["name"]) if r else None
+        return User(r["id"], r["name"], r["ui_lang"]) if r else None
+
+    def lang_for_session(self, token_hash: str) -> str | None:
+        """The interface language of a session's user (read only; expiry is checked by user_for_session)."""
+        r = self.conn.execute(
+            "SELECT u.ui_lang FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?", (token_hash,)
+        ).fetchone()
+        return r["ui_lang"] if r else None
+
+    def set_ui_lang(self, user_id: int, lang: str) -> None:
+        self.conn.execute("UPDATE users SET ui_lang = ? WHERE id = ?", (lang, user_id))
+        self.conn.commit()
 
     def delete_session(self, token_hash: str) -> None:
         self.conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
@@ -544,12 +565,31 @@ class WebStore:
                 out[r["topic"]] = (right + (r["verdict"] == "correct"), seen + 1)
         return out
 
-    def latest_practice(self, user_id: int) -> dict | None:
-        """The user's most recent practice session (its words are the current batch until a new one starts)."""
-        r = self.conn.execute(
-            "SELECT * FROM practice_sessions WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user_id,)
-        ).fetchone()
+    def latest_practice(self, user_id: int, kinds: tuple[str, ...] = (), open_only: bool = False) -> dict | None:
+        """The user's most recent practice session; `kinds`: only of these kinds; `open_only`: only an unfinished
+        one (its position before the end)."""
+        if open_only:
+            found = self.open_practices(user_id, kinds)
+            return found[0] if found else None
+        sql, args = "SELECT * FROM practice_sessions WHERE user_id = ?", [user_id]
+        if kinds:
+            sql += f" AND kind IN ({', '.join('?' * len(kinds))})"
+            args += list(kinds)
+        r = self.conn.execute(sql + " ORDER BY id DESC LIMIT 1", args).fetchone()
         return {"id": r["id"], "kind": r["kind"], "items": json.loads(r["items"]), "pos": r["pos"]} if r else None
+
+    def open_practices(self, user_id: int, kinds: tuple[str, ...] = ()) -> list[dict]:
+        """The user's unfinished sessions (of `kinds`, if given), newest first."""
+        sql, args = "SELECT * FROM practice_sessions WHERE user_id = ?", [user_id]
+        if kinds:
+            sql += f" AND kind IN ({', '.join('?' * len(kinds))})"
+            args += list(kinds)
+        out = []
+        for r in self.conn.execute(sql + " ORDER BY id DESC", args).fetchall():
+            items = json.loads(r["items"])
+            if r["pos"] < len(items):
+                out.append({"id": r["id"], "kind": r["kind"], "items": items, "pos": r["pos"]})
+        return out
 
     def save_practice(self, user_id: int, session_id: int, items: list[dict], pos: int) -> None:
         self.conn.execute(

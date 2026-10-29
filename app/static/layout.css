@@ -65,8 +65,37 @@ body { color: var(--ds-color-text-active); font-family: var(--ds-font-body-text-
 /* Üben as a chat: tasks run down the page; a task's reply (the answer, the corrected sentence, the feedback) is
    one block with no gaps; the answer input stays pinned to the bottom of the window. */
 .wort-chat { display: grid; gap: var(--ds-spacing-7); }
+/* Üben: the three modes as equal page-heads in the header (base.html). */
+.wort-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Pages with the word sidebar and the Grammatik pages run the full window width (garv, 2026-10-29). */
+body[data-layout="wide"] .wort-main { max-width: none; }
+/* A practice session (data-view="session"): the session's words in dis-system's sidebar-list, flush left under the
+   header and as high as the window below it (as in the other apps), a hairline to its right; the task column has the
+   page's padding. The column takes the list's own width, so its collapsed strip narrows it. Stacked on a narrow
+   window. */
+body[data-view="session"] .wort-main { padding: 0; }
+.wort-practice, .wort-practice__main { display: grid; gap: var(--ds-spacing-7); min-width: 0; }
+.wort-practice__main { padding: var(--ds-spacing-7) var(--ds-spacing-5); min-height: calc(100vh - var(--wort-head-h)); box-sizing: border-box; align-content: start; }
+.wort-pending { display: grid; gap: var(--ds-spacing-4); }
+.wort-pending > .wort-reply__mine { justify-self: end; }
+.wort-practice--words { grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 0; }
+/* z-index: the collapsed list opens over the page on hover (data-peek); it must lie above the task column, whose
+   messages are positioned (their tails). Below the header (z-index 4) and the side panels (3). */
+.wort-practice__words { position: sticky; top: var(--wort-head-h); height: calc(100vh - var(--wort-head-h)); display: flex; z-index: 2;
+  border-right: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-practice__words > .ds-sidebar-list { height: 100%; }
+@media (max-width: 720px) {
+  .wort-practice--words { grid-template-columns: minmax(0, 1fr); }
+  .wort-practice__words { position: static; height: auto; border-right: 0; }
+}
+.wort-feedback__actions { padding: var(--ds-spacing-3) var(--ds-spacing-cell); }
+.wort-mistake { display: grid; gap: var(--ds-spacing-3); padding: var(--ds-spacing-5) var(--ds-spacing-cell) 0; }
+.wort-mistake p { margin: 0; }
+.wort-review[hidden] { display: none; }
+.wort-reply__toggle { justify-self: end; }  /* "Show feedback" under the answer bubble */
 .wort-turn { display: grid; gap: var(--ds-spacing-4); scroll-margin-top: var(--wort-head-h); }
 .wort-reply { display: grid; gap: var(--ds-spacing-4); }
+.wort-feedback-fix { display: grid; padding: var(--ds-spacing-5) var(--ds-spacing-cell); }  /* "So wäre es richtig" under the tables */
 .wort-review { display: grid; border: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
 /* Messenger-like sides: the task on the left, the answer with its correction on the right, each at most 75% wide. */
 .wort-turn > .ds-message { justify-self: start; max-width: 75%; }
@@ -135,6 +164,10 @@ body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-t
   body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-template-columns: max-content minmax(0, 1.4fr) minmax(0, 2fr) max-content; }
 }
 
+/* Wörter page: the divider under the hero keeps the hero's own space (spacing-6, trial.css) to whatever follows; an
+   open lookup block then needs no top border of its own. */
+.wort-hero-divider { padding-bottom: var(--ds-spacing-6); }
+.wort-hero-divider + .wort-lookup { border-top: 0; }
 /* Wörter page: lookup results between the hero and the word table. */
 /* The opened lookup block runs the full page width, framed by a border above and below; its results sit
    centred, in columns of 480-560px (a forms table's reading width). */

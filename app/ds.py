@@ -20,12 +20,12 @@ COMPONENTS = [
     "dropdown-menu", "text-button", "input-dropdown", "input", "tag", "inline-mark", "message", "disclosure", "empty-state",
     "table-cell", "table-header-cell", "table-row", "table-header", "table-header-actions", "table-footer",
     "divider", "header-block", "header-tab", "page-head", "pane", "tooltip", "nav-bar", "toast", "fade-in",
-    "radio", "progress-bar",
+    "radio", "progress-bar", "sidebar-item", "sidebar-list", "context-menu", "popup",
 ]
 SCRIPTS = [
     "dropdown-menu", "text-button", "input-dropdown", "empty-state",
     "table-cell", "table-header-cell", "table-row", "header-tab", "page-head", "pane", "tooltip", "nav-bar", "toast",
-    "radio",
+    "radio", "context-menu", "popup", "sidebar-list",
 ]
 
 _SCHEME = re.compile(r"^(?:[a-z][a-z0-9+.-]*:)", re.IGNORECASE)
