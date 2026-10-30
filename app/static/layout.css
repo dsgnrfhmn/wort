@@ -155,12 +155,8 @@ body[data-view="texts"] .wort-main { padding: 0; }
 .wort-texts__empty .ds-empty-state { max-width: calc(var(--ds-spacing-9) * 10.5); }
 .wort-texts__empty .wort-row { justify-content: center; }
 .wort-text { display: grid; align-content: start; gap: var(--ds-spacing-6); padding: var(--ds-spacing-7) var(--ds-spacing-6) var(--ds-spacing-9); }
-.wort-text__photo { display: grid; justify-items: start; gap: var(--ds-spacing-3); }
-.wort-text__original { width: calc(var(--ds-spacing-9) * 8.5); max-width: 100%; }
-.wort-text__original[hidden] { display: none; }
 .wort-text__body { display: grid; gap: var(--ds-spacing-5); max-width: calc(var(--ds-spacing-9) * 19); }
 .wort-text__body p { margin: 0; }
-.wort-note[tabindex] { outline-offset: calc(-1 * var(--ds-spacing-1)); }
 /* The upload and check popups: a stack of rows; the check step has the photo at the left, the text at the right. */
 .wort-upload, .wort-check { display: grid; gap: var(--ds-spacing-5); }
 .wort-upload { gap: var(--ds-spacing-6); }
@@ -168,10 +164,24 @@ body[data-view="texts"] .wort-main { padding: 0; }
 .wort-check__cols { display: grid; grid-template-columns: minmax(0, calc(var(--ds-spacing-9) * 8.5)) minmax(0, 1fr); gap: var(--ds-spacing-7); align-items: start; }
 .wort-check__photo, .wort-check__text { display: grid; gap: var(--ds-spacing-3); min-width: 0; }
 .wort-check__text p, .wort-upload p { margin: 0; }
+.wort-translation, .wort-translation [data-translation-lines] { display: grid; gap: var(--ds-spacing-3); }
+.wort-translation p, .wort-translation [data-translation-lines] div { margin: 0; }
+.wort-translation [data-translation-lines] div { display: grid; gap: var(--ds-spacing-1); }
 @media (max-width: 720px) {
   .wort-texts { flex-direction: column; height: auto; }
-  .wort-texts__side { border-right: 0; }
-  .wort-texts__notes { flex: none; border-left: 0; }
+  .wort-texts__side { flex: none; border-right: 0; }
+  /* the list of texts: the full width, as tall as its rows up to a part of the screen, then it scrolls */
+  .wort-texts__side > .ds-sidebar-list:not([data-collapsed="true"]) { width: 100%; flex: 1 1 auto; height: auto; }
+  .wort-texts__side .ds-sidebar-list__items { flex: 0 1 auto; max-height: 40vh; }
+  /* stacked: each part is as tall as its content (a share of an auto height is none, and the text would sit under the notes) */
+  .wort-texts__reader, .wort-texts__notes { flex: none; }
+  .wort-texts__reader > .ds-pane, .wort-texts__notes > .ds-pane, .wort-texts .ds-pane__body { flex: none; }
+  .wort-texts .ds-pane__scroll { flex: none; overflow-y: visible; }
+  .wort-texts { min-width: 0; }  /* a grid item is as wide as its content unless told it may shrink */
+  .wort-texts .ds-pane__head, .wort-texts .ds-pane__heading { flex-wrap: wrap; }  /* a long title and its date wrap, the head grows with them */
+  .wort-texts .ds-pane__head { height: auto; min-height: calc(var(--ds-spacing-9) + var(--ds-spacing-5)); padding-block: var(--ds-spacing-3); }
+  .wort-texts .ds-pane__heading { white-space: normal; }
+  .wort-texts__notes { border-left: 0; }
   .wort-check__cols { grid-template-columns: minmax(0, 1fr); }
 }
 

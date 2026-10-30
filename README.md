@@ -115,7 +115,7 @@ See [Roadmap](#roadmap) below.
 
 ```bash
 git clone --recurse-submodules <repo> && cd wort     # the UI needs the dis-system submodule
-uv sync --group web
+uv sync --group web --group ocr                     # ocr: Texte reads photos; also `sudo apt install tesseract-ocr tesseract-ocr-deu`, restart the server after
 uv run wort import --file tests/fixtures/german_sample.jsonl   # 10-word test dictionary; or the full one, see CLI installation
 PYTHONPATH=.:src uv run python scripts/adduser.py NAME          # no signup: create a user (password min. 12 characters)
 WORT_INSECURE_COOKIES=1 PYTHONPATH=.:src uv run uvicorn app.main:create_app --factory --port 8000
@@ -149,9 +149,9 @@ design canvas (Wörter, Üben, Texte).
 | Üben | practice sessions, local grading (`app/practice.py`, `app/checking.py`, `app/scoring.py`) | works |
 | Üben | AI feedback (`app/ai/`) | built, off until a key is installed |
 | Üben | review queue and scheduling | planned |
-| Texte | upload validation (`app/uploads.py`: size cap, MIME + magic bytes, image deleted after OCR) | planned |
-| Texte | local OCR (`app/ocr.py`, Tesseract `deu`, uncertain spots) | planned |
-| Texte | saved texts and notes (`app/texts.py`) | planned |
+| Texte | upload validation (`app/uploads.py`: size cap, type + magic bytes, pixel cap, photo only in memory) | works, needs Pillow (`--group ocr`) |
+| Texte | local OCR (`app/ocr.py`, Tesseract `deu`, uncertain spots) and the translation preview | works with `tesseract` + `tesseract-ocr-deu` installed; photo quality not measured yet (D3) |
+| Texte | saved texts and notes (`app/texts.py`, tables `texts`, `text_words`) | works (save, edit, delete); "Paste text" not connected |
 | Dictionary | Step 0 measurements: coverage and lemmatizer (`spikes/`) | planned |
 | Server | sandbox proofs for the podman compose deploy (D00f): other services' files unreadable, egress only to the AI host | planned |
 | Server | nightly SQLite backup with a tested restore, logs, admin usage view | planned |
@@ -172,7 +172,7 @@ The design canvas has desktop screens only (1920 px). For phones:
 ## Development
 
 ```bash
-uv sync --group web                  # web tests need the web dependencies; AI tests also need --group ai (they skip otherwise)
+uv sync --group web --group ocr      # web tests need the web dependencies; photo tests need --group ocr, AI tests --group ai (they skip otherwise)
 PYTHONPATH=.:src uv run pytest
 ```
 

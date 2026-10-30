@@ -186,21 +186,32 @@ Keep README and this file in sync after each session.
   `users.ui_lang`; words and exercises stay German, the EN/UK label tooltips show with German only (DECISIONS D00j)
 - `app/importer.py`, `app/sync_app.py` — CLI export import, `POST /sync` (own process); `app/ui_terms.py` — EN/UK
   tooltips for the German button labels
-- `app/db.py` — web.db schema v7 + migrations (v5: an attempt keeps its asked form, expected answer, correction
+- `app/db.py` — web.db schema v9 + migrations (v5: an attempt keeps its asked form, expected answer, correction
   and rule, for the word detail's marked forms table and "Deine Fehler"; v7: `user_words.added_from` may be `text`,
   a word or **phrase** added while reading a text; a phrase is a row with `pos = 'phrase'` and the text as its lemma,
-  no dictionary entry, not practised in Üben yet, no checkbox in Wörter)
-- `app/texts.py` + `app/templates/texts.html` — Texte (design boards "Texte 1-5"): the UI stage with **mock texts** (fixed texts, notes
-  and recognition result; no photo is read: the dropzone's file input has no name); buttons that need the real
-  pipeline carry `data-demo` and say so; the popups (`popup` with the draft props `body_html` and link/submit actions) are opened
+  no dictionary entry, not practised in Üben yet, no checkbox in Wörter; v8: `ocr_usage`, photos per user and day; v9: `texts` (the user's saved texts: title, text, recognition percent; never
+  the photo) and `text_words` (the words added while reading a text, which make its notes))
+- `app/texts.py` + `app/templates/texts.html` — Texte (design boards "Texte 1-5"): the user's **own texts** (web.db `texts`; no mock texts any more);
+  "Paste text", "Select area / Rotate / Recognize again" carry `data-demo` and say so (the last three need the photo kept, which the upload rules forbid); the popups (`popup` with the draft props `body_html` and link/submit actions) are opened
   by app.js from the URL (`/texte/neu`, `/texte/{id}/bearbeiten`). **Real** (maintainer, 2026-10-30): every word of a text is a
   word-token (a span, so its text can be selected; its lemma comes from the dictionary, never from the browser); a click on it, "Add
   to list" on a note, or "Add to word list" in the **selection menu** (opens when text is selected: dis-system `context-menu` with
   the draft row type `note` for the translation) writes into the user's Wörter with `added_from = 'text'`; one selected word is
   added as a word, anything longer as a phrase (it must occur in the open text). A phrase is translated locally (`app/mt.py`, Argos:
   needs the optional `mt` install and its models, German → English only so far; without them the menu says so), a word from the
-  dictionary
-- `app/ocr.py` — image validation + Tesseract **[post-MVP]**, not written yet
+  dictionary.
+  **Photo → text → saved text (2026-10-30):** "Recognize text" (photo upload → `app/uploads.py` → `app/ocr.py` → the check step with the
+  recognised text, the uncertain spots marked on the photo and listed, and a **translation preview** that app.js requests paragraph by
+  paragraph from `POST /texte/neu/uebersetzung`: English, and Ukrainian where the local model exists, never a made-up line); "Save text"
+  stores the text of the field (`POST /texte/neu/speichern`, `/texte/{id}/speichern` for "Edit text"; at most 200 texts of 20 000
+  characters per user; "Delete text" after a confirmation popup, `POST /texte/{id}/loeschen`: the text and its notes go, the words it
+  added stay in the word list); the **notes** on the right are the words and phrases added from this text (a click or a selection links the
+  word to the text in `text_words`) that are still in the user's word list. Another user's text is a 404 on every route.
+- `app/uploads.py` — photo checks for Texte (size cap 20 MB before decoding, declared type, magic bytes, size in pixels, full Pillow decode,
+  EXIF turn, transparency on white; only JPG and PNG; the photo lives in memory for the request, nothing of ours writes it; a small JPEG
+  copy goes back in the check step's page); `app/ocr.py` — Tesseract `deu` through stdin/stdout (TSV: text, mean confidence, words under
+  60 % as "uncertain spots" with their place on the photo), one run at a time, 45 s limit; both need the optional `ocr` group (Pillow)
+  and the `tesseract` program, else the Texte page says "not set up"; per-user daily cap `WORT_OCR_DAILY_CAP` (default 20) in `ocr_usage`
 - `scripts/adduser.py`, `scripts/synctoken.py` — admin user and sync-token creation; `scripts/fetch_data.py` —
   downloads (the CLI never downloads); `scripts/dev.sh` — https dev server on the LAN (starts LanguageTool with it, stops it with it); `scripts/languagetool.sh` — the LanguageTool container (compose.yaml has its own service `wort-lt`)
 - `spikes/` — Step 0 measurement scripts (run on the server by the maintainer)

@@ -1,17 +1,22 @@
-"""Texte: reading texts, UI stage with mock texts.
+"""Texte: the user's saved texts, reading them, and the way from a photo to a text.
 
-Design: the "Texte 1-5" boards of the wort/design canvas (2026-10-30). The saved texts, the recognition result and the
-notes below are fixed examples: no text is read from or written to the database and no photo is read (the upload form
-sends a title only, the dropzone's file input has no name). The real pipeline (local OCR, stored texts; PLAN Step 6,
-post-MVP) replaces this data layer; the routes and templates stay.
+Design: the "Texte 1-5" boards of the wort/design canvas (2026-10-30). The texts are the user's own (web.db: `texts`,
+`text_words`; the photo is never kept, only the text the user saves).
 
-What is real is the way into the word list (maintainer decisions 2026-10-30): every word of a text is a word the reader
-can click, which adds its dictionary lemma; selecting text opens a menu with its translation and "Add to word list",
-which adds a single word as a word and anything longer as a phrase, both into the user's Wörter with added_from
-"text". The server decides what is added: a clicked word is found by its place in the text, a selection must occur in
-the open text, and no lemma ever comes from the browser. The translation of a phrase is local (Argos, app/mt.py, only
-where the optional "mt" install and its models exist; German to English only so far); a single word is glossed from
-the dictionary.
+From a photo to a text: "Recognize text" takes the photo (app/uploads.py: checked, held in memory only), reads it locally
+(app/ocr.py, Tesseract), counts it against the user's daily cap, and opens the check step with the recognised text, the
+places the recognition was unsure of, and a translation preview that app.js asks for paragraph by paragraph
+(`/texte/neu/uebersetzung`, app/mt.py, Argos: where the optional "mt" install and its models exist; none means no lines,
+never a made-up one). "Save text" stores the text as it stands in the field; "Edit text" opens the same step over a saved text;
+"Delete text" (after a confirmation) removes the text and its notes, the words it added stay in the word list.
+
+Reading: every word of a text is a word the reader can click, which adds its dictionary lemma; selecting text opens a menu
+with its translation and "Add to word list", which adds a single word as a word and anything longer as a phrase, both into
+the user's Wörter with added_from "text" (maintainer decisions 2026-10-30). The server decides what is added: a clicked word
+is found by its place in the text, a selection must occur in the open text, and no lemma ever comes from the browser. The
+translation of a phrase is local (Argos, app/mt.py; German to English only so far); a single word is glossed from the
+dictionary. The words added from a text (a click, or a selection) are linked to it (`text_words`) and make its notes: the
+right-hand list shows the ones that are still in the user's word list.
 
 The texts themselves are German in both interface languages; the dates and the labels around them follow the
 interface language (app/i18n.py).
@@ -19,47 +24,39 @@ interface language (app/i18n.py).
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
-from fastapi import Depends, Form, HTTPException, Request
+from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from app import i18n, mt
-from app.db import PHRASE, User
+from app import i18n, mt, ocr, uploads
+from app.db import MAX_TEXTS, PHRASE, StoredText, User
 from app.i18n import t
 from app.words import GLOSS_WORD, POS_LABEL, short_gloss, uk_text, v_label
 from wort import sanitize
+from wort.dictionary import grammar as g
 from wort.dictionary.lookup import Dictionary, Entry
 from wort.dictionary.ukrainian import Ukrainian
 
 MAX_TITLE = 80
-MAX_TEXT = 20_000  # characters of a pasted or recognized text we are willing to look at
+MAX_TEXT = ocr.MAX_TEXT  # characters of a pasted or recognized text we are willing to look at
+MAX_PARAGRAPH = 3_000  # characters of one paragraph sent to the translation preview (app.js asks paragraph by paragraph)
+OCR_DAILY_CAP = 20  # photos per user and day (WORT_OCR_DAILY_CAP); a starting value, not measured
 MAX_PHRASE = 300  # characters of a phrase or sentence added to the word list
 PUNCTUATION = ".,;:!?\"'()[]{}„“”‚‘’»«–—…"  # around a single selected word
 REF = re.compile(r"^(\d{1,3})-(\d{1,3})$")  # "paragraph-segment": where a word stands in a text
 
 
 @dataclass(frozen=True)
-class Card:
-    """What a word's hover card says: lemma and part of speech, translation, English, a grammar note."""
-
-    kicker: str
-    title: str
-    gloss: str = ""
-    note: str = ""
-
-
-@dataclass(frozen=True)
 class Word:
-    """A word of the text the reader can look up. state: none | noted (in the notes); "known" (in the word list) is
-    never stored here, it comes from the user's word list. lemma and pos: the dictionary entry a click adds."""
+    """A word of the text the reader can look up. lemma and pos (both given or both empty): the dictionary entry it
+    stands for, else the best match for the text as written."""
 
     text: str
-    state: str = "none"
-    card: Card | None = None
-    note: int | None = None  # index into the text's notes
     lemma: str = ""
     pos: str = ""
 
@@ -67,10 +64,10 @@ class Word:
 @dataclass(frozen=True)
 class Note:
     article: str  # der | die | das | "" (not a noun)
-    word: str  # as it stands in the text
+    word: str
     translation: str
     form: str
-    lemma: str  # the dictionary entry "Add to list" adds
+    lemma: str
     pos: str
 
     @property
@@ -83,125 +80,23 @@ class SavedText:
     id: int
     title: str
     day: date
-    recognized: int  # percent
-    paragraphs: list[list[str | Word]]
+    recognized: int | None  # percent; none for a text that did not come from a photo
+    body: str
     notes: list[Note] = field(default_factory=list)
 
     @property
+    def paragraphs(self) -> list[str]:
+        return paragraphs_of(self.body)
+
+    @property
     def plain(self) -> str:
-        return "\n\n".join("".join(s if isinstance(s, str) else s.text for s in p) for p in self.paragraphs)
+        return "\n\n".join(self.paragraphs)
 
 
-_EINREICHEN = Card("einreichen · Verb, trennbar", "подавати (документи)", "to submit, hand in",
-                   "hier: Imperativ, Sie-Form — „reichen Sie … ein“")
+def paragraphs_of(body: str) -> list[str]:
+    """The paragraphs of a text (blank lines between them), each on one line."""
+    return [" ".join(p.split()) for p in re.split(r"\n\s*\n", body) if p.strip()]
 
-
-def _w(text: str, lemma: str, pos: str, card: Card, state: str = "none", note: int | None = None) -> Word:
-    return Word(text, state, card, note, lemma, pos)
-
-
-TEXTS: list[SavedText] = [
-    SavedText(
-        1, "Brief vom Jobcenter", date(2026, 10, 21), 98,
-        [
-            ["Sehr geehrte Damen und Herren,"],
-            ["bitte ", _w("reichen", "einreichen", "verb", _EINREICHEN), " Sie die fehlenden ",
-             _w("Unterlagen", "Unterlage", "noun", Card("die Unterlagen · Nomen", "документи", "documents", "nur Plural · hier Akkusativ"), "noted", 0),
-             " bis zum 15. November ", _w("ein", "einreichen", "verb", _EINREICHEN),
-             ". Dazu gehören eine aktuelle ",
-             _w("Mietbescheinigung", "Mietbescheinigung", "noun",
-                Card("die Mietbescheinigung · Nomen", "довідка про оренду", "rent certificate", "Miete + Bescheinigung"), "noted", 1),
-             " und ein ",
-             _w("Nachweis", "Nachweis", "noun",
-                Card("der Nachweis · Nomen", "підтвердження", "proof", "Plural: die Nachweise · hier Akkusativ"), "noted", 2),
-             " über Ihre Weiterbildung."],
-            ["Ohne diese Unterlagen können wir Ihren ",
-             _w("Antrag", "Antrag", "noun", Card("der Antrag · Nomen", "заява", "application", "hier Akkusativ Singular")),
-             " leider nicht ",
-             _w("bearbeiten", "bearbeiten", "verb",
-                Card("bearbeiten · Verb", "опрацювати, розглянути", "to process, to handle", "bearbeitete · hat bearbeitet"), "noted", 3),
-             ". Bei Fragen erreichen Sie uns telefonisch oder über das Online-Portal."],
-            ["Mit freundlichen Grüßen"],
-        ],
-        [
-            Note("die", "Unterlagen", "документи · documents", "nur Plural · hier Akk. Pl.", "Unterlage", "noun"),
-            Note("die", "Mietbescheinigung", "довідка про оренду", "Miete + Bescheinigung", "Mietbescheinigung", "noun"),
-            Note("der", "Nachweis", "підтвердження · proof", "Pl. die Nachweise · hier Akk.", "Nachweis", "noun"),
-            Note("", "bearbeiten", "опрацювати, розглянути", "bearbeitete · hat bearbeitet", "bearbeiten", "verb"),
-        ],
-    ),
-    SavedText(
-        2, "Mietvertrag, § 3", date(2026, 10, 18), 95,
-        [
-            ["§ 3 Miete"],
-            ["Der ", _w("Mieter", "Mieter", "noun", Card("der Mieter · Nomen", "орендар", "tenant", "hier Nominativ Singular"), "noted", 0),
-             " verpflichtet sich, die ", _w("Miete", "Miete", "noun", Card("die Miete · Nomen", "оренда, орендна плата", "rent", "")),
-             " monatlich im Voraus, spätestens bis zum dritten ",
-             _w("Werktag", "Werktag", "noun", Card("der Werktag · Nomen", "робочий день", "working day", "Werk + Tag"), "noted", 1),
-             ", zu ", _w("entrichten", "entrichten", "verb", Card("entrichten · Verb", "сплачувати", "to pay", "formell; Zu-Infinitiv"), "noted", 2),
-             "."],
-        ],
-        [
-            Note("der", "Mieter", "орендар · tenant", "hier Nom. Sg.", "Mieter", "noun"),
-            Note("der", "Werktag", "робочий день · working day", "Werk + Tag", "Werktag", "noun"),
-            Note("", "entrichten", "сплачувати · to pay", "zu entrichten", "entrichten", "verb"),
-        ],
-    ),
-    SavedText(
-        3, "Kursplan Umschulung", date(2026, 10, 12), 91,
-        [
-            ["Die ", _w("Umschulung", "Umschulung", "noun", Card("die Umschulung · Nomen", "перекваліфікація", "retraining", ""), "noted", 0),
-             " beginnt am 4. November und dauert zwölf Monate."],
-            ["Die ", _w("Teilnahme", "Teilnahme", "noun", Card("die Teilnahme · Nomen", "участь", "participation", ""), "noted", 1),
-             " ist verpflichtend; ",
-             _w("Fehlzeiten", "Fehlzeit", "noun", Card("die Fehlzeit · Nomen", "пропуски", "absences", "meist Plural"), "noted", 2),
-             " müssen Sie schriftlich entschuldigen."],
-        ],
-        [
-            Note("die", "Umschulung", "перекваліфікація · retraining", "hier Nom. Sg.", "Umschulung", "noun"),
-            Note("die", "Teilnahme", "участь · participation", "hier Nom. Sg.", "Teilnahme", "noun"),
-            Note("die", "Fehlzeiten", "пропуски · absences", "meist Plural", "Fehlzeit", "noun"),
-        ],
-    ),
-    SavedText(
-        4, "Zeitungsartikel", date(2026, 10, 9), 87,
-        [
-            ["Die Stadt will im kommenden Jahr mehr Geld in den ",
-             _w("Nahverkehr", "Nahverkehr", "noun", Card("der Nahverkehr · Nomen", "місцеве сполучення", "local transport", ""), "noted", 0),
-             " ", _w("investieren", "investieren", "verb", Card("investieren · Verb", "інвестувати", "to invest", "investierte · hat investiert"), "noted", 1),
-             ". ", _w("Kritiker", "Kritiker", "noun", Card("der Kritiker · Nomen", "критик", "critic", "hier Nominativ Plural"), "noted", 2),
-             " ", _w("bezweifeln", "bezweifeln", "verb", Card("bezweifeln · Verb", "сумніватися", "to doubt", "bezweifelte · hat bezweifelt"), "noted", 3),
-             ", dass die Mittel ausreichen."],
-        ],
-        [
-            Note("der", "Nahverkehr", "місцеве сполучення · local transport", "", "Nahverkehr", "noun"),
-            Note("", "investieren", "інвестувати · to invest", "investierte · hat investiert", "investieren", "verb"),
-            Note("der", "Kritiker", "критик · critic", "hier Nom. Pl.", "Kritiker", "noun"),
-            Note("", "bezweifeln", "сумніватися · to doubt", "bezweifelte · hat bezweifelt", "bezweifeln", "verb"),
-        ],
-    ),
-]
-
-# What "Foto hochladen" would recognise: the text (with two slips the check step points at) and where the photo is unsure.
-RECOGNIZED_TEXT = (
-    "Sehr geehrte Damen und Herren,\n\n"
-    "bitte reichen Sie die fehlenden Unterlaqen bis zum 15. November ein. Dazu gehören eine aktuelle Mietbescheinigung "
-    "und ein Nachweis über Ihre Weiterbildung.\n\n"
-    "Ohne diese Unterlagen können wir Ihren Antrag leider nicht bearbeiten. Bei Fragen erreichen Sie uns telefonisch "
-    "oder über das Online-Portal.\n\n"
-    "Mit freundlichen Grüßen"
-)
-RECOGNIZED_PERCENT = 98
-DOUBTS = [
-    {"found": "Unterlaqen", "proposal": "Unterlagen", "line": 4, "sure": 61, "state": "open"},
-    {"found": "Mietbescheiniqung", "proposal": "Mietbescheinigung", "line": 6, "sure": None, "state": "accepted"},
-]
-# Percent of the photo (the placeholder page of dis-system's image-regions): where the recognition was unsure (line 4)
-# and where a correction was accepted (line 6).
-REGIONS = [
-    {"x": 48, "y": 11.2, "w": 24, "h": 3.2, "kind": "uncertain", "label": "Unterlaqen"},
-    {"x": 27, "y": 15.7, "w": 31, "h": 3.2, "kind": "accepted", "label": "Mietbescheinigung"},
-]
 
 _MONTHS = {
     "en": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -222,31 +117,27 @@ def notes_label(n: int) -> str:
     return t("1 note") if n == 1 else t("{n} notes", n=n)
 
 
-def side_items(current_id: int | None) -> list[dict]:
+def side_items(rows: list[StoredText], current_id: int | None) -> list[dict]:
     """The saved texts for dis-system's sidebar-list: title, date and note count, the open one active."""
-    return [{"name": x.title, "caption": f"{long_date(x.day)} · {notes_label(len(x.notes))}", "href": f"/texte/{x.id}",
-             "active": x.id == current_id, "save": False} for x in TEXTS]
+    return [{"name": x.title, "caption": f"{long_date(x.created_at.date())} · {notes_label(x.notes)}", "href": f"/texte/{x.id}",
+             "active": x.id == current_id, "save": False} for x in rows]
 
 
-def expand(paragraphs: list[list[str | Word]]) -> list[list[str | Word]]:
-    """The text as the reader sees it: every word of a plain string becomes a Word of its own (no lemma: it is resolved
-    from the dictionary), the words the text's author marked up stay as they are. A "paragraph-segment" ref (the place
-    a click names) counts in this expanded list."""
+def expand(paragraphs: list[str]) -> list[list[str | Word]]:
+    """The text as the reader sees it: every word of a paragraph becomes a Word of its own (no lemma: it is resolved from
+    the dictionary), the text between them stays a string. A "paragraph-segment" ref (the place a click names) counts in
+    this expanded list."""
     out = []
     for paragraph in paragraphs:
         items: list[str | Word] = []
-        for seg in paragraph:
-            if isinstance(seg, Word):
-                items.append(seg)
-                continue
-            at = 0
-            for m in GLOSS_WORD.finditer(seg):
-                if m.start() > at:
-                    items.append(seg[at:m.start()])
-                items.append(Word(m.group(0)))
-                at = m.end()
-            if at < len(seg):
-                items.append(seg[at:])
+        at = 0
+        for m in GLOSS_WORD.finditer(paragraph):
+            if m.start() > at:
+                items.append(paragraph[at:m.start()])
+            items.append(Word(m.group(0)))
+            at = m.end()
+        if at < len(paragraph):
+            items.append(paragraph[at:])
         out.append(items)
     return out
 
@@ -259,7 +150,7 @@ class Reader:
         self._entries: dict[tuple[str, str, str], Entry | None] = {}
 
     def entry(self, word: Word) -> Entry | None:
-        """The dictionary entry of a word: the one its author named, else the best match for the word as written
+        """The dictionary entry of a word: the one named by its lemma, else the best match for the word as written
         (an inflected form finds its lemma)."""
         if self.dic is None:
             return None
@@ -275,10 +166,8 @@ class Reader:
     def known(self, entry: Entry | None) -> bool:
         return entry is not None and (entry.lemma, entry.pos) in self.have
 
-    def card(self, word: Word, entry: Entry | None) -> dict | None:
-        """The hover card: the author's own, else the dictionary's lemma, part of speech and glosses; none without either."""
-        if word.card:
-            return {"kicker": word.card.kicker, "title": word.card.title, "gloss": word.card.gloss, "note": word.card.note}
+    def card(self, entry: Entry | None) -> dict | None:
+        """The hover card: the dictionary's lemma, part of speech and glosses; none for a word it does not have."""
         if entry is None:
             return None
         en = short_gloss(entry.glosses)
@@ -300,19 +189,34 @@ def reading(found: SavedText, reader: Reader) -> tuple[list[list[dict]], set[str
             ref = f"{pi}-{si}"
             if reader.known(entry):
                 known.add(ref)
-            items.append({"word": True, "ref": ref, "text": seg.text, "card": reader.card(seg, entry),
-                          "state": "known" if ref in known else seg.state})
+            items.append({"word": True, "ref": ref, "text": seg.text, "card": reader.card(entry),
+                          "state": "known" if ref in known else "none"})
         paragraphs.append(items)
     return paragraphs, known
 
 
-def known_notes(found: SavedText, reader: Reader) -> set[int]:
-    return {i for i, n in enumerate(found.notes) if reader.known(reader.entry(Word(n.word, lemma=n.lemma, pos=n.pos)))}
+def notes_of(linked: list[tuple[str, str]], reader: Reader) -> list[Note]:
+    """The notes of a text: the words added from it that are still in the word list, as the dictionary describes them
+    (a phrase has only its text)."""
+    notes = []
+    for lemma, pos in linked:
+        entry = None if pos == PHRASE else reader.entry(Word(lemma, lemma=lemma, pos=pos))
+        if entry is None:
+            notes.append(Note("", lemma, "", "", lemma, pos))
+            continue
+        card = reader.card(entry)
+        article = g.ARTICLES[entry.gender]["nominative"] if entry.pos == "noun" and entry.gender in g.ARTICLES else ""
+        notes.append(Note(article, entry.lemma, " · ".join(x for x in (card["title"], card["gloss"]) if x), "", entry.lemma,
+                          entry.pos))
+    return notes
 
 
 def register(app, ctx) -> None:
     current_user = ctx.current_user
     store = ctx.store
+    ocr_cap = int(os.environ.get("WORT_OCR_DAILY_CAP", OCR_DAILY_CAP))
+    if ocr_cap < 1:
+        raise ValueError("WORT_OCR_DAILY_CAP must be at least 1")
 
     def dictionary_or_none() -> Dictionary | None:
         try:
@@ -329,22 +233,30 @@ def register(app, ctx) -> None:
     def reader_for(user: User) -> Reader:
         return Reader(dictionary_or_none(), ukrainian_or_none(), {(w.lemma, w.pos) for w in store.words(user.id)})
 
-    def find(text_id: int) -> SavedText:
-        found = next((x for x in TEXTS if x.id == text_id), None)
-        if found is None:
+    def stored(user: User, text_id: int) -> StoredText:
+        """The user's own text; another user's, or none, is a 404 (the same answer for both)."""
+        row = store.text(user.id, text_id)
+        if row is None:
             raise HTTPException(404, "no such text")
-        return found
+        return row
 
-    def page(request: Request, user: User, current: SavedText | None = None, popup: str = "", status: int = 200,
+    def saved(row: StoredText, notes: list[Note] | None = None) -> SavedText:
+        return SavedText(row.id, row.title, row.created_at.date(), row.recognized, row.body, notes or [])
+
+    def find(user: User, text_id: int) -> SavedText:
+        return saved(stored(user, text_id))
+
+    def page(request: Request, user: User, row: StoredText | None = None, popup: str = "", status: int = 200,
              **extra) -> HTMLResponse:
-        paragraphs, notes = [], set()
-        if current:
+        extra.setdefault("upload_title", "")  # what to put back in the upload step's title field after a refusal
+        current, paragraphs = None, []
+        if row:
             reader = reader_for(user)
+            current = saved(row, notes_of(store.text_notes(user.id, row.id), reader))
             paragraphs, _ = reading(current, reader)
-            notes = known_notes(current, reader)
-        return ctx.render(request, "texts.html", status=status, user=user, page="texts", current=current, popup=popup,
-                          texts=TEXTS, side_items=side_items(current.id if current else None), long_date=long_date,
-                          notes_label=notes_label, paragraphs=paragraphs, known_notes=notes, **extra)
+        return ctx.render(request, "texts.html", status=status, user=user, page="texts", open_text=current, popup=popup,  # not "current": text-button reads that and marks every button aria-current
+                          side_items=side_items(store.texts(user.id), row.id if row else None), long_date=long_date,
+                          notes_label=notes_label, paragraphs=paragraphs, ocr_ready=ocr.available(), **extra)
 
     @app.get("/texte", response_class=HTMLResponse)
     def texts(request: Request, user: User = Depends(current_user)):
@@ -355,96 +267,171 @@ def register(app, ctx) -> None:
         return page(request, user, popup="upload")
 
     @app.post("/texte/neu", response_class=HTMLResponse)
-    def recognise(request: Request, csrf: str = Form(...), title: str = Form(""), user: User = Depends(current_user)):
-        """Mock: the check step with the canned recognition result, whatever photo was chosen (none is sent)."""
+    async def recognise(request: Request, csrf: str = Form(...), title: str = Form(""), photo: UploadFile | None = File(None),
+                        user: User = Depends(current_user)):
+        """"Recognize text": the photo is checked (app/uploads.py), read locally (app/ocr.py) and the check step opens with
+        what was read. The photo is held in memory for this request only (the server may spool a large upload to an
+        unnamed temporary file of /tmp, a tmpfs in the container, which is gone when the request ends). Every way it can
+        fail goes back to the upload step with a message, never a stack trace, never a part of the file."""
         ctx.verify_csrf(request, csrf)
-        title = sanitize.text(title, MAX_TITLE) or t("Untitled")
-        words = len(RECOGNIZED_TEXT.split())
-        return page(request, user, popup="check", new_title=title, recognized_text=RECOGNIZED_TEXT, doubts=DOUBTS,
-                    regions=REGIONS, recognized=RECOGNIZED_PERCENT, word_count=words)
+        typed = sanitize.text(title, MAX_TITLE)
+        title = typed or t("Untitled")
+        day = datetime.now().date().isoformat()
+
+        def back(message: str, status: int) -> HTMLResponse:
+            return page(request, user, popup="upload", status=status, message=message, message_status="error",
+                        upload_title=typed)
+
+        try:
+            if not ocr.available():
+                return back(t("Text recognition is not set up on this server."), 503)
+            if store.ocr_uploads_today(user.id, day) >= ocr_cap:
+                return back(t("The daily limit for photos is reached ({n}). Try again tomorrow.", n=ocr_cap), 429)
+            if photo is None:
+                return back(t("Choose a photo first."), 400)
+            try:
+                raw = await photo.read(uploads.MAX_BYTES + 1)
+            finally:
+                await photo.close()
+            image = await run_in_threadpool(uploads.read_image, raw, photo.content_type or "")
+            store.ocr_count_upload(user.id, day)  # from here on the recognition costs CPU: a failed one counts too
+            found = await run_in_threadpool(ocr.recognize, image)
+            shown = await run_in_threadpool(uploads.thumbnail, image)
+        except (uploads.UploadRejected, ocr.OcrFailed) as e:
+            return back(e.message, e.status)
+        if not found.text:
+            return back(t("No text was found in the photo. Try a sharper photo with the text filling more of it."), 422)
+        return page(request, user, popup="check", new_title=title, recognized_text=found.text, doubts=list(found.doubts),
+                    regions=[d.region for d in found.doubts], recognized=found.percent, word_count=len(found.text.split()),
+                    photo=shown)
+
+    @app.post("/texte/neu/uebersetzung")
+    async def preview(request: Request, csrf: str = Form(...), text: str = Form(""), user: User = Depends(current_user)):
+        """The check step's translation preview, one paragraph per request (app.js sends them one after the other, so the
+        first lines appear at once and no request outlasts the web server's timeout). English, and Ukrainian where the
+        local translator has it; no model means no lines and a message, never a made-up translation."""
+        ctx.verify_csrf(request, csrf)
+        paragraph = sanitize.text(text, MAX_PARAGRAPH + 1)
+        if len(paragraph) > MAX_PARAGRAPH:
+            raise HTTPException(400, t("A paragraph can have at most {n} characters.", n=MAX_PARAGRAPH))
+        if not paragraph:
+            return JSONResponse({"lines": [], "message": ""})
+        try:
+            english = await run_in_threadpool(mt.paragraph, paragraph, "en")
+            ukrainian = await run_in_threadpool(mt.paragraph, paragraph, "uk") if english else ""  # uk goes through English
+        except mt.Busy:
+            return JSONResponse({"lines": [], "message": t("The translator is busy. Try again in a moment.")}, status_code=503)
+        lines = [{"lang": lang, "text": done} for lang, done in (("en", english), ("uk", ukrainian)) if done]
+        return JSONResponse({"lines": lines, "message": "" if lines else t("No translation available here.")})
+
+    # --- saving ----------------------------------------------------------------------------------------------------
+
+    def check_again(request: Request, user: User, message: str, status: int, title: str, text: str, percent: int | None,
+                    row: StoredText | None = None) -> HTMLResponse:
+        """A save that cannot be done goes back to the check step with the text the user wrote, and says why."""
+        text = sanitize.text(text, MAX_TEXT, multiline=True)
+        return page(request, user, row, popup="check", status=status, message=message, message_status="error",
+                    new_title=title, recognized_text=text, doubts=[], regions=[], recognized=percent,
+                    word_count=len(text.split()), editing=row is not None)
+
+    def percent_of(value: str) -> int | None:
+        return int(value) if value.isdigit() and int(value) <= 100 else None
+
+    def body_of(text: str) -> str:
+        """The text as saved: cleaned (multi-line), paragraphs separated by one blank line; "" when there is none or too much."""
+        body = "\n\n".join(paragraphs_of(sanitize.text(text, MAX_TEXT + 1, multiline=True)))
+        return body if len(body) <= MAX_TEXT else ""
 
     @app.post("/texte/neu/speichern")
-    def save(request: Request, csrf: str = Form(...), text: str = Form(""), user: User = Depends(current_user)):
-        """Mock: the text is looked at (size, characters) and dropped; nothing is stored."""
+    def save(request: Request, csrf: str = Form(...), text: str = Form(""), title: str = Form(""), recognized: str = Form(""),
+             user: User = Depends(current_user)):
+        """"Save text" after a photo: the text of the field, under the title of the upload step."""
         ctx.verify_csrf(request, csrf)
+        name = sanitize.text(title, MAX_TITLE) or t("Untitled")
+        percent = percent_of(recognized)
         if len(sanitize.text(text, MAX_TEXT + 1, multiline=True)) > MAX_TEXT:
-            raise HTTPException(400, f"a text is limited to {MAX_TEXT} characters")
-        return ctx.redirect(f"/texte/{TEXTS[0].id}", t("Demo data: nothing was saved."))
+            return check_again(request, user, t("A text can have at most {n} characters.", n=MAX_TEXT), 400, name, text, percent)
+        body = body_of(text)
+        if not body:
+            return check_again(request, user, t("The text is empty."), 400, name, text, percent)
+        if store.text_count(user.id) >= MAX_TEXTS:
+            return check_again(request, user, t("You can keep at most {n} texts.", n=MAX_TEXTS), 400, name, text, percent)
+        return ctx.redirect(f"/texte/{store.add_text(user.id, name, body, percent)}", t("Text saved."))
 
     @app.get("/texte/{text_id:int}", response_class=HTMLResponse)
     def show(request: Request, text_id: int, user: User = Depends(current_user)):
-        return page(request, user, current=find(text_id))
+        return page(request, user, stored(user, text_id))
 
     @app.get("/texte/{text_id:int}/bearbeiten", response_class=HTMLResponse)
     def edit(request: Request, text_id: int, user: User = Depends(current_user)):
-        """Mock: "Text bearbeiten" opens the check step over the open text, with that text and no photo marks."""
-        found = find(text_id)
-        return page(request, user, current=found, popup="check", new_title=found.title, recognized_text=found.plain,
-                    doubts=[], regions=[], recognized=found.recognized, word_count=len(found.plain.split()), editing=True)
+        """"Text bearbeiten" opens the check step over a saved text, with its translation preview and no photo marks."""
+        row = stored(user, text_id)
+        return page(request, user, row, popup="check", new_title=row.title, recognized_text=saved(row).plain, doubts=[],
+                    regions=[], recognized=row.recognized, word_count=len(row.body.split()), editing=True)
+
+    @app.post("/texte/{text_id:int}/speichern")
+    def save_edit(request: Request, text_id: int, csrf: str = Form(...), text: str = Form(""),
+                  user: User = Depends(current_user)):
+        """"Save text" after "Edit text": the text of the field replaces the saved one (the title stays)."""
+        ctx.verify_csrf(request, csrf)
+        row = stored(user, text_id)
+        if len(sanitize.text(text, MAX_TEXT + 1, multiline=True)) > MAX_TEXT:
+            return check_again(request, user, t("A text can have at most {n} characters.", n=MAX_TEXT), 400, row.title, text,
+                               row.recognized, row)
+        body = body_of(text)
+        if not body:
+            return check_again(request, user, t("The text is empty."), 400, row.title, text, row.recognized, row)
+        store.update_text(user.id, row.id, row.title, body)
+        return ctx.redirect(f"/texte/{row.id}", t("Text saved."))
+
+    @app.post("/texte/{text_id:int}/loeschen")
+    def delete(request: Request, text_id: int, csrf: str = Form(...), user: User = Depends(current_user)):
+        """"Delete text" after its confirmation: the text and its notes go, the words stay in the word list."""
+        ctx.verify_csrf(request, csrf)
+        row = stored(user, text_id)
+        store.delete_text(user.id, row.id)
+        return ctx.redirect("/texte", t("“{title}” was deleted.", title=row.title))
 
     # --- into the word list ---------------------------------------------------------------------------------------
 
-    def entries_of(found: SavedText, reader: Reader, ref: str, note: str) -> list[Entry | None]:
-        """The dictionary entries a click means. Found by place in the text, never by browser text."""
-        if ref:
-            m = REF.match(ref)
-            paragraphs = expand(found.paragraphs)
-            try:
-                seg = paragraphs[int(m.group(1))][int(m.group(2))] if m else None
-            except IndexError:
-                seg = None
-            if not isinstance(seg, Word):
-                raise HTTPException(400, "no such word")
-            return [reader.entry(seg)]
-        notes = [Word(n.word, lemma=n.lemma, pos=n.pos) for n in found.notes]
-        if note == "all":
-            return [reader.entry(w) for w in notes]
-        if note.isdigit() and int(note) < len(notes):
-            return [reader.entry(notes[int(note)])]
-        raise HTTPException(400, "no such word")
+    def entry_at(found: SavedText, reader: Reader, ref: str) -> Entry | None:
+        """The dictionary entry a click means. Found by place in the text, never by browser text."""
+        m = REF.match(ref)
+        paragraphs = expand(found.paragraphs)
+        try:
+            seg = paragraphs[int(m.group(1))][int(m.group(2))] if m else None
+        except IndexError:
+            seg = None
+        if not isinstance(seg, Word):
+            raise HTTPException(400, "no such word")
+        return reader.entry(seg)
 
     def marks(found: SavedText, user: User) -> dict:
-        """What is in the user's word list now, for the page to mark: words as "paragraph-segment", notes by index."""
-        reader = reader_for(user)
-        _, refs = reading(found, reader)
-        return {"refs": sorted(refs), "notes": sorted(known_notes(found, reader))}
+        """What is in the user's word list now, for the page to mark: the places of its words, as "paragraph-segment"."""
+        _, refs = reading(found, reader_for(user))
+        return {"refs": sorted(refs)}
 
-    def add_entries(user: User, entries: list[Entry | None]) -> tuple[str, str]:
-        """Add dictionary entries to the word list as "from a text"; (status, message) for the toast."""
-        added = existing = missing = 0
-        label = ""
-        seen: set[int] = set()  # two words of one text can be the same entry
-        for entry in entries:
-            if entry is None:
-                missing += 1
-            elif entry.id in seen:
-                continue
-            elif store.add_word(user.id, entry.lemma, entry.pos, added_from="text"):
-                seen.add(entry.id)
-                added, label = added + 1, v_label(entry)
-            else:
-                seen.add(entry.id)
-                existing, label = existing + 1, v_label(entry)
-        status = "added" if added else "exists" if existing else "missing"
-        if len(entries) == 1:
-            return status, {"added": t("“{word}” is now in your words.", word=label),
-                            "exists": t("“{word}” is already in your words.", word=label),
-                            "missing": t("This word is not in the dictionary.")}[status]
-        return status, " · ".join(x for x in (t("{n} added to your words.", n=added) if added else "",
-                                              t("{n} already in your words.", n=existing) if existing else "",
-                                              t("{n} not in the dictionary.", n=missing) if missing else "") if x)
+    def add_entry(user: User, text_id: int, entry: Entry | None) -> tuple[str, str]:
+        """Add a dictionary entry to the word list as "from a text" and note it for this text; (status, message) for the toast."""
+        if entry is None:
+            return "missing", t("This word is not in the dictionary.")
+        added = store.add_word(user.id, entry.lemma, entry.pos, added_from="text")
+        store.link_text_word(user.id, text_id, entry.lemma, entry.pos)  # a word the user already had counts as noted too
+        if added:
+            return "added", t("“{word}” is now in your words.", word=v_label(entry))
+        return "exists", t("“{word}” is already in your words.", word=v_label(entry))
 
     @app.post("/texte/{text_id:int}/wort")
-    def add_word(request: Request, text_id: int, csrf: str = Form(...), ref: str = Form(""), note: str = Form(""),
+    def add_word(request: Request, text_id: int, csrf: str = Form(...), ref: str = Form(""),
                  user: User = Depends(current_user)):
-        """A click on any word of the text, or "Add to list" / "All to the word list" on the notes: into the word list."""
+        """A click on any word of the text: into the word list, and into this text's notes."""
         ctx.verify_csrf(request, csrf)
-        found = find(text_id)
+        found = find(user, text_id)
         reader = reader_for(user)
         if reader.dic is None:
             return JSONResponse({"status": "missing", "message": t("No dictionary found: import the dictionary first."),
-                                 "refs": [], "notes": []})
-        status, message = add_entries(user, entries_of(found, reader, ref, note))
+                                 "refs": []})
+        status, message = add_entry(user, text_id, entry_at(found, reader, ref))
         return JSONResponse({"status": status, "message": message, **marks(found, user)})
 
     def selection_of(found: SavedText, text: str) -> str:
@@ -462,16 +449,17 @@ def register(app, ctx) -> None:
                       user: User = Depends(current_user)):
         """"Add to word list" in the selection menu: one word is added as a word, anything longer as a phrase."""
         ctx.verify_csrf(request, csrf)
-        found = find(text_id)
+        found = find(user, text_id)
         phrase = selection_of(found, text)
         if len(phrase.split()) == 1:
             reader = reader_for(user)
             bare = phrase.strip(PUNCTUATION)
-            entry = reader.entry(Word(bare)) if bare else None
-            status, message = add_entries(user, [entry])
+            status, message = add_entry(user, text_id, reader.entry(Word(bare)) if bare else None)
             return JSONResponse({"status": status, "message": message, **marks(found, user)})
         shown = phrase if len(phrase) <= 60 else phrase[:57] + "…"
-        if store.add_word(user.id, phrase, PHRASE, added_from="text"):
+        added = store.add_word(user.id, phrase, PHRASE, added_from="text")
+        store.link_text_word(user.id, text_id, phrase, PHRASE)
+        if added:
             return JSONResponse({"status": "added", "message": t("“{phrase}” is now in your words as a phrase.", phrase=shown),
                                  **marks(found, user)})
         return JSONResponse({"status": "exists", "message": t("“{word}” is already in your words.", word=shown),
@@ -483,11 +471,11 @@ def register(app, ctx) -> None:
         """The selection menu's translation: a word from the dictionary, a phrase from the local translator (Argos,
         app/mt.py; none installed here means no lines, never a made-up one)."""
         ctx.verify_csrf(request, csrf)
-        phrase = selection_of(find(text_id), text)
+        phrase = selection_of(find(user, text_id), text)
         if len(phrase.split()) == 1:
             reader = reader_for(user)
             entry = reader.entry(Word(phrase.strip(PUNCTUATION))) if phrase.strip(PUNCTUATION) else None
-            card = reader.card(Word(phrase), entry)
+            card = reader.card(entry)
             if entry is None or card is None:
                 return JSONResponse({"kind": "word", "lines": [], "message": t("This word is not in the dictionary.")})
             return JSONResponse({"kind": "word", "lines": [card["kicker"].split(" · ")[0],

@@ -28,6 +28,9 @@ web = [
 mt = [
     "argostranslate>=1.9",
 ]
+ocr = [
+    "Pillow>=10",
+]
 ai = [
     "anthropic>=1",
 ]

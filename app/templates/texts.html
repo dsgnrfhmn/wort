@@ -1,23 +1,26 @@
 {% extends "base.html" %}
-{% block title %}{{ current.title if current else _('Texts') }} · wort{% endblock %}
+{% block title %}{{ open_text.title if open_text else _('Texts') }} · wort{% endblock %}
 {% block body_attrs %} data-layout="wide" data-view="texts"{% endblock %}
 
-{# Texte (design canvas wort/design, boards "Texte 1-5"), UI stage with mock data (app/texts.py). Three columns: the saved
-   texts (dis-system sidebar-list), the open text with words the reader can look up (word-token), and the notes made
-   while reading (note-item). "Foto hochladen" and "Text prüfen" are popups over the page: the page behind them is the
-   same page, opened by app.js on load (the [data-autoopen] button) when the URL asks for it. Buttons that need the
-   real pipeline carry [data-demo]: app.js answers them with a message instead of doing nothing. A click on a word,
-   "Add to list" on a note and a selection put things into the user's word list (app/texts.py, app.js). #}
+{# Texte (design canvas wort/design, boards "Texte 1-5"), the user's own texts (app/texts.py). Three columns: the saved
+   texts (dis-system sidebar-list), the open text with words the reader can look up (word-token), and the notes: the words
+   added from this text (note-item). "Foto hochladen" and "Text prüfen" are popups over the page: the page behind them is the
+   same page, opened by app.js on load (the [data-autoopen] button) when the URL asks for it. The upload is real: the photo
+   is read on the server (app/ocr.py) and the check step shows what was read, the places it was unsure of and a translation
+   preview that app.js fills paragraph by paragraph; "Save text" stores the text. Buttons that need more than that carry
+   [data-demo]: app.js answers them with a message instead of doing nothing. A click on a word and a selection put things
+   into the user's word list and into this text's notes (app/texts.py, app.js). #}
 
-{# The upload popup (board "Texte 2"). The dropzone's file input has no name on purpose: in this stage no photo is sent. #}
+{# The upload popup (board "Texte 2"). Only JPG and PNG: a phone converts its own format (HEIC) when the field names no other. #}
 {% macro upload_popup(popup) %}
   {% set body_html %}
-  <form class="wort-upload" id="wort-upload-form" method="post" action="/texte/neu">
+  <form class="wort-upload" id="wort-upload-form" method="post" action="/texte/neu" enctype="multipart/form-data">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% with steps=[_('Photo'), _('Check text'), _('Done')], current=1, label=_('Steps') %}{% include "components/stepper/template.html" %}{% endwith %}
-    {% with id='wort-upload-file', name='', accept='image/jpeg,image/png,image/heic', prompt=_('Drop a photo here or'), choose_label=_('choose a file'), hint=_('JPG, PNG or HEIC · up to 20 MB · one photo per text'), remove_label=_('Remove') %}{% include "components/dropzone/template.html" %}{% endwith %}
-    {% with type='text', name='title', label=_('Title'), fill='filled', placeholder=_('Title, e.g. Letter from the Jobcenter'), autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
-    <p>{{ _('The photo stays on your server. Text recognition runs locally.') }}</p>
+    {% with id='wort-upload-file', name='photo', required=true, accept='image/jpeg,image/png', prompt=_('Drop a photo here or'), choose_label=_('choose a file'), hint=_('JPG or PNG · up to 20 MB · one photo per text'), remove_label=_('Remove') %}{% include "components/dropzone/template.html" %}{% endwith %}
+    {% with type='text', name='title', label=_('Title'), fill='filled', value=upload_title, placeholder=_('Title, e.g. Letter from the Jobcenter'), autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+    <p>{{ _('The photo is read on your server and not stored. Text recognition runs locally.') }}</p>
+    {% if not ocr_ready %}<p role="note">{{ _('Text recognition is not set up on this server.') }}</p>{% endif %}
   </form>
   {% endset %}
   {% set cancel = {'label': _('Cancel'), 'href': '/texte'} if popup == 'upload' else {'label': _('Cancel')} %}
@@ -29,20 +32,22 @@
    per uncertain place. Also what "Text bearbeiten" opens, with the open text and no photo marks. #}
 {% macro check_popup() %}
   {% set body_html %}
-  <form class="wort-check" id="wort-check-form" method="post" action="/texte/neu/speichern">
+  <form class="wort-check" id="wort-check-form" method="post" action="{{ ('/texte/' ~ open_text.id ~ '/speichern') if editing else '/texte/neu/speichern' }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if not editing %}<input type="hidden" name="title" value="{{ new_title }}"><input type="hidden" name="recognized" value="{{ recognized if recognized is not none else '' }}">{% endif %}
     {% if not editing %}
     <div class="wort-row wort-check__status">
       {% with steps=[_('Photo'), _('Check text'), _('Done')], current=2, label=_('Steps') %}{% include "components/stepper/template.html" %}{% endwith %}
       <span class="wort-row">
-        {% with type='neutral', subtype='passive', label=_('Recognized · {p} % · {n} words', p=recognized, n=word_count) %}{% include "components/tag/template.html" %}{% endwith %}
+        {% if recognized is not none %}{% with type='neutral', subtype='passive', label=_('Recognized · {p} % · {n} words', p=recognized, n=word_count) %}{% include "components/tag/template.html" %}{% endwith %}{% endif %}
         {% if doubts %}{% with type='warning', subtype='passive', label=_('1 uncertain spot') if doubts | length == 1 else _('{n} uncertain spots', n=doubts | length) %}{% include "components/tag/template.html" %}{% endwith %}{% endif %}
       </span>
     </div>
     {% with value=100, label=_('Text recognition') %}{% include "components/progress-bar/template.html" %}{% endwith %}
     {% endif %}
     <div class="wort-check__cols">
-      <div class="wort-check__photo">
+      <div class="wort-check__photo"{% if photo %} data-photo="{{ photo }}" data-photo-alt="{{ _('Photo of the text') }}"{% endif %}>
+        {# The photo itself is a small copy sent with this page (app/uploads.py: thumbnail); app.js puts it into the frame. #}
         {% with label=_('Photo of the text'), regions=regions %}{% include "components/image-regions/template.html" %}{% endwith %}
         <div class="wort-row">
           {% for name in (_('Select area'), _('Rotate'), _('Recognize again')) %}
@@ -56,40 +61,43 @@
         {% if doubts %}
         <section class="wort-check__doubts" aria-label="{{ _('Uncertain spots') }}">
           {% with type='title-info', title=_('Uncertain spots'), info='' %}{% include "components/table-header/template.html" %}{% endwith %}
-          {% for d in doubts %}
-          {% with found=d.found, proposal=d.proposal, state=d.state, meta=_('Line {n} · {p} % sure', n=d.line, p=d.sure) if d.sure else _('Line {n}', n=d.line),
-                  ignore_label=_('Ignore'), accept_label=_('Accept'), accepted_label=_('accepted'), ignored_label=_('ignored'),
-                  extra_attrs='data-demo', ignore_extra_attrs='data-demo' %}{% include "components/correction-row/template.html" %}{% endwith %}
-          {% endfor %}
+          <p>{{ _('The photo marks where the recognition was unsure. Check these words in the text.') }}</p>
+          <div class="wort-row">
+            {% for d in doubts %}{% with type='warning', subtype='passive', label=_('{word} · line {n} · {p} % sure', word=d.found, n=d.line, p=d.sure) %}{% include "components/tag/template.html" %}{% endwith %}{% endfor %}
+          </div>
         </section>
         {% endif %}
+        {# The translation preview: app.js sends the text paragraph by paragraph to /texte/neu/uebersetzung and writes the lines it gets back. #}
+        {% set preview_html %}
+        <div class="wort-translation" data-translation>
+          <p data-translation-status role="status">{{ _('Translating …') }}</p>
+          <div data-translation-lines aria-live="polite"></div>
+          <div class="wort-row">
+            {% with priority='secondary', underline='dotted', label=_('Update translation'), extra_attrs='data-translation-update' %}{% include "components/text-button/template.html" %}{% endwith %}
+          </div>
+        </div>
+        {% endset %}
+        {% with title=_('Translation (preview)'), caption=_('English, Ukrainian where available'), open=true, body_html=preview_html %}{% include "components/disclosure/template.html" %}{% endwith %}
       </div>
     </div>
   </form>
   {% endset %}
-  {% set back = {'label': _('Cancel'), 'href': '/texte/' ~ current.id} if editing else {'label': _('Back'), 'href': '/texte/neu'} %}
+  {% set back = {'label': _('Cancel'), 'href': '/texte/' ~ open_text.id} if editing else {'label': _('Back'), 'href': '/texte/neu'} %}
   {% with popup_id='wort-texts-check', size='large', backdrop='static', title=(_('Edit text — {title}', title=new_title) if editing else _('Check text — {title}', title=new_title)),
           closable=true, body_html=body_html,
           bottom_actions=[back, {'label': _('Save text'), 'priority': 'primary', 'form': 'wort-check-form', 'confirm': true}] %}{% include "components/popup/template.html" %}{% endwith %}
 {% endmacro %}
 
 {% block content %}
-<div class="ds-split wort-texts"{% if current %} data-text-id="{{ current.id }}"{% endif %}>
+<div class="ds-split wort-texts"{% if open_text %} data-text-id="{{ open_text.id }}"{% endif %}>
   <div class="wort-texts__side">
     {% with title=_('Texts'), label=_('Saved texts'), items=side_items, create=_('Upload photo') %}{% include "components/sidebar-list/template.html" %}{% endwith %}
   </div>
 
   <div class="wort-texts__reader">
-  {% if current %}
+  {% if open_text %}
     {% set body_html %}
     <div class="wort-text">
-      {# The photo behind the text, closed until "Show original": the page placeholder of image-regions is a 440px portrait page, not a thumbnail. #}
-      <div class="wort-text__photo" data-original>
-        {% with priority='secondary', underline='dotted', label=_('Show original'), extra_attrs='data-original-toggle' %}{% include "components/text-button/template.html" %}{% endwith %}
-        <div class="wort-text__original" data-original-view hidden>
-          {% with label=_('Photo of the text'), regions=[] %}{% include "components/image-regions/template.html" %}{% endwith %}
-        </div>
-      </div>
       <div class="wort-text__body">
         {# Every word of the text is a word-token (app/texts.py: expand, reading), as a span (interactive=false): the text of a
            <button> cannot be selected with the mouse, and selecting is how a phrase is added. app.js handles the click and the
@@ -100,11 +108,14 @@
               extra_attrs='role="button" data-ref="' ~ seg.ref ~ '"' %}{% include "components/word-token/template.html" %}{% endwith %}{% endfilter %}{% endif %}{% endfor %}</p>
         {% endfor %}
       </div>
-      {% with mode='legend', legend=[{'state': 'noted', 'sample': _('Word'), 'label': _('in notes')}, {'state': 'known', 'sample': _('Word'), 'label': _('already in the word list')}], legend_hint=_('Hover: translation · Click: add word · Select text: translation, add to list') %}{% include "components/word-token/template.html" %}{% endwith %}
+      {% with mode='legend', legend=[{'state': 'known', 'sample': _('Word'), 'label': _('already in the word list')}], legend_hint=_('Hover: translation · Click: add word · Select text: translation, add to list') %}{% include "components/word-token/template.html" %}{% endwith %}
+      <div class="wort-row">
+        {% with priority='secondary', underline='dotted', label=_('Delete text'), extra_attrs='data-popup-open="wort-text-delete"' %}{% include "components/text-button/template.html" %}{% endwith %}
+      </div>
     </div>
     {% endset %}
-    {% with id='wort-text', title=current.title, emphasis=true, caption=_('{date} · recognized {p} %', date=long_date(current.day), p=current.recognized),
-            action=_('Edit text'), action_href='/texte/' ~ current.id ~ '/bearbeiten' %}{% include "components/pane/template.html" %}{% endwith %}
+    {% with id='wort-text', title=open_text.title, emphasis=true, caption=(_('{date} · recognized {p} %', date=long_date(open_text.day), p=open_text.recognized) if open_text.recognized is not none else long_date(open_text.day)),
+            action=_('Edit text'), action_href='/texte/' ~ open_text.id ~ '/bearbeiten' %}{% include "components/pane/template.html" %}{% endwith %}
   {% else %}
     {% set body_html %}
     <div class="wort-texts__empty">
@@ -119,30 +130,33 @@
   {% endif %}
   </div>
 
-  {% if current %}
+  {% if open_text %}
   <div class="wort-texts__notes">
     {% set body_html %}
-    {% for n in current.notes %}
-    <div class="wort-note" data-note-index="{{ loop.index0 }}" tabindex="-1">
-      {% with label=n.label, article=n.article, translation=n.translation, form=n.form, in_list=(loop.index0 in known_notes), in_list_label=_('in list'), add_label=_('Add to list'), extra_attrs='data-add-note="' ~ loop.index0 ~ '"' %}{% include "components/note-item/template.html" %}{% endwith %}
-    </div>
+    {% for n in open_text.notes %}
+    {% with label=n.label, article=n.article, translation=n.translation, form=n.form, in_list=true, in_list_label=_('in list') %}{% include "components/note-item/template.html" %}{% endwith %}
+    {% else %}
+    {% with icon='add', message=_('Words you add from this text appear here: click a word or select text.') %}{% include "components/empty-state/template.html" %}{% endwith %}
     {% endfor %}
-    <div class="ds-table-footer">
-      {% with priority='secondary', underline='dotted', label=_('All to the word list'), extra_attrs='data-add-all' %}{% include "components/text-button/template.html" %}{% endwith %}
-    </div>
     {% endset %}
-    {% with id='wort-notes', title=_('Notes'), caption=_('{n} total', n=current.notes | length), action=_('Practice'), action_href='/ueben' %}{% include "components/pane/template.html" %}{% endwith %}
+    {% with id='wort-notes', title=_('Notes'), caption=_('{n} total', n=open_text.notes | length), action=_('Practice'), action_href='/ueben' %}{% include "components/pane/template.html" %}{% endwith %}
   </div>
   {% endif %}
 </div>
 
-{% if current %}
+{% if open_text %}
 {# Selecting text in the open text opens this menu at the pointer (app.js): the translation of the selection (the first row,
    filled by app.js) and "Add to word list". The token is read by app.js for its posts; the form is never submitted. #}
 {% with id='wort-selection-menu', label=_('Selected text'), items=[{'note': _('Translating …'), 'id': 'wort-selection-translation'}, {'divider': true}, {'value': 'add-selection', 'label': _('Add to word list')}] %}{% include "components/context-menu/template.html" %}{% endwith %}
 <form id="wort-text-form" hidden><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+{# "Delete text": asks first (nothing can bring a text back); "Delete" submits this form, the words stay in the word list. #}
+<form id="wort-text-delete-form" method="post" action="/texte/{{ open_text.id }}/loeschen" hidden><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+{# body_html=none: an earlier {% set body_html %} on this page would otherwise be taken for this popup's body #}
+{% with popup_id='wort-text-delete', type='text', size='small', body_html=none, title=_('Delete this text?'),
+        paragraphs=[_('“{title}” and its notes are deleted. The words you added from it stay in your word list. This cannot be undone.', title=open_text.title)],
+        bottom_actions=[{'label': _('Cancel')}, {'label': _('Delete'), 'status': 'error', 'form': 'wort-text-delete-form', 'confirm': true}] %}{% include "components/popup/template.html" %}{% endwith %}
 {% endif %}
 {{ upload_popup(popup) }}
 {% if popup == 'check' %}{{ check_popup() }}{% endif %}
-{% if popup %}<button type="button" hidden data-popup-open="wort-texts-{{ popup }}" data-autoopen data-close-href="{{ ('/texte/' ~ current.id) if current else '/texte' }}"></button>{% endif %}
+{% if popup %}<button type="button" hidden data-popup-open="wort-texts-{{ popup }}" data-autoopen data-close-href="{{ ('/texte/' ~ open_text.id) if open_text else '/texte' }}"></button>{% endif %}
 {% endblock %}

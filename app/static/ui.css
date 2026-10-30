@@ -56,6 +56,10 @@ form.wort-inline { display: inline; margin: 0; }
 .wort-badge[data-v="correct"] { color: var(--wort-ok); }
 .wort-badge[data-v="wrong"] { color: var(--wort-bad); }
 .wort-badge[data-v="almost"] { color: var(--wort-mid); }
+/* The warning tag's own text colour is 2.1:1 on its tint in the light theme (Texte, uncertain spots); the amber of "almost right" is not. */
+.ds-tag[data-type="warning"][data-subtype="passive"] { color: var(--wort-mid); }
+/* The destructive popup action ("Delete", "Remove") is 3.9:1 in the light theme and 4.4:1 in the dark one in the system's red; the red used for "wrong" is not. */
+.ds-popup .ds-text-button[data-status="error"] { color: var(--wort-bad); }
 .wort-badge[data-v="tip"], .wort-badge[data-v="none"], .wort-badge[data-v="skipped"] { color: var(--ds-color-text-active); border-style: dashed; }
 .wort-badge__glyph { font-weight: bold; }
 

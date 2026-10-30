@@ -839,10 +839,9 @@ document.addEventListener('click', (e) => {
   });
 })();
 
-/* Texte (UI stage, mock texts): a popup the URL asks for opens on load and closing it goes back to the page behind; the
-   sidebar's "Upload photo" opens the upload popup; "Show original" opens the photo; buttons that need the real pipeline
-   ([data-demo]) say so instead of doing nothing. What is real is the way into the word list: a click on any word and
-   "Add to list" / "All to the word list" on the notes post a place in the text; selecting text opens dis-system's
+/* Texte: a popup the URL asks for opens on load and closing it goes back to the page behind; the sidebar's "Upload photo"
+   opens the upload popup; buttons that are not connected yet ([data-demo]) say so instead of doing nothing. The way into
+   the word list: a click on any word posts its place in the text; selecting text opens dis-system's
    context menu at the pointer with its translation and "Add to word list" (a single word is added as a word, longer
    text as a phrase) and posts the selected text. The server decides what is added and answers with a message and what
    is in the list now. */
@@ -861,6 +860,70 @@ document.addEventListener('click', (e) => {
   }
   document.querySelector('.wort-texts__side .ds-sidebar-item[data-role="create"] button')?.setAttribute('data-popup-open', 'wort-texts-upload');
 
+  // The check step. The photo is a small copy the server sent with the page (a data URL in an attribute, nothing is stored);
+  // it goes into the image frame, replacing the placeholder, and only a JPEG data URL is taken. The translation preview
+  // sends the text to the server one paragraph at a time, so the first lines appear at once and one slow paragraph never
+  // holds up the page; lines are written with textContent, in the language they are in. "Update translation" asks again.
+  const check = document.getElementById('wort-check-form');
+  if (check) {
+    const photo = check.querySelector('[data-photo]');
+    const frame = photo?.querySelector('.ds-image-regions__frame');
+    if (frame && (photo.dataset.photo || '').startsWith('data:image/jpeg;base64,')) {
+      const img = document.createElement('img');
+      img.className = 'ds-image-regions__img';
+      img.alt = photo.dataset.photoAlt || '';
+      img.src = photo.dataset.photo;
+      frame.querySelector('.ds-image-regions__placeholder')?.remove();
+      frame.removeAttribute('role');
+      frame.removeAttribute('aria-label');
+      frame.prepend(img);
+    }
+    const panel = check.querySelector('[data-translation]');
+    const field = check.querySelector('textarea[name="text"]');
+    const token = check.querySelector('input[name="csrf"]')?.value;
+    if (panel && field && token) {
+      const MAX_PARAGRAPHS = 40;
+      const status = panel.querySelector('[data-translation-status]');
+      const out = panel.querySelector('[data-translation-lines]');
+      let run = 0;
+      async function translateAll() {
+        const mine = ++run;
+        const all = field.value.split(/\n{2,}/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+        const paragraphs = all.slice(0, MAX_PARAGRAPHS);
+        out.replaceChildren();
+        status.textContent = paragraphs.length ? wortText('translating') : '';
+        status.hidden = !paragraphs.length;
+        let problem = '';
+        for (const paragraph of paragraphs) {
+          let data = null;
+          try {
+            const res = await fetch('/texte/neu/uebersetzung', { method: 'POST', credentials: 'same-origin',
+              headers: { Accept: 'application/json' }, body: new URLSearchParams({ csrf: token, text: paragraph }) });
+            data = await res.json().catch(() => null);
+            if (!data) problem = wortText('translate_failed');
+          } catch (err) { problem = wortText('translate_failed'); }
+          if (mine !== run) return;  // the text was translated again meanwhile: this run's lines are out of date
+          if (data && data.lines && data.lines.length) {
+            const block = document.createElement('div');
+            data.lines.forEach((line) => {
+              const p = document.createElement('p');
+              p.lang = line.lang;
+              p.textContent = line.text;
+              block.appendChild(p);
+            });
+            out.appendChild(block);
+          } else if (data) { problem = data.message || wortText('translate_failed'); }
+          if (problem) break;  // no model, busy or failed: the rest would fail the same way
+        }
+        if (!problem && all.length > MAX_PARAGRAPHS) problem = wortText('translate_cut');
+        status.textContent = problem;
+        status.hidden = !problem;
+      }
+      panel.querySelector('[data-translation-update]')?.addEventListener('click', (e) => { e.preventDefault(); translateAll(); });
+      translateAll();  // the check step opens with the page (data-autoopen): start at once, it does not block anything
+    }
+  }
+
   const textId = root.dataset.textId;
   const csrf = document.querySelector('#wort-text-form input[name="csrf"]')?.value;
   async function post(path, fields, quiet = false) {
@@ -874,25 +937,30 @@ document.addEventListener('click', (e) => {
     } catch (err) { if (!quiet) toast(wortText('add_failed'), 'error'); }
     return null;
   }
-  // What the server says is in the word list now: its words get the dotted underline, its notes the "in list" tag.
+  // What the server says is in the word list now: its words get the dotted underline. The notes list and the sidebar's note
+  // counts are fetched again (the page as the server renders it) and put in place of the old ones; nodes of that page,
+  // never markup written here.
   function showKnown(data) {
     (data.refs || []).forEach((ref) => root.querySelector(`.ds-word-token[data-ref="${CSS.escape(ref)}"]`)?.setAttribute('data-state', 'known'));
-    (data.notes || []).forEach((i) => {
-      const add = root.querySelector(`.wort-note[data-note-index="${CSS.escape(String(i))}"] [data-add-note]`);
-      if (!add) return;
-      const tag = document.createElement('span');
-      tag.className = 'ds-tag';
-      tag.dataset.type = 'neutral';
-      tag.dataset.subtype = 'passive';
-      tag.textContent = wortText('in_list');
-      add.replaceWith(tag);
-    });
+  }
+  async function refreshNotes() {
+    try {
+      const res = await fetch(window.location.pathname, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+      if (!res.ok) return;
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      ['.wort-texts__notes', '.wort-texts__side'].forEach((selector) => {
+        const fresh = doc.querySelector(selector);
+        const old = root.querySelector(selector);
+        if (fresh && old) { old.replaceChildren(...fresh.childNodes); window.wortPrepare?.(old); }
+      });
+    } catch (err) { /* the old notes stay until the page is loaded again */ }
   }
   async function add(path, fields) {
     const data = await post(path, fields);
     if (!data) return;
     toast(data.message);
     showKnown(data);
+    if (data.status === 'added' || data.status === 'exists') refreshNotes();
   }
 
   const body = root.querySelector('.wort-text__body');
@@ -927,13 +995,7 @@ document.addEventListener('click', (e) => {
       clickTimer = setTimeout(() => { if (!selectedText()) add('wort', { ref: word.dataset.ref }); }, 250);
       return;
     }
-    const noteAdd = e.target.closest('[data-add-note]');
-    if (noteAdd) { add('wort', { note: noteAdd.dataset.addNote }); return; }
-    if (e.target.closest('[data-add-all]')) { add('wort', { note: 'all' }); return; }
     if (e.target.closest('[data-demo]')) { e.preventDefault(); toast(wortText('demo_stub')); return; }
-    const toggle = e.target.closest('[data-original-toggle]');
-    const view = toggle && toggle.closest('[data-original]')?.querySelector('[data-original-view]');
-    if (view) { view.hidden = !view.hidden; toggle.textContent = wortText(view.hidden ? 'original_show' : 'original_hide'); }
   });
 
   // The selection menu: attached to the text for as long as something is selected in it (so everywhere else the

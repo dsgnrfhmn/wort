@@ -331,6 +331,13 @@ Confirmed by maintainer (date)*.
 | menu | _ | _ |
 | low light | _ | _ |
 
+- **Dev machine (2026-10-30), generated pages only, not real photos:** `app/ocr.py` runs `tesseract stdin stdout -l deu --psm 3 tsv`
+  (Tesseract 5, `tesseract-ocr-deu` 4.1 data from Debian) after the minimum of preparation: grey, `autocontrast(cutoff=1)`, scaled
+  down to 3000 px on the longer side. A DejaVu Sans letter (12 lines) read 96 % mean confidence and came out word for word (the
+  hyphen at "Miet-|bescheinigung" joined); the same page blurred (σ 2.4), speckled, turned 1.8° and saved as JPEG quality 25 read 80 %
+  with six words under 60 % (one real error, "Ihren" → "ihren", sat above the threshold: not flagged); at σ 3.0 it read 35 % and
+  mostly garbage, 20 words flagged. About 2 s a page here (through a container). **Threshold, deskew and the other rows of the table
+  are still open: they need the real photos** (book page, sign, screenshot, menu, low light) and the server's timings.
 - Decision: _
 - Confirmed by maintainer: _
 

@@ -16,7 +16,7 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 | 1    | Global shell                       | WIP   | Practice header done; Words, Texts, History, Login still on the old header, skip link and lang there |
 | 2    | Practice (start, session, quiz, grammar, result) | WIP | all fixes in and measured; left: keyboard and phone walkthrough by a person, one decision (two explanation surfaces) |
 | 3    | Words (list, lookup, word detail)  | TODO  | 6 fixes; touch selection, lookup field, plurals                     |
-| 4    | Texts                              | TODO  | mobile review not looked at yet; 3 fixes                            |
+| 4    | Texts                              | WIP   | photo → text → preview → saved text → notes → delete works (T-4, T-6, T-8, T-9); left: the visual review (T-1…T-3), real photos (T-5), proposals (T-7), paste |
 | 5    | History / Import                   | TODO  | native file input, page name, legacy routes                         |
 | 6    | Login                              | TODO  | layout and labels                                                   |
 | 7    | Cross-cutting: contrast and dis-system gaps | WIP | contrast fixed for Practice; other pages not re-audited; dis-system changes now optional |
@@ -174,7 +174,7 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 - [ ] W-5 Score chip colours through DS-1/DS-6.
 - [ ] W-6 Word detail and lookup result re-checked at 390 px and in dark after G-6.
 
-* TODO 4 — Texts [/]
+* WIP 4 — Texts [4/9]
 :PROPERTIES:
 :CUSTOM_ID: step-4
 :LEFT:     mobile not looked at, legend contrast
@@ -189,6 +189,12 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 - [ ] T-1 Legend contrast (DS-1) and wording.
 - [ ] T-2 Review 390 px (stacked panes) and the upload/edit popups in both themes.
 - [ ] T-3 =100dvh= for =.wort-texts= (G-8).
+- [X] T-4 *Photo → recognised text → translation preview* (garv, 2026-10-30; the check step of the upload popup). Upload checks =app/uploads.py= (20 MB before decoding, type + magic bytes, 40 Mpx from the header, full Pillow decode, EXIF turn, only JPG and PNG), recognition =app/ocr.py= (Tesseract =deu= through stdin, TSV → text, mean confidence, words under 60 % as uncertain spots with their place on the photo), daily cap =WORT_OCR_DAILY_CAP= (=ocr_usage=, schema v8), preview =POST /texte/neu/uebersetzung= paragraph by paragraph (=app/mt.py=). Verified: 546 passed, 2 skipped (with Pillow), 525 passed, 23 skipped (without); 17 deliberate breakages of the new code, all caught by the tests; real Tesseract 5 (throwaway container) read a generated letter at 96 % and a degraded one at 80 % with 6 spots flagged; in Chromium at 1440 and 390 px: file chosen → check step with text, photo copy with marks, tags, preview lines, "Update translation" after an edit, a refused file gives an error toast and the upload step again, no console errors, no horizontal overflow; contrast of all 33 texts in the popup ≥ 4.5:1 in both themes after one fix (warning tags were 2.1:1 in light; =ui.css= now uses the amber of "almost right"). *Not verified:* real photos, the real Argos translator (a stub was used for the layout; =argostranslate= is not installed here), the server image (=podman build= of =deploy/web/Containerfile= with the new apt line was not run), timings on the server, HEIC from an iPhone.
+- [ ] T-5 Real photos: the D3 spike (book page, sign, screenshot, menu, low light) decides whether threshold and deskew go in; the threshold of 60 % and the cap of 20 photos a day are starting values. :garv:
+- [X] T-6 *Saving* (garv, 2026-10-30, after seeing that "Save text" stored nothing): the user's own texts in =texts= (schema v9), the four mock texts are gone, the sidebar lists the user's texts newest first with a note count, "Edit text" saves in place, notes = the words and phrases added from the text that are still in the word list (=text_words=), shown live after a click without a reload. Verified: 556 passed, 1 skipped (the Anthropic SDK is not installed); 11 of 12 deliberate breakages caught (the twelfth changed nothing); in Chromium at 1440 and 390 px, both themes: photo → save → text in the sidebar → click two words → two notes and "2 notes" in the sidebar without a reload → edit → save, no console errors, no horizontal overflow. Not built: "Paste text" (still =data-demo=).
+- [X] T-9 *Deleting a text* (garv, 2026-10-30): "Delete text" under the reading text opens a confirmation popup (same pattern as removing a word in Wörter), "Delete" posts =/texte/{id}/loeschen=; the text and its notes go, the words stay in the word list; another user's text and a second delete are 404. Verified: 560 passed, 1 skipped; in Chromium at 1440 and 390 px: Cancel keeps the text, Delete removes it, the toast says so, the sidebar updates, the old address is 404, no console errors. Two findings fixed on the way: the page variable =current= (the open text) was read by dis-system's text-button, so *every button on the Texts page carried =aria-current="page"* (renamed =open_text=, test added); the red of a destructive popup action was 3.9:1 (light) and 4.4:1 (dark), now the "wrong" red, 7.7:1 and 6.1:1 (also for "Remove" in Wörter).
+- [X] T-8 The stacked layout at 390 px was broken before this work (reader text collapsed under the notes pane, the list of texts clipped to its head, the page 446 px wide): fixed in =layout.css= (layout only), checked in the browser.
+- [ ] T-7 Proposals for the uncertain spots ("Unterlaqen → Unterlagen", the design's correction rows with Accept / Ignore) are *not* built: the dictionary index only holds normalised forms (umlauts folded), so it cannot give a correctly spelled form. The spots are tags and marks on the photo; the user corrects in the text. A form index with the surface spelling would make them possible.
 
 * TODO 5 — History / Import [/]
 :PROPERTIES:
@@ -260,9 +266,12 @@ Fixed on the way: muted captions, column heads and labels (2.8–3.2 → ≥ 5.4
 - The global colour overrides in =ui.css= (DS-1) change every page. Keep them global, or scope them to Practice until each page is reviewed. :garv:decision:
 
 * Out of scope
-- New features (AI feedback, the real Texte pipeline, OCR), backend logic beyond renaming a template variable, the CLI/TUI look, the Mono style, a native mobile app.
+- New features (AI feedback), backend logic beyond renaming a template variable (the photo → text → preview pipeline was added on request, see T-4), the CLI/TUI look, the Mono style, a native mobile app.
 
 * Log
 - 2026-10-30: branch created, review of all pages done with demo data (Setup, findings above). No UI code changed.
 - 2026-10-30 (night): committed locally on =gui-improvements= (nothing pushed): the Practice refresh, the LanguageTool start-up (=dev.sh=, =compose.yaml=) and the dis-system pointer =bc62167=.
 - 2026-10-30 (evening): Practice refreshed (start, session, Quiz, result, grammar, mode bar). =PYTHONPATH=.:src uv run pytest=: 503 passed, 1 skipped. 3 new tests guard the verdict, the article leak (mutation-checked) and the page structure; existing assertions in 4 test files updated to the new markup (82 lines added, 26 removed in =tests/=). 24 German entries added. UX-20 … UX-29 added to =UX-Decisions.md=.
+- 2026-10-30 (late): Texts: photo → recognised text → translation preview built and verified as far as this machine allows (T-4); =pyproject.toml= has the new group =ocr= (Pillow; =uv lock= still to run), =deploy/web/Containerfile= installs Tesseract and Pillow (image not rebuilt). Not committed.
+- 2026-10-30 (later): Texts: saving added (T-6), notes are the words added from a text, mock texts removed, stacked layout fixed (T-8). Not committed.
+- 2026-10-30 (last): Texts: deleting a text (T-9), =aria-current= leak and popup red fixed. Not committed.

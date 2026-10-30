@@ -71,6 +71,18 @@ Do not run `scripts/languagetool.sh` (the dev machine's container `wort-language
 the same time: two JVMs of this size do not fit next to the other services. Not yet run through `podman-compose up` on the
 server: the command above is the first check to make (DECISIONS D4).
 
+## 3d. Texte: photo recognition and the translation preview
+
+`wort-web` reads a photo of a text with Tesseract (`deploy/web/Containerfile` installs `tesseract-ocr` and `tesseract-ocr-deu`, and
+Pillow). **Rebuild the image once** (`podman-compose build wort-web`, then `up -d`); before that the Texte page works but says
+"Text recognition is not set up on this server". Nothing else is needed: no port, no outbound connection, the photo is read from
+memory and never stored; only the text the user saves would be. Per user and day `WORT_OCR_DAILY_CAP` photos (default 20, set it in
+`wort-web`'s `environment:`); it protects the shared host's CPU, one recognition runs at a time and takes about 2-30 s, nginx waits 60 s.
+
+The translation preview uses the local translator (`app/mt.py`, Argos Translate): it needs the `mt` group and the model files in the
+data volume, **neither is in the image by default**. Without them the preview says "No translation available here." and recognition
+still works. German to English exists; Ukrainian goes through English and needs the en-uk model too.
+
 ## 4. Firewall (ufw): allow the LAN to reach this socket only
 
     sudo ufw allow from <LAN-SUBNET> to <LAN-IP> port 8455 proto tcp comment 'wort https'

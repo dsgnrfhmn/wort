@@ -16,10 +16,11 @@ from pathlib import Path
 from app import scoring
 from wort import sanitize
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 9
 ATTEMPT_DETAILS = ("task", "expected", "corrected", "rule")
 PHRASE = "phrase"  # user_words.pos of a phrase or sentence added from a text: no dictionary entry, not practised (yet)
 MAX_DETAIL = 300
+MAX_TEXTS = 200  # saved texts per user (each at most 20 000 characters)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -106,6 +107,28 @@ CREATE TABLE IF NOT EXISTS ai_usage (
     calls INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, day)
 );
+CREATE TABLE IF NOT EXISTS ocr_usage (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    uploads INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day)
+);
+CREATE TABLE IF NOT EXISTS texts (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    recognized INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_texts_user ON texts(user_id, id);
+CREATE TABLE IF NOT EXISTS text_words (
+    text_id INTEGER NOT NULL REFERENCES texts(id) ON DELETE CASCADE,
+    lemma TEXT NOT NULL,
+    pos TEXT NOT NULL,
+    PRIMARY KEY (text_id, lemma, pos)
+);
 CREATE TABLE IF NOT EXISTS grammar_attempts (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -188,6 +211,19 @@ class UserWord:
     @property
     def is_phrase(self) -> bool:
         return self.pos == PHRASE
+
+
+@dataclass
+class StoredText:
+    """A text the user saved (Texte): its text (the photo is never kept), when, how sure the recognition was (None: not
+    recognised from a photo) and how many of its words the user has added to the word list."""
+
+    id: int
+    title: str
+    body: str
+    recognized: int | None
+    created_at: datetime
+    notes: int = 0
 
 
 def _ts(value: datetime) -> str:
@@ -633,6 +669,80 @@ class WebStore:
         self.conn.commit()
 
     # --- AI usage -----------------------------------------------------------
+
+    # --- saved texts (Texte) ------------------------------------------------
+
+    _TEXT = ("SELECT t.*, (SELECT COUNT(*) FROM text_words w JOIN user_words u ON u.user_id = t.user_id AND u.lemma = w.lemma "
+             "AND u.pos = w.pos WHERE w.text_id = t.id) AS notes FROM texts t")
+
+    @staticmethod
+    def _stored(r) -> StoredText:
+        return StoredText(r["id"], r["title"], r["body"], r["recognized"], datetime.fromisoformat(r["created_at"]), r["notes"])
+
+    def add_text(self, user_id: int, title: str, body: str, recognized: int | None = None,
+                 now: datetime | None = None) -> int:
+        stamp = _ts(now or datetime.now())
+        cur = self.conn.execute(
+            "INSERT INTO texts (user_id, title, body, recognized, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, title, body, recognized, stamp, stamp),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def texts(self, user_id: int) -> list[StoredText]:
+        """The user's texts, newest first."""
+        return [self._stored(r) for r in self.conn.execute(f"{self._TEXT} WHERE t.user_id = ? ORDER BY t.id DESC", (user_id,))]
+
+    def text(self, user_id: int, text_id: int) -> StoredText | None:
+        """One of the user's texts; another user's text is none."""
+        r = self.conn.execute(f"{self._TEXT} WHERE t.user_id = ? AND t.id = ?", (user_id, text_id)).fetchone()
+        return self._stored(r) if r else None
+
+    def text_count(self, user_id: int) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM texts WHERE user_id = ?", (user_id,)).fetchone()[0]
+
+    def update_text(self, user_id: int, text_id: int, title: str, body: str, now: datetime | None = None) -> bool:
+        cur = self.conn.execute(
+            "UPDATE texts SET title = ?, body = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+            (title, body, _ts(now or datetime.now()), user_id, text_id),
+        )
+        self.conn.commit()
+        return cur.rowcount == 1
+
+    def delete_text(self, user_id: int, text_id: int) -> bool:
+        """Delete one of the user's texts and its notes (the links in text_words go with it). The words stay in the word list."""
+        cur = self.conn.execute("DELETE FROM texts WHERE user_id = ? AND id = ?", (user_id, text_id))
+        self.conn.commit()
+        return cur.rowcount == 1
+
+    def link_text_word(self, user_id: int, text_id: int, lemma: str, pos: str) -> None:
+        """Remember that the user added (or already had) this word while reading this text of theirs."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO text_words (text_id, lemma, pos) SELECT id, ?, ? FROM texts WHERE id = ? AND user_id = ?",
+            (lemma, pos, text_id, user_id),
+        )
+        self.conn.commit()
+
+    def text_notes(self, user_id: int, text_id: int) -> list[tuple[str, str]]:
+        """(lemma, pos) of the words noted in this text that are still in the user's word list, in the order they were noted."""
+        return [(r["lemma"], r["pos"]) for r in self.conn.execute(
+            "SELECT w.lemma, w.pos FROM text_words w JOIN texts t ON t.id = w.text_id "
+            "JOIN user_words u ON u.user_id = t.user_id AND u.lemma = w.lemma AND u.pos = w.pos "
+            "WHERE t.user_id = ? AND t.id = ? ORDER BY w.rowid", (user_id, text_id))]
+
+    def ocr_uploads_today(self, user_id: int, day: str) -> int:
+        r = self.conn.execute("SELECT uploads FROM ocr_usage WHERE user_id = ? AND day = ?", (user_id, day)).fetchone()
+        return r["uploads"] if r else 0
+
+    def ocr_count_upload(self, user_id: int, day: str) -> int:
+        """Count one photo sent for recognition (v8: no migration step, SCHEMA adds the table)."""
+        self.conn.execute(
+            "INSERT INTO ocr_usage (user_id, day, uploads) VALUES (?, ?, 1) "
+            "ON CONFLICT (user_id, day) DO UPDATE SET uploads = uploads + 1",
+            (user_id, day),
+        )
+        self.conn.commit()
+        return self.ocr_uploads_today(user_id, day)
 
     def ai_calls_today(self, user_id: int, day: str) -> int:
         r = self.conn.execute("SELECT calls FROM ai_usage WHERE user_id = ? AND day = ?", (user_id, day)).fetchone()

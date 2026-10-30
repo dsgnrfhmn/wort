@@ -1,8 +1,13 @@
 # wort-web image: python plus the web dependencies. The code is bind-mounted read-only
 # from the repository (compose.yaml), not copied in.
-# Keep this list in sync with the `web` group in pyproject.toml.
+# Keep this list in sync with the `web` and `ocr` groups in pyproject.toml.
 FROM docker.io/library/python:3.13-slim
-RUN pip install --no-cache-dir "fastapi>=0.110" "jinja2>=3.1" "uvicorn>=0.29" "python-multipart>=0.0.9" "argon2-cffi>=23"
+# Text recognition for Texte (app/ocr.py): the Tesseract program with its German data. Without them the Texte page says
+# "Text recognition is not set up on this server" and everything else works.
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-deu \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir "fastapi>=0.110" "jinja2>=3.1" "uvicorn>=0.29" "python-multipart>=0.0.9" "argon2-cffi>=23" \
+    "Pillow>=10"
 # The Anthropic SDK is only installed when the AI is wanted: podman build --build-arg WITH_AI=1 (see DEPLOY.md §6).
 ARG WITH_AI=0
 RUN if [ "$WITH_AI" = "1" ]; then pip install --no-cache-dir "anthropic>=1"; fi

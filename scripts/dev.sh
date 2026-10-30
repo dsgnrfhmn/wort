@@ -64,7 +64,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 # Not `exec`: this shell has to outlive the server to stop the LanguageTool it started.
-env PYTHONPATH="$here:$here/src" uv run --group web uvicorn app.main:create_app --factory \
+env PYTHONPATH="$here:$here/src" uv run --group web --group ocr uvicorn app.main:create_app --factory \
   --host "$WORT_DEV_HOST" --port "$WORT_DEV_PORT" \
   --ssl-certfile "$WORT_DEV_TLS_CERT" --ssl-keyfile "$WORT_DEV_TLS_KEY" \
   --reload --reload-dir app --reload-dir src &
