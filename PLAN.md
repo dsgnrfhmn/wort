@@ -28,8 +28,9 @@ This file is the ordered execution plan and what "done" means at each step.
 > 6. **Two front ends, one lexicon** (2026-10-04): the fully local `wort`
 >    CLI/TUI **stays** next to the web app (Step C). The CLI logs every
 >    query; history and practice words reach the web app by **export/import** — no network path from the dev
->    machine. dis-system is taken from its **`main`** branch for now
->    (`dev-isolated` no longer exists; main-vs-pin to be decided later).
+>    machine. dis-system is taken from its integration branch
+>    **`dsgnrfhmn/uiux-dev`** until the redesign is merged into its `main`
+>    (2026-10-31, `DECISIONS.md` D00b; `dev-isolated` no longer exists).
 
 ## Sequencing principle
 

@@ -76,10 +76,14 @@ explanations.
 
 - The web UI is built **only** from `dis-system` (the CLI/TUI uses
   Textual/Rich). It is vendored as a git submodule — never copy-pasted CSS.
-  Normally pinned to a tag/commit. **Temporary exception (2026-10-18): it
-  follows `main` (branch `dev-isolated` no longer exists) until the
-  maintainer decides between a pinned tag and `main`**; record the commit
-  hash in `DECISIONS.md` at every bump.
+  Normally pinned to a tag/commit. **Temporary exception (2026-10-31): it
+  follows dis-system's integration branch `dsgnrfhmn/uiux-dev`, not `main`,
+  until the redesign is finished and merged into `main`** (reasons and rules:
+  `DECISIONS.md` D00b); record the commit hash in `DECISIONS.md` at every bump.
+- `dsgnrfhmn/uiux-dev` is never force-pushed, rebased or deleted while a pin
+  of wort is on it; `main` is merged *into* it, never the reverse, until the
+  maintainer calls the redesign finished. Nothing pushed there may name a
+  consuming application (dis-system rule).
 - App-local CSS may contain **layout only** (grid, page regions, spacing via
   dis-system tokens). No new colors, type styles, or component styles in
   this repo.

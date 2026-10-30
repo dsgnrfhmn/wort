@@ -245,7 +245,8 @@ Confirmed by maintainer (date)*.
   - CLI/TUI and web keep separate practice progress (scores do not sync).
   - dis-system follows **`main`** (2026-10-18: the `dev-isolated` branch does
     not exist on GitHub; the maintainer's updates are on `main`). Pinned tag
-    vs `main` is still open.
+    vs `main` is still open. *(Superseded 2026-10-31: integration branch,
+    see below.)*
   - Web app: own SQLite DB (`web.db`, history + favorites), UI composed from
     dis-system Jinja templates (`app/ds.py` adds the `vendor/dis-system` root to
     the template loader and serves its tokens/components/icons under `/ds`).
@@ -258,17 +259,31 @@ Confirmed by maintainer (date)*.
   (`--ds-color-accent-1` and its hover/pressed) and the input focus border (`--ds-color-input-border-focus`) are set to
   `--ds-color-text-active` (white) in `app/static/layout.css`,
   an exception to "no colors in this repo". Move it into dis-system or drop it once decided.
-- **dis-system commit in use (2026-10-30):** `bc62167` on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
-  top of `8f1d0b4`. Commits the draft props that had been in the working tree since 2026-10-29/30: message `tail` /
+- **dis-system integration branch (2026-10-31, maintainer):** wort follows `dsgnrfhmn/uiux-dev` instead of `main`
+  (`.gitmodules` branch = `dsgnrfhmn/uiux-dev`). The branch was cut at `bc62167` (the former local
+  `dsgnrfhmn/message-note`) on top of `main` @ `2db2701`. Why: against that `main` it changes 52 existing files
+  (components, tokens, `site.js`, `nav.js`) and adds 3, so it must not reach the other services before it is
+  finished. A submodule pins a commit, so other services are untouched until they bump their own pin; the branch
+  also keeps the pinned commits reachable on GitHub. Rules: not merged into `main` until the maintainer calls the
+  redesign finished; no force-push, rebase or delete while a wort pin is on it; `main` is merged into it (not
+  rebased) at each bump; into `main` only by PR with a merge commit, not a squash (a squash orphans the pinned
+  commits), then wort re-pins to `main`; the other services move to `main` only after that merge, each checked in
+  both themes. dis-system forbids names of consuming applications in anything pushed (checked for the four
+  commits: none; authors are noreply addresses). **Not verified yet:** that the changed components keep their old
+  output with default props. Run dis-system `tests` and the existing demos before any PR into `main`.
+- **dis-system commit in use (2026-10-30):** `bc62167` on branch `dsgnrfhmn/uiux-dev` (renamed 2026-10-31 from
+  `dsgnrfhmn/message-note`; **pushed 2026-10-31**, `origin/dsgnrfhmn/uiux-dev` = `bc62167`, together with the three
+  commits below it), on top of `8f1d0b4`. Commits the draft props that had been in the working tree since 2026-10-29/30: message `tail` /
   `note_tone` / `inverted`, nav-bar `workspace_items` / `workspace_name`, page-head `title_href` / `current`, popup
   `body_html` and link/form actions, context-menu `note` rows, sidebar-list `caption` / `muted`. The pages built on
   them rendered from the uncommitted tree until now. `python -m pytest tests` there: 74 passed. Same rule as below:
-  the branch has to be pushed and a dis-system PR opened (maintainer's OK) before this pointer is pushed.
-  Previous: `8f1d0b4` (2026-10-29) on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
+  the branch has to be pushed before this pointer is pushed; a dis-system PR is not needed until the redesign is
+  finished (see the integration-branch decision above).
+  Previous: `8f1d0b4` (2026-10-29) on branch `dsgnrfhmn/message-note` (now part of `dsgnrfhmn/uiux-dev`), on
   top of `b2ed6ea`. Draft props (D00h): nav-bar `brand` / `brand_href` / `brand_html` and an empty `workspace_label`
   leaving the dropdown out, table-header-actions `outlined`, disclosure `body_html`, radio `disabled`. Waits for the
   maintainer's OK before it is pushed (to `dsgnrfhmn/isolated`) and a PR is opened.
-  Previous: `b2ed6ea` (2026-10-28) on the same branch (local, **not pushed**), on
+  Previous: `b2ed6ea` (2026-10-28) on the same branch (now part of `dsgnrfhmn/uiux-dev`), on
   top of `ab5d22e` (Mono style draft). Adds message `note` / `note_tooltip` / `note_more` / `task`, table-cell `wrap`,
   inline-mark `href` / `current`, textarea `rows`. Push the branch and open a dis-system PR before this pointer is
   pushed, or the submodule commit will be missing for everyone else.
