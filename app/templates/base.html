@@ -85,7 +85,7 @@
   {% endfor %}
   {# English / Ukrainian tooltips for the German labels: only with the German interface. #}
   {% if lang == 'de' %}<script type="application/json" id="wort-glossary">{{ ui_glossary | tojson }}</script>{% endif %}
-  <script type="application/json" id="wort-i18n">{{ {'lookup_failed': _('Lookup failed. Please try again.'), 'delete_named': _('“{word}” will be removed with its score and your answers. This cannot be undone.'), 'explain_more': _('Explain more'), 'hide_feedback': _('Hide explanation'), 'send_stalled': _('No answer from the server. Please send again.'), 'demo_stub': _('Demo data: this is not connected yet.'), 'add_failed': _('Could not add it. Please try again.'), 'translating': _('Translating …'), 'translate_failed': _('The translation failed. Please try again.'), 'translate_cut': _('The preview translates the first 40 paragraphs.')} | tojson }}</script>
+  <script type="application/json" id="wort-i18n">{{ {'lookup_failed': _('Lookup failed. Please try again.'), 'delete_named': _('“{word}” will be removed with its score and your answers. This cannot be undone.'), 'explain_more': _('Explain more'), 'hide_feedback': _('Hide explanation'), 'send_stalled': _('No answer from the server. Please send again.'), 'demo_stub': _('Demo data: this is not connected yet.'), 'add_failed': _('Could not add it. Please try again.'), 'translating': _('Translating …'), 'translate_failed': _('The translation failed. Please try again.'), 'translate_cut': _('The preview translates the first 40 paragraphs.'), 'selected_n': _('{n} selected'), 'select_hint': _('Select words to practise them')} | tojson }}</script>
   <script src="/static/app.js"></script>
 </body>
 </html>

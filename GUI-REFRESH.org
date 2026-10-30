@@ -5,7 +5,7 @@
 #+STARTUP: overview indent logdone
 #+COLUMNS: %ITEM(Step) %TODO(State) %LEFT(What is left)
 
-Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improvements= (from =wip/web-view= at =a389a01=). Three lenses: design critique, design-system audit, accessibility review (WCAG 2.1 AA). Every finding below was checked in a browser (Chromium 151, demo data, 1440 and 390 px, light and dark), in the DOM, in computed styles or in the code; the evidence column says which. A box is ticked only where it was verified (the evidence is in the line). *Practice was refreshed on 2026-10-30*; the other pages are untouched. Severity: 🔴 critical (blocks a task or fails WCAG badly), 🟡 moderate, 🟢 minor. Order of work: Practice first, then Words, Texts, History/Import, Login.
+Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improvements= (from =wip/web-view= at =a389a01=). Three lenses: design critique, design-system audit, accessibility review (WCAG 2.1 AA). Every finding below was checked in a browser (Chromium 151, demo data, 1440 and 390 px, light and dark), in the DOM, in computed styles or in the code; the evidence column says which. A box is ticked only where it was verified (the evidence is in the line). *Practice, Words and Texts were refreshed on 2026-10-30*; History/Import and Login are untouched. Severity: 🔴 critical (blocks a task or fails WCAG badly), 🟡 moderate, 🟢 minor. Order of work: Practice first, then Words, Texts, History/Import, Login.
 
 *Decision 2026-10-30 (garv): dis-system is a visual reference for this work, not a guideline.* Practice therefore uses wort's own small kit: =app/static/ui.css= (buttons, badges, cards, steps, verdict, mode bar; every colour, size and space still comes from the =--ds-*= tokens, so both themes follow) and =app/templates/_ui.html= (macros =bubble=, =badge=, =btn=). Nothing was changed inside =vendor/dis-system=. *This contradicts the "Design-system rules (hard)" section of =CLAUDE.md=, which still says layout-only CSS and a dis-system component for every new pattern; the file is not changed yet (Open decisions).* The rest of the rules stay: both themes checked on every touched screen; new strings through =_()= with a German entry; tests green (=PYTHONPATH=.:src uv run pytest=); a rule worth keeping goes to =UX-Decisions.md= (no wort context, status draft); commits only on garv's word.
 
@@ -13,10 +13,10 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 | Step | Title                              | State | What is left                                                        |
 |------+------------------------------------+-------+---------------------------------------------------------------------|
 | 0    | Setup                              | DONE  | decision on the 17 uncommitted dis-system files (Open decisions)   |
-| 1    | Global shell                       | WIP   | Practice header done; Words, Texts, History, Login still on the old header, skip link and lang there |
+| 1    | Global shell                       | WIP   | Practice, Words and Texts have their own h1 and lang; History and Login still on the old page head |
 | 2    | Practice (start, session, quiz, grammar, result) | WIP | all fixes in and measured; left: keyboard and phone walkthrough by a person, one decision (two explanation surfaces) |
-| 3    | Words (list, lookup, word detail)  | TODO  | 6 fixes; touch selection, lookup field, plurals                     |
-| 4    | Texts                              | WIP   | photo → text → preview → saved text → notes → delete works (T-4, T-6, T-8, T-9); left: the visual review (T-1…T-3), real photos (T-5), proposals (T-7), paste |
+| 3    | Words (list, lookup, word detail)  | DONE  | all six fixes in and measured (W-1…W-6); left: a phone and a keyboard walkthrough by a person |
+| 4    | Texts                              | WIP   | refreshed after Words (T-1…T-3, T-10) on top of photo → text → preview → saved text → notes → delete; left: real photos (T-5), proposals (T-7), paste |
 | 5    | History / Import                   | TODO  | native file input, page name, legacy routes                         |
 | 6    | Login                              | TODO  | layout and labels                                                   |
 | 7    | Cross-cutting: contrast and dis-system gaps | WIP | contrast fixed for Practice; other pages not re-audited; dis-system changes now optional |
@@ -59,8 +59,8 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 ** Plan
 - [X] G-1 Current mode marked: heavy underline and bold on the open mode, muted text on the others (=ui.css=, =base.html=). Evidence: screenshots of all three modes; =aria-current="page"= and no =role="tablist"= on every Practice page (=tests/test_web_practice.py=, DOM).
 - [X] G-2 Empty settings row removed; "Look up" sits at the end of the mode row. Evidence: header 166 → 122 px at 1440×900 (DOM); the toggle still opens the panel (screenshot).
-- [-] G-3 One =<h1>= and a skip link to =<main id="main">=: done on every Practice page (DOM: 1 h1 and 1 skip link on every captured Practice state, both widths) and the skip link is in =base.html= so it is on every page; =<h1>= on Words, Texts, History and Login is open.
-- [-] G-4 =lang="de"= on German text and =lang="uk"= on Ukrainian notes: done in Practice (macro =bubble=, hints, Quiz word, results, grammar). Open: Words, word detail, lookup, Texts.
+- [-] G-3 One =<h1>= and a skip link to =<main id="main">=: done on every Practice page (DOM: 1 h1 and 1 skip link on every captured Practice state, both widths) and the skip link is in =base.html= so it is on every page; =<h1>= on Words and Texts is done too (a test each); History and Login are open.
+- [-] G-4 =lang="de"= on German text and =lang="uk"= on Ukrainian notes: done in Practice (macro =bubble=, hints, Quiz word, results, grammar). Also done: Words, word detail, lookup, the text in Texts. Open: History.
 - [X] G-5 Header at 390 px: nav bar no longer runs off the screen (scrollWidth 490 → 390 on Words, History, Texts and Practice; the Words table scrolls inside its own box), the mode row fits with counts under the names; the theme toggle wraps to a third nav row; the header scrolls away on a phone. Evidence: screenshots 390, DOM.
 - [X] G-6 Side panel: a result is one column in the 440 px panel, the forms table fits. Evidence: screenshot (before: "das Hau", "die Häus" cut).
 - [-] G-7 Link strips: Practice has none left (steps and topic chips are plain links with =aria-current=); dis-system =header-tab= itself is unchanged and still used elsewhere.
@@ -150,10 +150,10 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 - [X] P-5.1 Summary line ("0 of 5 right · Score -2") above a real =<table>= (caption, column headers, scope); verdict as badge.
 - [X] P-5.2 One filled button ("Another round with the same words"); the others outlined or plain.
 
-* TODO 3 — Words [/]
+* DONE 3 — Words [6/6]
 :PROPERTIES:
 :CUSTOM_ID: step-3
-:LEFT:     touch selection, lookup field, plurals, mobile table
+:LEFT:     a phone and a keyboard walkthrough by a person
 :END:
 
 *Definition of done:* words can be selected and practised by touch and keyboard, the lookup field is labelled, the table reads at 390 px, counts are grammatical.
@@ -167,28 +167,34 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 *** Works well (keep)
 - Article-coloured words with the article written out, the word pane beside the table with its own scroll, translations Ukrainian first then English, the context menu on rows.
 *** Plan
-- [ ] W-1 Checkboxes always visible where there is no hover (=@media (hover: none)= in DS =table-row=); a caption on the disabled bulk buttons ("Select words").
-- [ ] W-2 Label or button on the lookup field; placeholder contrast.
-- [ ] W-3 390 px: wrap the bulk buttons, keep Score visible (hide Added first).
-- [ ] W-4 Plural forms in =app/i18n.py= for the two counts.
-- [ ] W-5 Score chip colours through DS-1/DS-6.
-- [ ] W-6 Word detail and lookup result re-checked at 390 px and in dark after G-6.
+- [X] W-1 Row checkboxes are drawn at all times (=ui.css=; dis-system shows them only under the pointer); the selection bar above the table says "Select words to practise them" or "2 selected" (=role="status"=, filled by =app.js=) and its buttons wait with =disabled=. Evidence: DOM in Chromium (two rows ticked → "2 selected", the three buttons enabled; Clear → the hint again), screenshots at 1440 and 390.
+- [X] W-2 The lookup is a labelled field ("Look up a word or sentence", visible) with its own "Look up" button; the list filter has a visible label too ("Filter the list"). Evidence: =tests/test_web_words.py=; Enter and Tab+Enter both look up (Chromium).
+- [X] W-3 At 390 px "Added" gives way to "Score", the table fits (scrollWidth 390 on list, detail and lookup), the lookup button sits beside its field, "Import" beside the title, the selection bar wraps. The bulk buttons are 44 px high. Evidence: DOM, screenshots.
+- [X] W-4 "1 Wort · 1 diese Woche", "1 hit": a singular for the two counts. Evidence: tests (German and English strings).
+- [X] W-5 Tags (score, "in your words", uncertain spots, "in list") are drawn like the verdict badges: border, the verdict's text colour, a glyph (✓ ~ ✗, none = dashed). Evidence: computed contrast of every visible text on the list, the lookup result and the open word, both themes, 1440 and 390: 0 failing of 59–114 (before: dark tags 4.04:1, the lookup's grey lines 2.85:1).
+- [X] W-6 Word detail and lookup result re-checked at 390 and in dark; also the lookup in the Practice side panel (same result block).
+Also done on the way:
+- The page has its own =<h1>= ("Words" with its count) and =lang="de"= on the words, their forms and examples (G-3, G-4); section bars are real headings (=bar= macro in =_ui.html=), the score of the open word is a badge with its level and says "No score yet" / "not practised yet" instead of a dash.
+- "Remove word" in the open word asks first, with the same confirmation as the row menu (before: it deleted at once). The form still works without scripts. Evidence: Chromium (Remove → popup names the word → Cancel keeps it; confirm → "“schnell” was removed.", 12 → 11 rows, no console errors).
+- Popup buttons everywhere (Cancel, Remove, Delete, Save text …) are buttons like the rest of wort (44 px, outlined; the main one filled; the destructive one red); dis-system draws them as text links.
+- Removed: the hero block and its divider (=trial.css=, =layout.css=), the "Look up" text links. Nothing of the page's text was taken away: the legend, hints, captions and empty states are all still there, some as captions in the kit's style.
 
 * WIP 4 — Texts [4/9]
 :PROPERTIES:
 :CUSTOM_ID: step-4
-:LEFT:     mobile not looked at, legend contrast
+:LEFT:     real photos (T-5), proposals (T-7), paste
 :END:
 
-*Definition of done:* the three panes work at 390 px and the legend is readable. The page runs on mock texts (=data-demo=).
+*Definition of done:* the three panes work at 390 px and the legend is readable (done 2026-10-30). Paste text is not connected (muted).
 | ID  | Sev | Finding                                                                                                                                  | Evidence          |
 |-----+-----+------------------------------------------------------------------------------------------------------------------------------------------+-------------------|
 | T-a | 🟡  | The legend lines under the text ("Word in notes · already in the word list", "Hover: translation · Click: add word …") are grey italic 2.85:1. | computed contrast |
 | T-b | 🟢  | Desktop layout works: three panes, highlighted note words, "Add to list" per note. 390 px screenshot exists but was not looked at.        | screenshot        |
 *** Plan
-- [ ] T-1 Legend contrast (DS-1) and wording.
-- [ ] T-2 Review 390 px (stacked panes) and the upload/edit popups in both themes.
-- [ ] T-3 =100dvh= for =.wort-texts= (G-8).
+- [X] T-1 The legend under the text is a caption (upright, 5.7:1) instead of grey italic (2.85:1); its wording is unchanged.
+- [X] T-2 390 px and both popups reviewed in both themes (screenshots: empty, upload, check, open text, notes, delete). The saved texts are one row that opens ("Saved texts 2") above the text, "Upload photo" stays in sight (UX-27); contrast of every visible text 0 failing in 14–80 elements per state.
+- [X] T-3 =.wort-texts= keeps =100vh= on a wide window (a phone stacks the panes and has no fixed height, so G-8 does not apply there).
+- [X] T-10 *Texts refreshed after Words* (garv, 2026-10-30): one =<h1>= (the open text's title, or "Texts"), "Edit text" and "Delete text" are buttons in the text's own pane (secondary / red plain), "Practice" a button above the notes, "Upload photo" the one filled button (sidebar, phone bar, empty page), the three photo actions and "Paste text" muted with =aria-disabled= and still saying so when pressed (UX-6), "in list" in a note is a green ✓ tag, section bars and captions in the kit's style, a visible label on the title field, =lang="de"= on the text. Nothing removed. Evidence: =tests/test_web_texts.py= (3 new), Chromium at 1440 and 390 in both themes, two words clicked → two notes, delete confirmation, no console errors, no horizontal overflow.
 - [X] T-4 *Photo → recognised text → translation preview* (garv, 2026-10-30; the check step of the upload popup). Upload checks =app/uploads.py= (20 MB before decoding, type + magic bytes, 40 Mpx from the header, full Pillow decode, EXIF turn, only JPG and PNG), recognition =app/ocr.py= (Tesseract =deu= through stdin, TSV → text, mean confidence, words under 60 % as uncertain spots with their place on the photo), daily cap =WORT_OCR_DAILY_CAP= (=ocr_usage=, schema v8), preview =POST /texte/neu/uebersetzung= paragraph by paragraph (=app/mt.py=). Verified: 546 passed, 2 skipped (with Pillow), 525 passed, 23 skipped (without); 17 deliberate breakages of the new code, all caught by the tests; real Tesseract 5 (throwaway container) read a generated letter at 96 % and a degraded one at 80 % with 6 spots flagged; in Chromium at 1440 and 390 px: file chosen → check step with text, photo copy with marks, tags, preview lines, "Update translation" after an edit, a refused file gives an error toast and the upload step again, no console errors, no horizontal overflow; contrast of all 33 texts in the popup ≥ 4.5:1 in both themes after one fix (warning tags were 2.1:1 in light; =ui.css= now uses the amber of "almost right"). *Not verified:* real photos, the real Argos translator (a stub was used for the layout; =argostranslate= is not installed here), the server image (=podman build= of =deploy/web/Containerfile= with the new apt line was not run), timings on the server, HEIC from an iPhone.
 - [ ] T-5 Real photos: the D3 spike (book page, sign, screenshot, menu, low light) decides whether threshold and deskew go in; the threshold of 60 % and the cap of 20 photos a day are starting values. :garv:
 - [X] T-6 *Saving* (garv, 2026-10-30, after seeing that "Save text" stored nothing): the user's own texts in =texts= (schema v9), the four mock texts are gone, the sidebar lists the user's texts newest first with a note count, "Edit text" saves in place, notes = the words and phrases added from the text that are still in the word list (=text_words=), shown live after a click without a reload. Verified: 556 passed, 1 skipped (the Anthropic SDK is not installed); 11 of 12 deliberate breakages caught (the twelfth changed nothing); in Chromium at 1440 and 390 px, both themes: photo → save → text in the sidebar → click two words → two notes and "2 notes" in the sidebar without a reload → edit → save, no console errors, no horizontal overflow. Not built: "Paste text" (still =data-demo=).
@@ -242,8 +248,8 @@ Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improve
 - [X] DS-3 Mode bar with the current section marked and one =<h1>= per page: own markup on Practice.
 - [-] DS-4 =lang= on content: own macro =bubble= and attributes in the Practice templates; dis-system components still have no =lang= prop.
 - [X] DS-5 Pane body collapse in Quiz: no longer used there; =.ds-pane= still has =flex: 1 1 0= for auto-height hosts (not fixed upstream).
-- [X] DS-6 Passive tag colours below 4.5:1: Practice uses its own badge. Words score chips and "in your words" still use =ds-tag= (open for step 3).
-- [ ] DS-7 =table-row= checkbox under =(hover: none)= and 44 px rows: Words.
+- [X] DS-6 Passive tag colours below 4.5:1: Practice uses its own badge; every other =ds-tag= (score chips, "in your words", uncertain spots, "in list") is drawn like it by =ui.css=, in both themes.
+- [X] DS-7 =table-row= checkbox: always drawn on Words (=ui.css=); rows are 45 px. dis-system itself is unchanged.
 - [ ] DS-8 =text-button= reads a context variable =article=: the Quiz route no longer sets one, the trap remains for any other route that does.
 
 ** Colour contrast check (computed styles of every visible text)
@@ -252,7 +258,7 @@ Before (2026-10-30 morning, 10 pages × 2 themes, 1440 px): light 119 failing te
 |-------+-------------+--------------------------------------------------------------------------------------------------------+--------|
 | Light | 10 of 388   | disabled radio "Explain in German" (3.0:1); muted, not yet reachable words in the session list (3.1:1) | ✅ (both are inactive controls, exempt from 1.4.3) |
 | Dark  | 2 of 388    | the same disabled radio (2.4:1)                                                                        | ✅ (inactive) |
-Fixed on the way: muted captions, column heads and labels (2.8–3.2 → ≥ 5.4:1), the correction marks (3.6 → ≥ 4.5), the green corrected line (4.3 → 5.7), verdict badges (own colours, ≥ 5.7:1). Words, word detail, lookup, History, Texts and Login were *not* re-audited after the global token change.
+Fixed on the way: muted captions, column heads and labels (2.8–3.2 → ≥ 5.4:1), the correction marks (3.6 → ≥ 4.5), the green corrected line (4.3 → 5.7), verdict badges (own colours, ≥ 5.7:1). Words (list, lookup, open word) and Texts (empty, upload, check, open, notes, delete; 1440 and 390) were measured after their refresh: 0 failing text elements in both themes. History and Login were *not* re-audited after the global token change.
 
 * Open decisions
 - *dis-system draft props:* the 17 files that only the working tree had (message =tail= and =note_tone=, nav-bar =workspace_items=, page-head =title_href= …) are committed on =dsgnrfhmn/message-note= as =bc62167= (2026-10-30, local only, 74 dis-system tests pass) and =gui-improvements= points at it. Still open: push that branch and open a dis-system PR before =gui-improvements= is pushed or merged, or the pointer leads nowhere for everyone else. :garv:decision:
@@ -275,3 +281,4 @@ Fixed on the way: muted captions, column heads and labels (2.8–3.2 → ≥ 5.4
 - 2026-10-30 (late): Texts: photo → recognised text → translation preview built and verified as far as this machine allows (T-4); =pyproject.toml= has the new group =ocr= (Pillow; =uv lock= still to run), =deploy/web/Containerfile= installs Tesseract and Pillow (image not rebuilt). Not committed.
 - 2026-10-30 (later): Texts: saving added (T-6), notes are the words added from a text, mock texts removed, stacked layout fixed (T-8). Not committed.
 - 2026-10-30 (last): Texts: deleting a text (T-9), =aria-current= leak and popup red fixed. Not committed.
+- 2026-10-30 (after the first commit =f806b7c=, rollback tag =gui/before-words-texts=): Words (W-1…W-6) and Texts (T-1…T-3, T-10) refreshed in the kit of Practice. =PYTHONPATH=.:src pytest=: 560 passed before the new tests, 7 new ones after; 8 deliberate breakages of the new markup, all caught. UX-30 … UX-34 added to =UX-Decisions.md=. Committed locally with the tag =gui/words-texts-refresh=; nothing pushed.

@@ -56,8 +56,17 @@ form.wort-inline { display: inline; margin: 0; }
 .wort-badge[data-v="correct"] { color: var(--wort-ok); }
 .wort-badge[data-v="wrong"] { color: var(--wort-bad); }
 .wort-badge[data-v="almost"] { color: var(--wort-mid); }
-/* The warning tag's own text colour is 2.1:1 on its tint in the light theme (Texte, uncertain spots); the amber of "almost right" is not. */
-.ds-tag[data-type="warning"][data-subtype="passive"] { color: var(--wort-mid); }
+/* Tags (score, "in your words", uncertain spots) look like the verdict badges: a border, the text colour of the verdict,
+   a glyph for the colour-blind (UX-21). dis-system's own passive tags are 2.1-3.4:1 on their tints in the light theme. */
+.ds-tag[data-subtype="passive"] { padding: 1px var(--ds-spacing-3); background: none; border: 1px solid currentColor; border-radius: 0; font-size: var(--ds-font-data-size); font-weight: var(--ds-font-title-weight); line-height: 1.5; color: var(--ds-color-text-active); }
+.ds-tag[data-subtype="passive"][data-type="success"] { background-color: transparent; color: var(--wort-ok); }
+.ds-tag[data-subtype="passive"][data-type="warning"] { background-color: transparent; color: var(--wort-mid); }
+.ds-tag[data-subtype="passive"][data-type="danger"] { background-color: transparent; color: var(--wort-bad); }
+.ds-tag[data-subtype="passive"][data-type="neutral"] { background-color: transparent; color: var(--ds-color-text-active); border-style: dashed; }
+.ds-tag[data-subtype="passive"]:is([data-type="success"], [data-type="warning"], [data-type="danger"])::before { margin-right: var(--ds-spacing-2); font-weight: bold; }
+.ds-tag[data-subtype="passive"][data-type="success"]::before { content: "✓" / ""; }
+.ds-tag[data-subtype="passive"][data-type="warning"]::before { content: "~" / ""; }
+.ds-tag[data-subtype="passive"][data-type="danger"]::before { content: "✗" / ""; }
 /* The destructive popup action ("Delete", "Remove") is 3.9:1 in the light theme and 4.4:1 in the dark one in the system's red; the red used for "wrong" is not. */
 .ds-popup .ds-text-button[data-status="error"] { color: var(--wort-bad); }
 .wort-badge[data-v="tip"], .wort-badge[data-v="none"], .wort-badge[data-v="skipped"] { color: var(--ds-color-text-active); border-style: dashed; }
@@ -175,7 +184,7 @@ ol.wort-chips { counter-reset: none; }
 .wort-resulttable td { padding: var(--ds-spacing-4) var(--ds-spacing-cell); border-bottom: 1px solid var(--ds-color-border-table); }
 .wort-resulttable td:nth-child(n+3), .wort-resulttable th:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
 
-.wort-section-title { margin: 0; padding: var(--ds-spacing-cell) var(--ds-spacing-6); background: var(--ds-color-bg-surface-pressed); border: 1px solid var(--wort-line); font-size: var(--ds-font-title-size); font-weight: var(--ds-font-title-weight); line-height: 1.3; }
+.wort-section-title, .wort-bar { margin: 0; padding: var(--ds-spacing-cell) var(--ds-spacing-6); background: var(--ds-color-bg-surface-pressed); border: 1px solid var(--wort-line); font-size: var(--ds-font-title-size); font-weight: var(--ds-font-title-weight); line-height: 1.3; }
 /* ---- Grammar ------------------------------------------------------------------------------------------------------- */
 .wort-grammar__uk { padding: var(--ds-spacing-3) var(--ds-spacing-5); border-left: 3px solid var(--wort-line); color: var(--ds-color-text-active); }
 .wort-topiclist { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--wort-line); }
@@ -213,6 +222,89 @@ ol.wort-chips { counter-reset: none; }
   .wort-verdict { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .wort-btn, .wort-chip { transition: none; } }
+
+/* A section heading with a note at its end ("2 of 5"); the grammar topic's title is the same bar. */
+.wort-bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--ds-spacing-2) var(--ds-spacing-5); }
+.wort-bar__info { font-size: var(--ds-font-data-size); font-weight: normal; color: var(--ds-color-text-subactive); }
+.wort-label { font-weight: var(--ds-font-title-weight); color: var(--ds-color-text-active); }
+button.wort-chip { font: inherit; cursor: pointer; }
+button.wort-chip:hover { border-color: var(--ds-color-text-active); }
+button.wort-chip:focus-visible { outline: 2px solid var(--wort-focus); outline-offset: 2px; }
+
+/* ---- Words: title with its count, the labelled lookup, the filter and the selection bar, the table, the open word ---- */
+.wort-wordspage { display: grid; gap: var(--ds-spacing-6); align-content: start; padding: var(--ds-spacing-7) 0 var(--ds-spacing-9); }
+.wort-wordspage > .wort-pagehead, .wort-lookupbar { padding-inline: var(--ds-spacing-6); }
+.wort-lookupbar { box-sizing: border-box; max-width: calc(var(--ds-spacing-9) * 24); }
+.wort-lookupbar__form, .wort-ownform { display: grid; gap: var(--ds-spacing-3); }
+.wort-lookupbar__row { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--ds-spacing-4); }
+.wort-lookupbar__row .ds-input { flex: 1 1 calc(var(--ds-spacing-9) * 4); width: auto; min-width: 0; min-height: var(--wort-target); }
+.wort-listbar { display: grid; gap: var(--ds-spacing-5); }
+.wort-listbar__tools, .wort-selbar, .wort-empty { margin-inline: var(--ds-spacing-6); }
+.wort-listbar__tools { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--ds-spacing-4) var(--ds-spacing-7); }
+.wort-filter { display: grid; gap: var(--ds-spacing-2); flex: 1 1 calc(var(--ds-spacing-9) * 8); max-width: calc(var(--ds-spacing-9) * 12); }
+.wort-filter .ds-input { width: auto; min-height: var(--wort-target); }
+.wort-quick { display: grid; gap: var(--ds-spacing-2); }
+.wort-selbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ds-spacing-3) var(--ds-spacing-6); padding: var(--ds-spacing-3) var(--ds-spacing-5); background: var(--ds-color-bg-surface-pressed); border: 1px solid var(--wort-line); }
+.wort-selbar__state { margin: 0; color: var(--ds-color-text-subactive); }
+.wort-selbar:has([data-status="active"]) .wort-selbar__state { color: var(--ds-color-text-active); font-weight: var(--ds-font-title-weight); }
+.wort-empty { display: grid; gap: var(--ds-spacing-5); justify-items: center; padding-top: var(--ds-spacing-6); }
+.wort-more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-3) var(--ds-spacing-5); padding: var(--ds-spacing-5) var(--ds-spacing-6); border-top: 1px solid var(--ds-color-border-table); }
+/* The row checkbox is there at all times (dis-system shows it only under the pointer): a touch screen has no hover. */
+.wort-words .ds-table-row:not(:hover):not(:focus-within):not([data-selected="true"]) > .ds-table-cell[data-type="checkbox-cell"] .ds-table-cell__icon { opacity: 1; }
+.wort-word__title { margin: 0; font-size: var(--ds-font-heading-3-size); line-height: 1.2; }
+.wort-word__title[data-article="der"] { color: var(--ds-color-accent-1); }
+.wort-word__title[data-article="die"] { color: var(--ds-color-row-status-declined-text); }
+.wort-word__title[data-article="das"] { color: var(--wort-ok); }
+.wort-word__summary { display: grid; gap: var(--ds-spacing-3); }
+.wort-word__summary p { margin: 0; }
+.wort-word__translation { font-size: var(--ds-font-heading-5-size); }
+.wort-word .ds-pane__head { flex-wrap: wrap; gap: var(--ds-spacing-2) var(--ds-spacing-5); }
+.wort-detail .wort-note { margin: 0; }
+/* A plain button at the start of a line sits on the text's edge, not on its own padding. */
+.wort-detail .wort-btn--ghost { margin-left: calc(-1 * var(--ds-spacing-4)); }
+.wort-wordspage > .wort-pagehead > .wort-pagehead__text { flex: 1 1 calc(var(--ds-spacing-9) * 5); }
+.wort-wordspage > .wort-pagehead > .wort-btn-row { flex: 0 0 auto; }
+
+/* ---- Texts: the actions of a text together, the legend as a caption, the list of texts on a phone ------------------------ */
+.wort-text__actions { margin-bottom: calc(-1 * var(--ds-spacing-3)); }
+.wort-text .wort-btn-row > .wort-btn--ghost:first-child { margin-left: calc(-1 * var(--ds-spacing-4)); }
+/* "in list" in a note: the word is in the word list, which is good news: the success look of the badges. */
+.ds-note-item .ds-tag[data-type="neutral"] { color: var(--wort-ok); border-style: solid; }
+.ds-note-item .ds-tag[data-type="neutral"]::before { content: "✓" / ""; margin-right: var(--ds-spacing-2); font-weight: bold; }
+.wort-text .ds-word-token-legend { font-style: normal; font-size: var(--ds-font-data-size); color: var(--ds-color-text-subactive); }
+.wort-notes { display: grid; align-content: start; }
+.wort-notes > .wort-btn-row { padding: var(--ds-spacing-4) var(--ds-spacing-6); border-bottom: 1px solid var(--ds-color-border-table); }
+.wort-upload__title { display: grid; gap: var(--ds-spacing-2); }
+.wort-check__photo .wort-btn-row { gap: var(--ds-spacing-2); }
+.wort-check__doubts { display: grid; gap: var(--ds-spacing-3); }
+.wort-check__doubts p { margin: 0; }
+.wort-note[role="note"] { margin: 0; }
+.wort-texts-m { display: none; }
+/* The create row of the list of texts ("Upload photo") is the one filled button of the page. */
+.wort-texts__side .ds-sidebar-item[data-role="create"] { padding: var(--ds-spacing-4) var(--ds-spacing-5); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button { box-sizing: border-box; width: 100%; min-height: var(--wort-target); justify-content: center; background: var(--ds-color-accent-1); border: 1px solid var(--ds-color-accent-1); color: var(--ds-color-bg-surface); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button:hover { background: var(--ds-color-accent-1-hover); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button__text { text-decoration: none; font-weight: var(--ds-font-title-weight); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button::before, .wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button::after { display: none; }
+@media (max-width: 720px) {
+  .wort-texts-m { display: block; border-bottom: 1px solid var(--wort-line); }
+  .wort-texts-m__bar { padding: var(--ds-spacing-4) var(--ds-spacing-5); }
+  .wort-texts-m__bar .wort-btn { width: 100%; }
+  .wort-texts-m .wort-words-m { border-bottom: 0; border-top: 1px solid var(--wort-line); }
+  .wort-texts-m__row { flex-wrap: wrap; align-items: center; padding-block: var(--ds-spacing-3); }
+  .wort-texts__side { display: none; }
+}
+
+/* ---- Popups: their actions are buttons like the rest of wort (dis-system draws them as text links) ----------------- */
+.ds-popup__bottom { flex-wrap: wrap; height: auto; min-height: calc(var(--ds-spacing-9) + var(--ds-spacing-6)); padding: var(--ds-spacing-5) var(--ds-spacing-6); gap: var(--ds-spacing-3) var(--ds-spacing-4); }
+.ds-popup__bottom .ds-text-button { box-sizing: border-box; min-height: var(--wort-target); justify-content: center; padding: 0 var(--ds-spacing-6); color: var(--ds-color-accent-1); border: 1px solid var(--ds-color-accent-1); }
+.ds-popup__bottom .ds-text-button .ds-text-button__text, .ds-popup__bottom .ds-text-button .ds-text-button__label { text-decoration: none; font-weight: var(--ds-font-title-weight); }
+.ds-popup__bottom .ds-text-button::before, .ds-popup__bottom .ds-text-button::after { display: none; }
+.ds-popup__bottom .ds-text-button:hover { background: var(--ds-color-bg-surface-pressed); }
+.ds-popup__bottom .ds-text-button[data-priority="primary"] { background: var(--ds-color-accent-1); color: var(--ds-color-bg-surface); }
+.ds-popup__bottom .ds-text-button[data-priority="primary"]:hover { background: var(--ds-color-accent-1-hover); }
+.ds-popup__bottom .ds-text-button[data-status="error"] { border-color: var(--wort-bad); }
+.ds-popup__bottom .ds-text-button:focus-visible { outline: 2px solid var(--wort-focus); outline-offset: 2px; }
 
 /* Look-up side panel (440px, even on a wide window): its result is one column, the forms table at full width. */
 .wort-side__results .wort-lookup__item.wort-result { grid-template-columns: minmax(0, 1fr); }

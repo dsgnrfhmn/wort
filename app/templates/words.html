@@ -1,41 +1,57 @@
 {% extends "base.html" %}
+{% from "_ui.html" import btn, badge, bar with context %}
 {% block title %}{{ _('Words') }} · wort{% endblock %}
 {% block body_attrs %} data-layout="full"{% endblock %}
-{% block head_extra %}
-<link rel="stylesheet" href="/ds/local-components/hero-block/style.css">
-{% endblock %}
 {% block content %}
-{# Hero: the lookup field only (the name "wort" is the nav bar's brand). dis-system's staged local-components/hero-block
-   markup, sized to its content (data-fit). #}
-<section class="ds-hero-block" data-fit="content" aria-label="{{ _('Look up') }}">
-  <form class="ds-hero-block__search" method="get" action="/" role="search">
-    <input type="hidden" name="s" value="1">
-    {% with name='q', label=_('Look up a word or sentence'), value=query, placeholder=_('A word in German or English'), fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
-  </form>
-</section>
-{# The hero ends in a dis-system divider; nav bar → field, field → divider and divider → the content below are the
-   same space (garv, 2026-10-29; layout.css / trial.css). #}
-<div class="wort-hero-divider">{% include "components/divider/template.html" %}</div>
+{# GUI refresh (garv, 2026-10-30), after Practice: the page's own title with its count, one labelled field to look
+   things up, the selection bar that says why its buttons wait, the table, the open word beside it. The table, its
+   sort headers, the row menu and the word pane keep dis-system's components and the behaviour in app.js. #}
+<div class="wort-wordspage">
+  <header class="wort-pagehead">
+    <div class="wort-pagehead__text">
+      <h1 class="wort-title">{{ _('Words') }}</h1>
+      <p class="wort-caption">{{ _('{n} word', n=total) if total == 1 else _('{n} words', n=total) }} · {{ _('{week} this week', week=this_week) }}{% if last_added %} · {{ _('last {date}', date=last_added) }}{% endif %}</p>
+    </div>
+    {# "Gesuchte laden" (dev only, WORT_CLI_DB set): the CLI's searches and words from this machine's user.db. #}
+    <form method="post" action="/import/cli" class="wort-cli-import wort-btn-row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {{ btn(_('Import'), 'secondary', href='/history') }}
+      {% if cli_import %}{{ btn(_('Load searches'), 'ghost', submit=true) }}{% endif %}
+    </form>
+  </header>
+
+  {# The lookup: a word or a whole sentence, in German or English. The result block (.wort-lookup) is swapped in
+     right below this section, in place (app.js), and its "Close" removes it again. #}
+  <section class="wort-lookupbar" data-lookup aria-labelledby="lookup-label">
+    <form class="wort-lookupbar__form" method="get" action="/" role="search">
+      <input type="hidden" name="s" value="1">
+      <label class="wort-label" id="lookup-label" for="wort-lookup-q">{{ _('Look up a word or sentence') }}</label>
+      <div class="wort-lookupbar__row">
+        {% with id='wort-lookup-q', name='q', label=_('Look up a word or sentence'), value=query, placeholder=_('A word in German or English'), fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+        {{ btn(_('Look up'), 'secondary', submit=true) }}
+      </div>
+    </form>
+  </section>
 
 {% if query %}
 {# Search result (design "Wörter — Suchergebnis"): a bar with the query, then per entry the word with its forms on
-   the left and its examples and related words on the right. app.js swaps this block in place; its "Schließen"
+   the left and its examples and related words on the right. app.js swaps this block in place; its "Close"
    (a[href="/"] in the first .wort-row) closes it, and the side panel on Üben posts its /words/add forms itself. #}
-{% macro add_form(r, label, outlined) %}
-  <form method="post" action="/words/add">
+{% macro add_form(r, label, primary) %}
+  <form method="post" action="/words/add" class="wort-inline">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="lemma" value="{{ r.entry.lemma }}">
     <input type="hidden" name="pos" value="{{ r.entry.pos }}">
     <input type="hidden" name="q" value="{{ query }}">
-    {% with priority='primary', underline='dotted', label=label, submit=true, outlined=outlined %}{% include "components/text-button/template.html" %}{% endwith %}
+    {{ btn(label, 'primary' if primary else 'secondary', submit=true) }}
   </form>
 {% endmacro %}
 <section class="wort-lookup" aria-live="polite" aria-labelledby="results-title">
   <div class="wort-row wort-lookup__bar">
-    <h2 class="wort-lookup__summary" id="results-title">{{ _('Result for “{query}” · {n} hits', query=query, n=results | length) }}{% if searches %} · {{ _('searched {n}×', n=searches) }}{% endif %}{% if note %} · {{ note }}{% endif %}</h2>
+    <h2 class="wort-lookup__summary" id="results-title">{{ _('Result for “{query}” · {n} hits', query=query, n=results | length) if results | length != 1 else _('Result for “{query}” · 1 hit', query=query) }}{% if searches %} · {{ _('searched {n}×', n=searches) }}{% endif %}{% if note %} · {{ note }}{% endif %}</h2>
     <div class="wort-row">
       {% if results | length == 1 and not results[0].owned %}{{ add_form(results[0], _('Add to my words'), true) }}{% endif %}
-      {% with priority='secondary', underline='solid', label=_('Close'), href='/', outlined=true %}{% include "components/text-button/template.html" %}{% endwith %}
+      {{ btn(_('Close'), 'ghost', href='/') }}
     </div>
   </div>
   {% if not has_dictionary %}
@@ -47,26 +63,25 @@
   {% for r in results %}
   <article class="wort-lookup__item wort-result" aria-labelledby="result-{{ loop.index }}">
     <div class="wort-result__main">
-      <h3 class="wort-result__word" id="result-{{ loop.index }}" tabindex="-1"{% if r.article %} data-article="{{ r.article }}"{% endif %}><span class="wort-tip-wrap"{% if r.tooltip %} data-tooltip="{{ r.tooltip }}"{% endif %}>{{ r.label }}</span></h3>
+      <h3 class="wort-result__word" id="result-{{ loop.index }}" tabindex="-1" lang="de"{% if r.article %} data-article="{{ r.article }}"{% endif %}><span class="wort-tip-wrap"{% if r.tooltip %} data-tooltip="{{ r.tooltip }}"{% endif %}>{{ r.label }}</span></h3>
       <p class="wort-result__translation">{{ r.translation }}</p>
       {% if r.meta %}<p class="wort-result__meta">{{ r.meta }}</p>{% endif %}
       <div class="wort-row wort-result__status">
         {% if r.owned %}
-        {% with type='success', subtype='passive', label=_('in your words') %}{% include "components/tag/template.html" %}{% endwith %}
+        {{ badge('correct', _('in your words')) }}
         {% else %}
-        {% with type='neutral', subtype='passive', label='–' %}{% include "components/tag/template.html" %}{% endwith %}
         <span class="wort-result__note">{{ _('Not in your list yet') }}</span>
         {% if results | length > 1 %}{{ add_form(r, _('Add to my words'), false) }}{% endif %}
         {% endif %}
       </div>
       {% if r.definitions %}
       {# German definitions; every word in them shows its translation on hover (app.js). #}
-      <ol class="wort-definitions" aria-label="{{ _('Meaning') }}">{% for d in r.definitions %}<li>{{ d }}</li>{% endfor %}</ol>
+      <ol class="wort-definitions" lang="de" aria-label="{{ _('Meaning') }}">{% for d in r.definitions %}<li>{{ d }}</li>{% endfor %}</ol>
       {% endif %}
       {% if r.table %}
       <section class="wort-result__section">
-        {% with type='title-info', title=r.table.title, info=r.table.headers[1:] | join(' und ' if r.table.headers | length == 3 else ' · ') %}{% include "components/table-header/template.html" %}{% endwith %}
-        <div class="wort-table {{ 'wort-conjugation' if r.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ r.table.title }} {{ r.label }}">
+        {{ bar(r.table.title, r.table.headers[1:] | join(' und ' if r.table.headers | length == 3 else ' · '), lang='de') }}
+        <div class="wort-table {{ 'wort-conjugation' if r.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ r.table.title }} {{ r.label }}" lang="de">
           {% for h in r.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
           {% for row in r.table.rows %}
           {% set cells = [{'type': 'text-passive-cell', 'content': row[0]}] %}
@@ -81,21 +96,21 @@
     <div class="wort-result__side">
       {% if r.sample %}
       <section class="wort-result__section" data-examples>
-        {% with type='title-info', title=_('Examples'), info=_('{shown} of {total}', shown=[3, r.sample | length] | min, total=r.sample | length) %}{% include "components/table-header/template.html" %}{% endwith %}
+        {{ bar(_('Examples'), _('{shown} of {total}', shown=[3, r.sample | length] | min, total=r.sample | length)) }}
         {% for ex in r.sample %}
         <div class="wort-example"{% if loop.index > 3 %} hidden{% endif %}>
-          <p>{% for seg in ex.segments %}{% if seg.hl %}<span class="wort-example__word"{% if r.article %} data-article="{{ r.article }}"{% endif %}>{{ seg.text }}</span>{% else %}{{ seg.text }}{% endif %}{% endfor %}</p>
+          <p lang="de">{% for seg in ex.segments %}{% if seg.hl %}<span class="wort-example__word"{% if r.article %} data-article="{{ r.article }}"{% endif %}>{{ seg.text }}</span>{% else %}{{ seg.text }}{% endif %}{% endfor %}</p>
           {% if ex.translation %}<p class="wort-example__translation">{{ ex.translation }}</p>{% endif %}
         </div>
         {% endfor %}
         {% if r.sample | length > 3 %}
-        {% with priority='secondary', underline='dotted', label=_('Show another example'), extra_attrs='data-more-examples' %}{% include "components/text-button/template.html" %}{% endwith %}
+        {{ btn(_('Show another example'), 'ghost', attrs='data-more-examples') }}
         {% endif %}
       </section>
       {% endif %}
       {% if r.related %}
       <section class="wort-result__section">
-        {% with type='title', title=_('Related words') %}{% include "components/table-header/template.html" %}{% endwith %}
+        {{ bar(_('Related words')) }}
         <p class="wort-related">{% for w in r.related %}{% if not loop.first %} · {% endif %}{% with priority='secondary', underline='solid', label=w.label, article=w.article, href='/?s=1&q=' ~ (w.q | urlencode) %}{% include "components/text-button/template.html" %}{% endwith %}{% if w.pos %} <span class="wort-result__note">{{ w.pos }}</span>{% endif %}{% endfor %}</p>
       </section>
       {% endif %}
@@ -107,21 +122,32 @@
 </section>
 {% endif %}
 
-<section class="wort-section">
-  {# "Gesuchte laden" (dev only, WORT_CLI_DB set): the CLI's searches and words from this machine's user.db. #}
-  {% set actions = [{'label': _('Import'), 'href': '/history', 'underline': 'solid'}] + ([{'label': _('Load searches'), 'submit': true, 'underline': 'dotted'}] if cli_import else []) %}
-  <form method="post" action="/import/cli" class="wort-cli-import">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% with title=_('Words'), actions_left=actions, meta_text=_('{n} words · {week} this week', n=total, week=this_week) ~ (' · ' ~ _('last {date}', date=last_added) if last_added else ''), actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
-  </form>
-  {% with layout='bulk', search=true, search_placeholder=_('Word or translation'), actions=[
-    {'label': _('Build sentences'), 'priority': 'primary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/saetze" data-needs-selection'},
-    {'label': _('Quiz'), 'priority': 'secondary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'submit': true, 'extra_attrs': 'form="practice-form" formaction="/ueben/abfrage" data-needs-selection'},
-    {'label': _('Clear selection'), 'priority': 'secondary', 'outlined': true, 'status': 'active' if selected else 'disabled', 'extra_attrs': 'data-clear-selection data-needs-selection'}
-  ], more_actions=[
-    {'label': _('10 weakest'), 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="weakest"'},
-    {'label': _('Last 20'), 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="preset-form" name="preset" value="latest"'}
-  ] %}{% include "components/header-block/template.html" %}{% endwith %}
+<section class="wort-listbar" aria-labelledby="list-title">
+  <h2 class="wort-sr" id="list-title">{{ _('Your words') }}</h2>
+  {% if rows %}
+  {# Two ways to choose words, then the bar that says what is chosen and why its buttons wait. #}
+  <div class="wort-listbar__tools">
+    <div class="wort-filter">
+      <label class="wort-label" for="wort-filter">{{ _('Filter the list') }}</label>
+      {% with id='wort-filter', label=_('Filter the list'), placeholder=_('Word or translation'), fill='filled', autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+    </div>
+    <div class="wort-quick" role="group" aria-label="{{ _('Quick pick') }}">
+      <span class="wort-label" aria-hidden="true">{{ _('Quick pick') }}</span>
+      <div class="wort-chips">
+        <button class="wort-chip" type="submit" form="preset-form" name="preset" value="weakest">{{ _('10 weakest') }}</button>
+        <button class="wort-chip" type="submit" form="preset-form" name="preset" value="latest">{{ _('Last 20') }}</button>
+      </div>
+    </div>
+  </div>
+  <div class="wort-selbar" role="group" aria-label="{{ _('Practise the selected words') }}">
+    <p class="wort-selbar__state" data-selection-state role="status">{{ _('{n} selected', n=selected | length) if selected else _('Select words to practise them') }}</p>
+    <div class="wort-btn-row">
+      {{ btn(_('Build sentences'), 'primary', submit=true, attrs='form="practice-form" formaction="/ueben/saetze" data-needs-selection data-status="' ~ ('active' if selected else 'disabled') ~ '"' ~ ('' if selected else ' disabled')) }}
+      {{ btn(_('Quiz'), 'secondary', submit=true, attrs='form="practice-form" formaction="/ueben/abfrage" data-needs-selection data-status="' ~ ('active' if selected else 'disabled') ~ '"' ~ ('' if selected else ' disabled')) }}
+      {{ btn(_('Clear selection'), 'ghost', attrs='data-clear-selection data-needs-selection data-status="' ~ ('active' if selected else 'disabled') ~ '"' ~ ('' if selected else ' disabled')) }}
+    </div>
+  </div>
+  {% endif %}
   <form id="preset-form" method="get" action="/" hidden></form>
   <form id="practice-form" method="post" action="/ueben/saetze" hidden>
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -153,9 +179,10 @@
     {% endfor %}
   </div>
   {% if total > rows | length %}
-  <div class="ds-table-footer">
-    {% with priority='secondary', underline='dotted', label=_('Load 20 more'), href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ (limit + 20) %}{% include "components/text-button/template.html" %}{% endwith %}
-    {% with priority='secondary', underline='dotted', label=_('Load all {n}', n=total), href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ total %}{% include "components/text-button/template.html" %}{% endwith %}
+  <div class="wort-more">
+    <span class="wort-caption">{{ _('{shown} of {total}', shown=rows | length, total=total) }}</span>
+    {{ btn(_('Load 20 more'), 'secondary', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ (limit + 20)) }}
+    {{ btn(_('Load all {n}', n=total), 'ghost', href='/?sort=' ~ sort ~ '&dir=' ~ dir ~ '&limit=' ~ total) }}
   </div>
   {% endif %}
   </div>
@@ -177,10 +204,11 @@
   <div class="wort-split-list__side" id="wort-side">{% if detail %}{% with d=detail %}{% include "_word_detail.html" %}{% endwith %}{% endif %}</div>
   </div>
   {% else %}
-  {% with message=_('No words yet. Add words from your history (“Learn”) or import an export file.') %}{% include "components/empty-state/template.html" %}{% endwith %}
-  <div class="wort-row">
-    {% with priority='primary', underline='solid', label=_('Add from history'), href='/history' %}{% include "components/text-button/template.html" %}{% endwith %}
+  <div class="wort-empty">
+    {% with message=_('No words yet. Add words from your history (“Learn”) or import an export file.') %}{% include "components/empty-state/template.html" %}{% endwith %}
+    <div class="wort-btn-row">{{ btn(_('Add from history'), 'primary', href='/history') }}</div>
   </div>
   {% endif %}
 </section>
+</div>
 {% endblock %}

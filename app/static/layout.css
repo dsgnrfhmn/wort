@@ -228,18 +228,14 @@ body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-t
   /* #detail / #wort-table: --wort-head-h is measured, so it already covers the nav bar wrapping to three rows */
   /* The word table keeps readable columns and scrolls sideways in its own box instead of squeezing them. */
   .wort-split-list__table { overflow-x: auto; }
-  body[data-layout="full"] .wort-words { min-width: calc(var(--ds-spacing-9) * 18); }
   /* The word pane sits above the table here, so the table never changes width: the Wort column goes back to its
-     share of the table (22vw would cut the words at phone width). */
-  body[data-layout="full"] .wort-words { grid-template-columns: max-content minmax(0, 1.4fr) minmax(0, 2fr) max-content max-content; }
-  body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-template-columns: max-content minmax(0, 1.4fr) minmax(0, 2fr) max-content; }
+     share of the table (22vw would cut the words at phone width). "Added" gives way to "Score" (the word's own pane
+     says when it was added), so the table fits the screen. */
+  body[data-layout="full"] .wort-words, body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1.4fr) max-content; }
+  .wort-words > .ds-table-header-cell:nth-child(4), .wort-words .ds-table-row > :nth-child(4) { display: none; }
 }
 
-/* Wörter page: the divider under the hero keeps the hero's own space (spacing-6, trial.css) to whatever follows; an
-   open lookup block then needs no top border of its own. */
-.wort-hero-divider { padding-bottom: var(--ds-spacing-6); }
-.wort-hero-divider + .wort-lookup { border-top: 0; }
-/* Wörter page: lookup results between the hero and the word table. */
+/* Wörter page: lookup results between the lookup bar and the word table. */
 /* The opened lookup block runs the full page width, framed by a border above and below; its results sit
    centred, in columns of 480-560px (a forms table's reading width). */
 .wort-lookup { display: grid; gap: var(--ds-spacing-6); padding: var(--ds-spacing-6) var(--ds-spacing-5) var(--ds-spacing-8); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); border-bottom: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
@@ -266,7 +262,6 @@ body[data-layout="full"] .wort-split-list[data-open="true"] .wort-words { grid-t
   .wort-result__side { border-left: 0; border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
 }
 .wort-definitions { margin: 0; padding-left: var(--ds-spacing-6); display: grid; gap: var(--ds-spacing-2); }
-.wort-lookup .ds-table-header__title { padding: 0; }
 .wort-conjugation { grid-template-columns: minmax(0, 0.8fr) repeat(3, minmax(0, 1.4fr)); }
 /* Abfrage (design Üben 6): the word beside this round's results; stacked on a narrow window. */
 .wort-abfrage { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); scroll-margin-top: var(--wort-head-h); }

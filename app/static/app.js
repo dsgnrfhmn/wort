@@ -68,12 +68,16 @@ window.addEventListener('DOMContentLoaded', () => {
   const selectedRows = () => Array.from(table.querySelectorAll('.ds-table-row[data-selected="true"][data-word-id]:not([data-phrase])'));
   const gated = () => Array.from(document.querySelectorAll('[data-needs-selection]'));
 
+  const state = document.querySelector('[data-selection-state]');
   const syncButtons = () => {
-    const on = selectedRows().length > 0;
+    const n = selectedRows().length;
+    const on = n > 0;
     gated().forEach((b) => {
       b.dataset.status = on ? 'active' : 'disabled';
       if (b.tagName === 'BUTTON') b.disabled = !on;
     });
+    // The bar says what is chosen, or why its buttons wait (textContent: the texts are our own, from the page's JSON).
+    if (state) state.textContent = on ? wortText('selected_n').replace('{n}', String(n)) : wortText('select_hint');
   };
   // Nothing is selected on load; only a preset from the server ("10 schwächste", "Letzte 20") pre-selects rows.
   // A phrase row has no checkbox and is never selected (Üben has no exercise for it); "select all" skips it, and the
@@ -121,7 +125,7 @@ window.addEventListener('DOMContentLoaded', () => {
     window.location.assign(url);
   });
 
-  document.querySelector('.ds-header-block__search input')?.addEventListener('input', (e) => {
+  document.getElementById('wort-filter')?.addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
     table.querySelectorAll('.ds-table-row').forEach((r) => {
       r.hidden = q !== '' && !r.textContent.toLowerCase().includes(q);
@@ -148,7 +152,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     return null;
   };
-  const labelButtons = (root) => root.querySelectorAll('.ds-text-button, .ds-header-tab, .ds-table-header-cell__sort-btn').forEach((button) => {
+  const labelButtons = (root) => root.querySelectorAll('.ds-text-button, .ds-header-tab, .ds-table-header-cell__sort-btn, .wort-btn, .wort-chip').forEach((button) => {
     if (button.closest('[data-tooltip]') || button.querySelector('[data-tooltip]')) return;
     let target = button.querySelector('.ds-text-button__label, .ds-text-button__text, .ds-header-tab__label, .ds-table-cell__text');
     const label = (target || button).textContent.replace(/\s+/g, ' ').trim();
@@ -426,13 +430,13 @@ window.wortPrepare = (root) => {
   });
 })();
 
-/* Lookup in place: the hero's field submits by fetch and only the result block (.wort-lookup) is swapped in
-   below the hero, fading in; the hero and the field do not move, the page is not reloaded and the scroll stays.
+/* Lookup in place: the lookup bar's field submits by fetch and only the result block (.wort-lookup) is swapped in
+   below the bar, fading in; the bar and the field do not move, the page is not reloaded and the scroll stays.
    The result block's own "Suche schließen" removes it. Address bar and back/forward follow (pushState); a
    failed fetch falls back to the normal page load. */
 (() => {
-  const hero = document.querySelector('.ds-hero-block');
-  const form = hero?.querySelector('form[role="search"]');
+  const bar = document.querySelector('[data-lookup]');
+  const form = bar?.querySelector('form[role="search"]');
   if (!form) return;
   const input = form.querySelector('input[name="q"]');
   let token = 0;
@@ -440,7 +444,7 @@ window.wortPrepare = (root) => {
     document.querySelector('.wort-lookup')?.remove();
     if (!section) return;
     const block = document.importNode(section, true);
-    hero.after(block);
+    bar.after(block);
     window.wortPrepare(block);
     block.classList.add('ds-fade-in');  // dis-system fade-in: the result block arrives softly, the field stays put
     block.addEventListener('animationend', () => block.classList.remove('ds-fade-in'), { once: true });
@@ -760,6 +764,17 @@ document.addEventListener('click', (e) => {
       opener.click();
     }
   });
+  // "Remove word" in the open word's pane: the same confirmation (without scripts its form posts straight away).
+  document.addEventListener('click', (e) => {
+    const button = e.target instanceof Element ? e.target.closest('[data-remove-word]') : null;
+    if (!button || !confirmBox || !deleteForm || !opener || !/^\d+$/.test(button.dataset.removeWord || '')) return;
+    e.preventDefault();
+    pending = button.dataset.removeWord;
+    const word = (document.getElementById('detail-title')?.textContent || '').trim();
+    const text = confirmBox.querySelector('.ds-popup__body p');
+    if (text && word) text.textContent = wortText('delete_named').replace('{word}', word);
+    opener.click();
+  });
   confirmBox?.addEventListener('ds-popup-before-close', (e) => {
     const button = e.detail && e.detail.button;
     if (!pending || !button || !button.hasAttribute('data-popup-confirm')) { pending = null; return; }
@@ -948,7 +963,7 @@ document.addEventListener('click', (e) => {
       const res = await fetch(window.location.pathname, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
       if (!res.ok) return;
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-      ['.wort-texts__notes', '.wort-texts__side'].forEach((selector) => {
+      ['.wort-texts__notes', '.wort-texts__side', '.wort-texts-m'].forEach((selector) => {
         const fresh = doc.querySelector(selector);
         const old = root.querySelector(selector);
         if (fresh && old) { old.replaceChildren(...fresh.childNodes); window.wortPrepare?.(old); }

@@ -36,7 +36,7 @@ def test_lookup_shows_german_definitions_when_installed(tmp_path, dict_path):
     c.get("/login")
     c.post("/login", data={"csrf": c.cookies.get("wort_csrf"), "name": "anna", "password": "correct horse battery"})
     html = c.get("/?q=Haus").text
-    assert '<ol class="wort-definitions" aria-label="Bedeutung"><li>Gebäude, das Menschen zum Wohnen dient</li>' in html
+    assert '<ol class="wort-definitions" lang="de" aria-label="Bedeutung"><li>Gebäude, das Menschen zum Wohnen dient</li>' in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;Familie" in html and "<script>alert(1)" not in html  # data, escaped
     without = create_app(db_path=tmp_path / "web.db", dict_path=dict_path, secure_cookies=False,
                          de_path=tmp_path / "missing.db")

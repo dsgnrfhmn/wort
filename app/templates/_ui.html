@@ -22,6 +22,10 @@
 {# A verdict by glyph, word and colour. `v`: correct | almost | wrong | tip | none | skipped. #}
 {% macro badge(v, label) %}<span class="wort-badge" data-v="{{ v }}"><span class="wort-badge__glyph" aria-hidden="true">{{ {'correct': '✓', 'almost': '~', 'wrong': '✗', 'tip': 'i', 'skipped': '→'}.get(v, '–') }}</span><span>{{ label }}</span></span>{% endmacro %}
 
+{# A section heading as a filled bar, with an optional note at its end ("2 of 5"). A real heading (h2 / h3), unlike
+   dis-system's table-header, which is a div; `lang` is for a title that is a German word. #}
+{% macro bar(title, info=none, level=3, lang=none) %}<h{{ level }} class="wort-bar"><span class="wort-bar__title"{% if lang %} lang="{{ lang }}"{% endif %}>{{ title }}</span>{% if info %}<span class="wort-bar__info">{{ info }}</span>{% endif %}</h{{ level }}>{% endmacro %}
+
 {# A button or link that looks like one. kind: primary | secondary | ghost | danger. `submit`: a form button; `href`: a link. #}
 {% macro btn(label, kind='secondary', href=none, submit=false, attrs='') %}
 {%- if href -%}<a class="wort-btn wort-btn--{{ kind }}" href="{{ href | safe_url }}"{% if attrs %} {{ attrs | safe }}{% endif %}>{{ label }}</a>

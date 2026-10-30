@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 import pytest
@@ -36,7 +37,7 @@ def test_list_shows_article_translation_and_score(env):
     store.record_attempt(a, wid, "form", "article", "p", "das", "correct", now=NOW)
     html = client_for(app, "anna").get("/").text
     assert "das Haus" in html and f'data-word-id="{wid}"' in html and f'href="/words/{wid}?' in html
-    assert "1 Wörter" in html
+    assert "1 Wort ·" in html and "1 Wörter" not in html  # a count in the singular
 
 
 def test_empty_list_has_explicit_state(env):
@@ -51,6 +52,7 @@ def test_bulk_buttons_disabled_until_selection_and_presets_preselect(env):
     c = client_for(app, "anna")
     plain = c.get("/").text
     assert 'data-status="disabled"' in plain and 'data-selected="true"' not in plain
+    assert "Wähle Wörter zum Üben aus" in plain  # the bar says why its buttons wait
     preset = c.get("/?preset=latest").text
     assert preset.count('data-selected="true"') == 3
 
@@ -187,7 +189,7 @@ def test_list_uses_article_color_and_score_chip(env):
     from app import words
     chip = words.SCORE_TAG[level(store.words(a)[0].score)]
     assert f'class="ds-tag" data-type="{chip}" data-subtype="passive">' in html
-    assert "ds-page-head" in html and "1 Wörter · 1 diese Woche" in html
+    assert 'class="wort-title"' in html and "1 Wort · 1 diese Woche" in html  # the page's own heading, the count in the singular
 
 
 def test_score_tag_types_follow_the_level():
@@ -408,7 +410,7 @@ def test_lookup_result_shows_examples_with_the_word_marked(env):
     app, store, a, _ = env
     page = client_for(app, "anna").get("/?s=1&q=Haus").text
     assert 'class="wort-example__word" data-article="das">' in page
-    assert 'class="wort-result__word" id="result-1" tabindex="-1" data-article="das">' in page
+    assert 'class="wort-result__word" id="result-1" tabindex="-1" lang="de" data-article="das">' in page
     assert "Nomen · neutral" in page
 
 
@@ -428,3 +430,48 @@ def test_rows_open_a_context_menu_and_removing_asks_first_and_takes_the_answers_
     assert "Haus" in c.get("/").text.split('data-flash')[1][:200]  # "„Haus“ wurde entfernt."
     assert [w.lemma for w in store.words(a)] == ["gehen"] and store.attempts(a, wid) == []
     assert c.post(f"/words/{wid}/delete", data={"csrf": "forged"}).status_code == 403
+
+
+def test_the_page_has_one_heading_and_its_fields_have_visible_labels(env):
+    app, store, a, _ = env
+    store.add_word(a, "Haus", "noun", now=NOW)
+    html = client_for(app, "anna").get("/").text
+    assert html.count("<h1") == 1 and ">Wörter</h1>" in html
+    assert '<label class="wort-label" id="lookup-label" for="wort-lookup-q">' in html and 'id="wort-lookup-q"' in html
+    assert re.search(r'<button class="wort-btn wort-btn--secondary" type="submit">Nachschlagen</button>', html)  # the lookup has its own button
+    assert '<label class="wort-label" for="wort-filter">Liste filtern</label>' in html and 'id="wort-filter"' in html
+    assert 'name="preset" value="weakest"' in html and 'name="preset" value="latest"' in html  # the quick picks stay
+
+
+def test_the_bar_says_how_many_are_chosen_or_why_its_buttons_wait(env):
+    app, store, a, _ = env
+    for i, lemma in enumerate(["Haus", "Hund"]):
+        store.add_word(a, lemma, "noun", now=NOW.replace(hour=i))
+    c = client_for(app, "anna")
+    assert "Wähle Wörter zum Üben aus" in c.get("/").text
+    chosen = c.get("/?preset=latest").text
+    assert "2 ausgewählt" in chosen and "Wähle Wörter zum Üben aus</p>" not in chosen
+    assert chosen.count(" disabled") == 0 or 'data-status="active"' in chosen  # the buttons are on once something is chosen
+
+
+def test_the_open_word_names_its_score_and_removing_asks_first(env):
+    app, store, a, _ = env
+    store.add_word(a, "Haus", "noun", now=NOW)
+    wid = store.words(a)[0].id
+    c = client_for(app, "anna")
+    page = c.get(f"/words/{wid}").text
+    assert 'data-v="none"' in page and "Noch kein Score" in page and "noch nicht geübt" in page  # not a bare dash
+    assert f'data-remove-word="{wid}"' in page and f'action="/words/{wid}/delete"' in page  # asks first with scripts, still works without
+    store.record_attempt(a, wid, "form", "article", "p", "das", "correct", now=NOW)
+    scored = c.get(f"/words/{wid}").text
+    badge = re.search(r'<span class="wort-badge" data-v="(\w+)">.*?Score (\d+)', scored)
+    assert badge and badge.group(1) != "none" and "Noch kein Score" not in scored
+
+
+def test_a_one_word_list_and_a_one_hit_result_are_in_the_singular(env):
+    app, store, a, _ = env
+    store.add_word(a, "Haus", "noun", now=datetime.now())
+    c = client_for(app, "anna")
+    assert "1 Wort · 1 diese Woche" in c.get("/").text
+    result = c.get("/?s=1&q=Haus").text
+    assert "1 Treffer" in result and "1 Treffern" not in result

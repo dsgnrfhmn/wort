@@ -22,24 +22,16 @@
 :root:not([data-theme="dark"]) body[data-view="session"] .wort-practice__main { background-color: var(--ds-color-base-150); }
 body[data-view="session"] .wort-review { background-color: var(--ds-color-bg-surface); }
 
-/* Wörter hero: as low as it gets; the field sits the same space (spacing-6) below the nav bar and above the divider
-   that closes the hero (garv, 2026-10-29; the divider's space to the content below is in layout.css). */
-.ds-hero-block[data-fit="content"] { min-height: 0; gap: var(--ds-spacing-2); padding: var(--ds-spacing-6) var(--ds-spacing-cell); }
-.ds-hero-block[data-fit="content"] .ds-hero-block__title { margin: 0; padding: 0; }
-.ds-hero-block[data-fit="content"] .ds-hero-block__search { margin-bottom: 0; }
-
 /* Search result (design "Wörter — Suchergebnis"): type and color of the parts dis-system has no component for yet.
    Article colors as dis-system's text-button uses them (der accent-1, die / das the row-status texts). */
 .wort-lookup__summary { margin: 0; font-size: var(--ds-font-body-text-size); font-weight: var(--ds-font-body-text-weight); font-style: italic; color: var(--ds-color-text-subactive); }
 .wort-result p { margin: 0; }
 .wort-result__word { margin: 0; font-size: var(--ds-font-heading-2-size); font-weight: var(--ds-font-heading-5-weight); line-height: var(--ds-font-heading-2-line-height); color: var(--ds-color-text-active); }
 .wort-result__translation { font-size: var(--ds-font-heading-5-size); }
-.wort-result__meta { font-family: var(--ds-font-data-family); font-size: var(--ds-font-data-size); font-weight: var(--ds-font-data-weight); color: var(--ds-color-base-750); }
+.wort-result__meta { font-family: var(--ds-font-data-family); font-size: var(--ds-font-data-size); font-weight: var(--ds-font-data-weight); color: var(--ds-color-text-subactive); }
 .wort-result__note { font-style: italic; color: var(--ds-color-text-subactive); }
-.wort-example__translation { color: var(--ds-color-base-750); }
+.wort-example__translation { color: var(--ds-color-text-subactive); }
 .wort-example__word { font-weight: var(--ds-font-body-text-medium-weight); }
 :is(.wort-result__word, .wort-example__word)[data-article="der"] { color: var(--ds-color-accent-1); font-weight: inherit; }
 :is(.wort-result__word, .wort-example__word)[data-article="die"] { color: var(--ds-color-row-status-declined-text); font-weight: inherit; }
 :is(.wort-result__word, .wort-example__word)[data-article="das"] { color: var(--ds-color-row-status-approved-text); font-weight: inherit; }
-/* The section heads (Deklination, Beispiele, Verwandte Wörter) as the design's filled bar. */
-.wort-result__section > .ds-table-header { background-color: var(--ds-color-bg-surface-pressed); border: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }

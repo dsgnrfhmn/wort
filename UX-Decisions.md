@@ -259,3 +259,48 @@ written by Claude and not yet reviewed by garv. Status of all: `draft`.
   field when a task waits (not on a touch screen, where it would open the keyboard over the task).
 - **Why:** Enter-to-send is a convention of chat, not of forms, and nothing tells a first-time user.
 - **Source:** 2026-10-30, GUI refresh. **Status:** draft
+
+## Lists, selection and fields
+
+Added with the second GUI refresh of 2026-10-30 (the word list and the texts). Wordings written by Claude, not yet
+reviewed by garv. Status of all: `draft`.
+
+### UX-30: A bar above a list says what is chosen, or why its actions wait
+
+- **Rule:** the actions that need a choice (practise, delete, move) sit in one bar above the list, always in the same
+  place. With nothing chosen the bar says what to do ("Select words to practise them") and its buttons are disabled; with
+  a choice it says how many ("2 selected") and the buttons work. The main action is the filled one (UX-22).
+- **Why:** buttons that are simply grey leave the reader guessing whether the page is broken; a sentence beside them
+  answers it, and a bar that stays put does not move the list when the first row is ticked.
+- **Source:** 2026-10-30, GUI refresh (finding W-a). **Status:** draft
+
+### UX-31: The field a page is for has a visible label and its own button
+
+- **Rule:** a search or lookup field carries a visible label above it and a button beside it; Enter also works. A filter of
+  a list on the same page has a visible label too. A placeholder is an example, never the label.
+- **Why:** a grey box with a placeholder gives no name once text is typed and no hint that it can be sent by touch; the
+  label stays and the button is a target for a thumb.
+- **Source:** 2026-10-30, GUI refresh (finding W-b). **Status:** draft
+
+### UX-32: Row selection is visible without hover
+
+- **Rule:** the checkbox of a row is drawn at all times, not only under the pointer. Rows are at least 44 px high.
+- **Why:** a touch screen has no hover, so a hidden checkbox means selection cannot be found, and a keyboard user only
+  meets it by tabbing into it.
+- **Source:** 2026-10-30, GUI refresh (finding W-a). **Status:** draft
+
+### UX-33: A destructive action asks first, from every place it can be reached
+
+- **Rule:** removing something that takes other data with it (a score, answers, notes) asks for confirmation in the
+  same way from the row menu, from the open item and from anywhere else; the confirmation names the item and says what
+  goes with it. The confirming button is the destructive one, in the error colour, and is not filled.
+- **Why:** the same action answering at once from one place and asking from another teaches that the confirmation is
+  optional; a name in the question makes a wrong click visible.
+- **Source:** 2026-10-30, GUI refresh (the open word's "Remove word" deleted at once, the row menu asked). **Status:** draft
+
+### UX-34: A count has a singular
+
+- **Rule:** counts and result lines use the singular where the number is one ("1 word", "1 hit"), in every interface
+  language, not "1 words".
+- **Why:** it is the first thing a reader notices as unfinished.
+- **Source:** 2026-10-30, GUI refresh (finding W-d). **Status:** draft

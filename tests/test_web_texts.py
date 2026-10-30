@@ -430,3 +430,34 @@ def test_the_store_keeps_texts_per_user_and_links_only_words_of_the_owner(tmp_pa
     store.conn.commit()
     assert store.conn.execute("SELECT COUNT(*) FROM texts").fetchone()[0] == 0
     assert store.conn.execute("SELECT COUNT(*) FROM text_words").fetchone()[0] == 0
+
+
+def test_the_page_has_one_heading_and_its_actions_are_buttons_beside_the_text(env, small):
+    c, *_ = env
+    page = c.get(f"/texte/{small}").text
+    assert page.count("<h1") == 1 and ">Testtext</h1>" in page  # the open text names the page
+    reader = page.split('class="wort-texts__reader"')[1].split('class="wort-texts__notes"')[0]
+    assert f'class="wort-btn wort-btn--secondary" href="/texte/{small}/bearbeiten">Edit text</a>' in reader
+    assert 'data-popup-open="wort-text-delete"' in reader and "Delete text" in reader  # both in the text's own pane, none in its head
+    assert "ds-pane__action" not in reader
+    empty = c.get("/texte").text
+    assert empty.count("<h1") == 1 and ">Texts</h1>" in empty
+
+
+def test_a_phone_gets_the_saved_texts_as_one_row_that_opens_and_the_upload_stays_in_sight(env, small):
+    c, store, uid = env
+    store.add_text(uid, "Zweiter", "Ein Hund.", None, now=datetime(2026, 10, 25))
+    page = c.get(f"/texte/{small}").text
+    mobile = page.split('class="wort-texts-m"')[1].split('class="wort-texts__side"')[0]
+    assert "Upload photo" in mobile and 'data-popup-open="wort-texts-upload"' in mobile
+    assert mobile.count('class="wort-words-m__row wort-texts-m__row"') == 2 and f'href="/texte/{small}" aria-current="page"' in mobile
+    assert "<details" in mobile and "<details class=\"wort-words-m\" open" not in mobile  # folded while a text is open
+    start = c.get("/texte").text.split('class="wort-texts-m"')[1].split('class="wort-texts__side"')[0]
+    assert '<details class="wort-words-m" open>' in start  # open while none is
+
+
+def test_what_is_not_connected_yet_is_muted_and_still_says_so(env, small):
+    c, *_ = env
+    empty = c.get("/texte").text
+    assert re.search(r'<button[^>]*data-demo[^>]*aria-disabled="true"[^>]*>Paste text</button>', empty)
+    assert not re.search(r'<button[^>]*data-popup-open="wort-texts-upload"[^>]*aria-disabled', empty)  # the real upload is not muted

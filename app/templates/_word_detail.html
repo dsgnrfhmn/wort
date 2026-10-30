@@ -1,6 +1,10 @@
 {# The open word beside the table on the Wörter page. Expects `d` (words.word_detail's detail dict),
-   `list_params` (the table's sort/dir/limit, kept by "Schließen") and `csrf`. #}
+   `list_params` (the table's sort/dir/limit, kept by "Schließen") and `csrf`. GUI refresh 2026-10-30: the word as
+   a heading, its score as a badge, section bars as real headings, the label of the own-translation field visible,
+   and removing asks first (app.js; the form below still works without it). #}
+{% from "_ui.html" import btn, badge, bar with context %}
 {% set v = d.v %}
+{% set level = {'success': 'correct', 'warning': 'almost', 'danger': 'wrong'}.get(v.score_type, 'none') %}
 <section class="ds-pane wort-word" id="detail" aria-labelledby="detail-title">
   <form id="practice-one" method="post" action="/ueben/saetze" hidden>
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -8,31 +12,31 @@
   </form>
   <div class="ds-pane__head">
     <div class="ds-pane__heading">
-      <span class="ds-pane__title" data-emphasis="true" id="detail-title">{{ v.label }}</span>
+      <h2 class="ds-pane__title wort-word__title" data-emphasis="true" id="detail-title" lang="de"{% if v.article %} data-article="{{ v.article }}"{% endif %}>{{ v.label }}</h2>
       <span class="ds-pane__caption">{{ v.pos_label }}{% if v.entry and v.entry.gender in ('m', 'f', 'n') %} · {{ {'m': 'maskulin', 'f': 'feminin', 'n': 'neutral'}[v.entry.gender] }}{% endif %}</span>
     </div>
-    <div class="wort-row">
-      {% with priority='primary', underline='dotted', label=_('Practice'), submit=true, extra_attrs='form="practice-one"' %}{% include "components/text-button/template.html" %}{% endwith %}
-      {% with priority='secondary', underline='solid', label=_('Close'), href='/?' ~ list_params ~ '#wort-table' %}{% include "components/text-button/template.html" %}{% endwith %}
+    <div class="wort-btn-row">
+      {{ btn(_('Practice'), 'secondary', submit=true, attrs='form="practice-one"') }}
+      {{ btn(_('Close'), 'ghost', href='/?' ~ list_params ~ '#wort-table') }}
     </div>
   </div>
   <div class="ds-pane__body"><div class="wort-detail">
 
-    <section class="wort-section">
-      {% with type='title-info', title=v.label, info=v.translation %}{% include "components/table-header/template.html" %}{% endwith %}
+    <section class="wort-word__summary" aria-label="{{ _('Summary') }}">
+      <p class="wort-word__translation">{{ v.translation }}</p>
       <div class="wort-row">
-        {% with type=v.score_type, subtype='passive', label='Score ' ~ ((v.word.score | string) if v.word.score is not none else '–') %}{% include "components/tag/template.html" %}{% endwith %}
-        <span>✓{{ d.right }} ✗{{ d.wrong }}</span>
-        <span>{{ _('last practised {date}', date=german_date(v.word.last_seen)) }} · {{ _('added {date}', date=german_date(v.word.added_at)) }}</span>
+        {{ badge(level, _('Score') ~ ' ' ~ (v.word.score | string) if v.word.score is not none else _('No score yet')) }}
+        <span>{{ _('{right} right · {wrong} wrong', right=d.right, wrong=d.wrong) }}</span>
       </div>
+      <p class="wort-caption">{{ _('last practised {date}', date=german_date(v.word.last_seen)) if v.word.last_seen else _('not practised yet') }} · {{ _('added {date}', date=german_date(v.word.added_at)) }}</p>
     </section>
 
     {# Only what the word has: a section without content (no forms table, no examples, no mistakes, never
        searched) is left out, e.g. for a verb the dictionary knows little about. #}
     {% if d.table and d.table.rows %}
     <section class="wort-section" aria-labelledby="forms-title">
-      {% with type='title-info', title=d.table.title, info=_('mistakes marked') if d.marks else '' %}{% include "components/table-header/template.html" %}{% endwith %}
-      <div class="wort-table {{ 'wort-conjugation' if d.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ d.table.title }}">
+      <h3 class="wort-bar" id="forms-title"><span class="wort-bar__title" lang="de">{{ d.table.title }}</span>{% if d.marks %}<span class="wort-bar__info">{{ _('mistakes marked') }}</span>{% endif %}</h3>
+      <div class="wort-table {{ 'wort-conjugation' if d.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ d.table.title }}" lang="de">
         {% for h in d.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
         {% for row in d.table.rows %}
         {% set r = loop.index0 %}
@@ -45,7 +49,7 @@
     {% endif %}
 
     {% if d.examples or d.mistakes %}
-    <section>
+    <section class="wort-section">
       {% if d.examples %}
       {% set ex_items = [] %}
       {% for de, en in d.examples %}{% set _x = ex_items.append(de ~ ' — ' ~ en if en else de) %}{% endfor %}
@@ -62,28 +66,31 @@
 
     {% if d.searches %}
     <section class="wort-section">
-      {% with type='title-info', title=_('Search history'), info=_('searched {n}×', n=d.searches) %}{% include "components/table-header/template.html" %}{% endwith %}
+      {{ bar(_('Search history'), _('searched {n}×', n=d.searches)) }}
     </section>
     {% endif %}
 
     {# Not in the design canvas; kept until the next stage decides where they go. #}
     {% if d.facts %}
     <section class="wort-section">
-      {% with type='title-info', title=_('Grammar'), info='' %}{% include "components/table-header/template.html" %}{% endwith %}
-      {% for line in d.facts %}{% with message=line %}{% include "components/empty-state/template.html" %}{% endwith %}{% endfor %}
+      {{ bar(_('Grammar')) }}
+      {% for line in d.facts %}<p class="wort-note" lang="de">{{ line }}</p>{% endfor %}
     </section>
     {% endif %}
 
     <section class="wort-section">
-      {% with type='title-info', title=_('Own translation'), info='' %}{% include "components/table-header/template.html" %}{% endwith %}
-      <form class="wort-row" method="post" action="/words/{{ v.id }}/translation">
+      {{ bar(_('Own translation')) }}
+      <form class="wort-ownform" method="post" action="/words/{{ v.id }}/translation">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        {% with name='text', label=_('Own translation'), value=v.word.own_translation, placeholder=_('Translation'), fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
-        {% with priority='primary', underline='dotted', label=_('Save'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        <div class="wort-lookupbar__row">
+          {% with id='own-translation', name='text', label=_('Own translation'), value=v.word.own_translation, placeholder=_('Translation'), fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+          {{ btn(_('Save'), 'secondary', submit=true) }}
+        </div>
       </form>
-      <form class="wort-row" method="post" action="/words/{{ v.id }}/delete">
+      {# The button asks first (app.js opens the confirmation); the form is the way without scripts. #}
+      <form class="wort-btn-row" method="post" action="/words/{{ v.id }}/delete">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        {% with priority='secondary', underline='dotted', label=_('Remove word'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+        {{ btn(_('Remove word'), 'ghost wort-btn--danger', submit=true, attrs='data-remove-word="' ~ v.id ~ '"') }}
       </form>
     </section>
   </div></div>

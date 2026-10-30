@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_ui.html" import btn, bar with context %}
 {% block title %}{{ open_text.title if open_text else _('Texts') }} · wort{% endblock %}
 {% block body_attrs %} data-layout="wide" data-view="texts"{% endblock %}
 
@@ -18,9 +19,12 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% with steps=[_('Photo'), _('Check text'), _('Done')], current=1, label=_('Steps') %}{% include "components/stepper/template.html" %}{% endwith %}
     {% with id='wort-upload-file', name='photo', required=true, accept='image/jpeg,image/png', prompt=_('Drop a photo here or'), choose_label=_('choose a file'), hint=_('JPG or PNG · up to 20 MB · one photo per text'), remove_label=_('Remove') %}{% include "components/dropzone/template.html" %}{% endwith %}
-    {% with type='text', name='title', label=_('Title'), fill='filled', value=upload_title, placeholder=_('Title, e.g. Letter from the Jobcenter'), autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
-    <p>{{ _('The photo is read on your server and not stored. Text recognition runs locally.') }}</p>
-    {% if not ocr_ready %}<p role="note">{{ _('Text recognition is not set up on this server.') }}</p>{% endif %}
+    <div class="wort-upload__title">
+      <label class="wort-label" for="wort-upload-title">{{ _('Title') }}</label>
+      {% with id='wort-upload-title', type='text', name='title', label=_('Title'), fill='filled', value=upload_title, placeholder=_('Title, e.g. Letter from the Jobcenter'), autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+    </div>
+    <p class="wort-caption">{{ _('The photo is read on your server and not stored. Text recognition runs locally.') }}</p>
+    {% if not ocr_ready %}<p class="wort-note" role="note">{{ _('Text recognition is not set up on this server.') }}</p>{% endif %}
   </form>
   {% endset %}
   {% set cancel = {'label': _('Cancel'), 'href': '/texte'} if popup == 'upload' else {'label': _('Cancel')} %}
@@ -49,19 +53,18 @@
       <div class="wort-check__photo"{% if photo %} data-photo="{{ photo }}" data-photo-alt="{{ _('Photo of the text') }}"{% endif %}>
         {# The photo itself is a small copy sent with this page (app/uploads.py: thumbnail); app.js puts it into the frame. #}
         {% with label=_('Photo of the text'), regions=regions %}{% include "components/image-regions/template.html" %}{% endwith %}
-        <div class="wort-row">
-          {% for name in (_('Select area'), _('Rotate'), _('Recognize again')) %}
-          {% with priority='secondary', underline='dotted', label=name, extra_attrs='data-demo' %}{% include "components/text-button/template.html" %}{% endwith %}
-          {% endfor %}
+        {# Not connected yet (they need the photo kept, which it is not): muted (UX-6); pressed, app.js says why. #}
+        <div class="wort-btn-row">
+          {% for name in (_('Select area'), _('Rotate'), _('Recognize again')) %}{{ btn(name, 'ghost', attrs='data-demo aria-disabled="true"') }}{% endfor %}
         </div>
       </div>
       <div class="wort-check__text">
         {% with type='textarea', name='text', label=_('Recognized text, editable'), rows=12, fill='filled', required=true, value=recognized_text %}{% include "components/input/template.html" %}{% endwith %}
-        <p>{{ _('Fix mistakes, delete needless lines such as the address or footer, or add what is missing.') }}</p>
+        <p class="wort-caption">{{ _('Fix mistakes, delete needless lines such as the address or footer, or add what is missing.') }}</p>
         {% if doubts %}
         <section class="wort-check__doubts" aria-label="{{ _('Uncertain spots') }}">
-          {% with type='title-info', title=_('Uncertain spots'), info='' %}{% include "components/table-header/template.html" %}{% endwith %}
-          <p>{{ _('The photo marks where the recognition was unsure. Check these words in the text.') }}</p>
+          {{ bar(_('Uncertain spots')) }}
+          <p class="wort-caption">{{ _('The photo marks where the recognition was unsure. Check these words in the text.') }}</p>
           <div class="wort-row">
             {% for d in doubts %}{% with type='warning', subtype='passive', label=_('{word} · line {n} · {p} % sure', word=d.found, n=d.line, p=d.sure) %}{% include "components/tag/template.html" %}{% endwith %}{% endfor %}
           </div>
@@ -72,9 +75,7 @@
         <div class="wort-translation" data-translation>
           <p data-translation-status role="status">{{ _('Translating …') }}</p>
           <div data-translation-lines aria-live="polite"></div>
-          <div class="wort-row">
-            {% with priority='secondary', underline='dotted', label=_('Update translation'), extra_attrs='data-translation-update' %}{% include "components/text-button/template.html" %}{% endwith %}
-          </div>
+          <div class="wort-btn-row">{{ btn(_('Update translation'), 'secondary', attrs='data-translation-update') }}</div>
         </div>
         {% endset %}
         {% with title=_('Translation (preview)'), caption=_('English, Ukrainian where available'), open=true, body_html=preview_html %}{% include "components/disclosure/template.html" %}{% endwith %}
@@ -89,7 +90,24 @@
 {% endmacro %}
 
 {% block content %}
+{# One heading for the page (the open text's title is also the reader's head, below). #}
+<h1 class="wort-sr">{{ open_text.title if open_text else _('Texts') }}</h1>
 <div class="ds-split wort-texts"{% if open_text %} data-text-id="{{ open_text.id }}"{% endif %}>
+  {# A phone: the saved texts as one row that opens (the sidebar below is for a wide window, UX-27); "Upload photo"
+     stays in sight. The block is re-read after a click on a word, like the notes (app.js refreshNotes). #}
+  <div class="wort-texts-m">
+    <div class="wort-texts-m__bar">{{ btn(_('Upload photo'), 'primary', attrs='data-popup-open="wort-texts-upload"') }}</div>
+    {% if side_items %}
+    <details class="wort-words-m"{% if not open_text %} open{% endif %}>
+      <summary><span>{{ _('Saved texts') }}</span><span class="wort-caption">{{ side_items | length }}</span></summary>
+      <ul>
+        {% for it in side_items %}
+        <li><a class="wort-words-m__row wort-texts-m__row" href="{{ it.href }}"{% if it.active %} aria-current="page"{% endif %}><span>{{ it.name }}</span><span class="wort-caption">{{ it.caption }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
   <div class="wort-texts__side">
     {% with title=_('Texts'), label=_('Saved texts'), items=side_items, create=_('Upload photo') %}{% include "components/sidebar-list/template.html" %}{% endwith %}
   </div>
@@ -98,7 +116,8 @@
   {% if open_text %}
     {% set body_html %}
     <div class="wort-text">
-      <div class="wort-text__body">
+      <div class="wort-btn-row wort-text__actions">{{ btn(_('Edit text'), 'secondary', href='/texte/' ~ open_text.id ~ '/bearbeiten') }}</div>
+      <div class="wort-text__body" lang="de">
         {# Every word of the text is a word-token (app/texts.py: expand, reading), as a span (interactive=false): the text of a
            <button> cannot be selected with the mouse, and selecting is how a phrase is added. app.js handles the click and the
            Enter key. trim: the component ends with a line break, which would show as a space before the punctuation. #}
@@ -109,20 +128,19 @@
         {% endfor %}
       </div>
       {% with mode='legend', legend=[{'state': 'known', 'sample': _('Word'), 'label': _('already in the word list')}], legend_hint=_('Hover: translation · Click: add word · Select text: translation, add to list') %}{% include "components/word-token/template.html" %}{% endwith %}
-      <div class="wort-row">
-        {% with priority='secondary', underline='dotted', label=_('Delete text'), extra_attrs='data-popup-open="wort-text-delete"' %}{% include "components/text-button/template.html" %}{% endwith %}
-      </div>
+      <div class="wort-btn-row">{{ btn(_('Delete text'), 'ghost wort-btn--danger', attrs='data-popup-open="wort-text-delete"') }}</div>
     </div>
     {% endset %}
     {% with id='wort-text', title=open_text.title, emphasis=true, caption=(_('{date} · recognized {p} %', date=long_date(open_text.day), p=open_text.recognized) if open_text.recognized is not none else long_date(open_text.day)),
-            action=_('Edit text'), action_href='/texte/' ~ open_text.id ~ '/bearbeiten' %}{% include "components/pane/template.html" %}{% endwith %}
+            no_action=true %}{% include "components/pane/template.html" %}{% endwith %}
   {% else %}
     {% set body_html %}
     <div class="wort-texts__empty">
       {% with icon='add', message=_('Choose a saved text on the left or upload a photo of a letter, a page or a sign. The text is recognized, every word can be looked up.') %}{% include "components/empty-state/template.html" %}{% endwith %}
-      <div class="wort-row">
-        {% with priority='secondary', underline='dotted', label=_('Paste text'), extra_attrs='data-demo' %}{% include "components/text-button/template.html" %}{% endwith %}
-        {% with priority='primary', underline='dotted', label=_('Upload photo'), extra_attrs='data-popup-open="wort-texts-upload"' %}{% include "components/text-button/template.html" %}{% endwith %}
+      <div class="wort-btn-row">
+        {# Paste is not connected yet: muted (UX-6), and pressed it says so (app.js). #}
+        {{ btn(_('Paste text'), 'secondary', attrs='data-demo aria-disabled="true"') }}
+        {{ btn(_('Upload photo'), 'primary', attrs='data-popup-open="wort-texts-upload"') }}
       </div>
     </div>
     {% endset %}
@@ -133,13 +151,16 @@
   {% if open_text %}
   <div class="wort-texts__notes">
     {% set body_html %}
+    <div class="wort-notes">
+    <div class="wort-btn-row">{{ btn(_('Practice'), 'secondary', href='/ueben') }}</div>
     {% for n in open_text.notes %}
     {% with label=n.label, article=n.article, translation=n.translation, form=n.form, in_list=true, in_list_label=_('in list') %}{% include "components/note-item/template.html" %}{% endwith %}
     {% else %}
     {% with icon='add', message=_('Words you add from this text appear here: click a word or select text.') %}{% include "components/empty-state/template.html" %}{% endwith %}
     {% endfor %}
+    </div>
     {% endset %}
-    {% with id='wort-notes', title=_('Notes'), caption=_('{n} total', n=open_text.notes | length), action=_('Practice'), action_href='/ueben' %}{% include "components/pane/template.html" %}{% endwith %}
+    {% with id='wort-notes', title=_('Notes'), caption=_('{n} total', n=open_text.notes | length), no_action=true %}{% include "components/pane/template.html" %}{% endwith %}
   </div>
   {% endif %}
 </div>
