@@ -175,7 +175,8 @@ window.addEventListener('DOMContentLoaded', () => {
    by a scrolling table or covered by the sticky bar). On top of it: any German word in a text shows its lemma,
    Ukrainian and English when the pointer rests on it (GET /api/gloss, 404 for anything that is not a German
    dictionary word). The word is found under the pointer in the text itself, so no page needs extra markup; fields
-   and controls with a tooltip of their own are left alone. Answers, misses included, are kept for the page's life. */
+   and controls with a tooltip of their own are left alone, and so is anything inside [data-no-gloss] (the text on Texte has its
+   own hover card per word). Answers, misses included, are kept for the page's life. */
 window.addEventListener('DOMContentLoaded', () => {
   const tip = window.dsTooltip;
   if (!tip) return;
@@ -206,7 +207,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     if (!node || node.nodeType !== Node.TEXT_NODE) return null;
     const el = node.parentElement;
-    if (!el || el.closest('input, textarea, select, [contenteditable], script, style, .ds-tooltip-layer')) return null;
+    if (!el || el.closest('input, textarea, select, [contenteditable], script, style, .ds-tooltip-layer, [data-no-gloss]')) return null;
     const text = node.data;
     const joins = (i) => (text[i] === '-' || text[i] === "'") && LETTER.test(text[i - 1] || '') && LETTER.test(text[i + 1] || '');
     let start = offset;

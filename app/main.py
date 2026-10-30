@@ -164,11 +164,11 @@ def create_app(
         name = sanitize.text(name, auth.MAX_FIELD)
         key = name.casefold()
         if throttle.blocked(key):
-            return render(request, "login.html", 429, user=None, error=i18n.t("Too many attempts. Try again in a few minutes."))
+            return render(request, "login.html", 429, user=None, typed_name=name, error=i18n.t("Too many attempts. Try again in a few minutes."))
         found = store.user_by_name(name)
         if not auth.verify_password(found[1] if found else None, password) or not found:
             throttle.fail(key)
-            return render(request, "login.html", 401, user=None, error=i18n.t("Wrong name or password."))
+            return render(request, "login.html", 401, user=None, typed_name=name, error=i18n.t("Wrong name or password."))
         throttle.reset(key)
         token, now = auth.new_token(), datetime.now()
         store.create_session(found[0].id, auth.token_hash(token), now, auth.session_expiry(now))
@@ -198,8 +198,8 @@ def create_app(
     practice.register(app, shared)
     texts.register(app, shared)
 
-    @app.get("/history", response_class=HTMLResponse)
-    def history(request: Request, limit: int = 100, user: User = Depends(current_user)):
+    def history_page(request: Request, user: User, limit: int = 100, status: int = 200, **extra) -> HTMLResponse:
+        """The history page; the import's error answer renders the same page (with its rows and counts) plus a message."""
         limit = max(1, min(limit, 1000))
         all_rows = store.history(user.id)
         try:
@@ -212,8 +212,12 @@ def create_app(
             entry = words.resolve_query(dic, r.query) if dic and r.found else None
             rows.append({"row": r, "entry": entry,
                          "learned": bool(entry) and (entry.lemma.casefold(), entry.pos) in owned})
-        return render(request, "history.html", rows=rows, total=len(all_rows), limit=limit, user=user,
-                      has_dictionary=dic is not None)
+        return render(request, "history.html", status, rows=rows, total=len(all_rows), limit=limit, user=user,
+                      has_dictionary=dic is not None, german_date=words.german_date, **extra)
+
+    @app.get("/history", response_class=HTMLResponse)
+    def history(request: Request, limit: int = 100, user: User = Depends(current_user)):
+        return history_page(request, user, limit)
 
     @app.post("/import")
     async def import_history(request: Request, csrf: str = Form(...), file: UploadFile = File(...),
@@ -223,8 +227,8 @@ def create_app(
         try:
             result = import_export(store, user.id, raw)
         except ValueError as e:
-            return render(request, "history.html", 400, rows=store.history(user.id), user=user,
-                          message=i18n.t("Import failed: {error}", error=sanitize.text(str(e), 150)), message_status="error")
+            return history_page(request, user, 100, 400,
+                                message=i18n.t("Import failed: {error}", error=sanitize.text(str(e), 150)), message_status="error")
         msg = i18n.t("Imported {q_new} new of {q_total} queries, {w_new} new of {w_total} words.",
                      q_new=result.queries_new, q_total=result.queries_total, w_new=result.words_new,
                      w_total=result.words_total)

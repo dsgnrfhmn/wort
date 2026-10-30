@@ -132,7 +132,6 @@ DE: dict[str, str] = {
     'Explain more': 'Mehr erklären',
     'Explain the mistakes': 'Fehler erklären',
     'Explanation': 'Erklärung',
-    'Export file': 'Export-Datei',
     'Export file from “wort export”': 'Export-Datei von „wort export“',
     'Favorites': 'Favoriten',
     'Feedback': 'Feedback',
@@ -391,4 +390,9 @@ DE: dict[str, str] = {
     '{right} right · {wrong} wrong': '{right} richtig · {wrong} falsch',
     'No score yet': 'Noch kein Score',
     'not practised yet': 'noch nicht geübt',
+    'Import and history': 'Import und Verlauf',
+    'Words you looked up, and what the CLI exported.': 'Wörter, die du nachgeschlagen hast, und was die CLI exportiert hat.',
+    'Drop the export file here or': 'Ziehe die Exportdatei hierher oder',
+    'JSON · up to 20 MB': 'JSON · bis zu 20 MB',
+    '{n} word looked up': '{n} Wort nachgeschlagen',
 }

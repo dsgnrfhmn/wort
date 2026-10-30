@@ -304,3 +304,20 @@ reviewed by garv. Status of all: `draft`.
   language, not "1 words".
 - **Why:** it is the first thing a reader notices as unfinished.
 - **Source:** 2026-10-30, GUI refresh (finding W-d). **Status:** draft
+
+### UX-35: An error is said in words, with a glyph, and announced; what was typed stays except secrets
+
+- **Rule:** a failed submit shows its message above the form as a block with a glyph and a coloured bar (never colour or
+  italics alone), marked as an alert so a screen reader reads it at once. The fields keep what was typed, except
+  passwords. Every field has a visible label that is tied to it.
+- **Why:** a grey italic line under a form is easy to miss and, for a screen reader, not there; typing a name again after a
+  typo in the password is a cost that costs nothing to avoid.
+- **Source:** 2026-10-30, GUI refresh (Login, L-a, L-2). **Status:** draft
+
+### UX-36: One tooltip per element
+
+- **Rule:** an element that shows a card of its own on hover (a word in a text) gets no second, general tooltip on top.
+  Everywhere else the general one stays.
+- **Why:** two bubbles on one word cover each other and say the same thing twice.
+- **Source:** 2026-10-30, garv (the text of a saved text showed the word's card and the translation tooltip together).
+  **Status:** draft

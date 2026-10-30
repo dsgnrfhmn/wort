@@ -130,3 +130,30 @@ def test_secure_cookies_have_no_loopback_guard(tmp_path):
 def test_is_loopback():
     assert auth.is_loopback("127.0.0.1") and auth.is_loopback("::1") and auth.is_loopback("::ffff:127.0.0.1")
     assert not any(auth.is_loopback(h) for h in ["0.0.0.0", "192.168.0.1", "::", "localhost", "", "testclient"])
+
+
+def test_the_sign_in_page_is_centred_under_the_brand_and_every_field_has_its_label(client):
+    page = client.get("/login").text
+    assert page.count("<h1") == 1 and ">Anmelden</h1>" in page or ">Sign in</h1>" in page
+    assert 'class="wort-login__brand"' in page and "<svg" in page.split('class="wort-login__brand"')[1].split("</p>")[0]
+    for field, label in (("login-name", "Name"), ("login-password", "Passwort" if "Passwort" in page else "Password")):
+        assert f'<label class="wort-label" for="{field}">{label}</label>' in page and f'id="{field}"' in page
+
+
+def test_a_failed_sign_in_is_announced_in_words_and_keeps_the_name_but_never_the_password(client, users):
+    r = login(client, "anna", "not the password!!")
+    assert r.status_code == 401
+    assert '<p class="wort-alert" role="alert">' in r.text and "Wrong name or password." in r.text
+    assert 'value="anna"' in r.text and "not the password" not in r.text
+    assert "<anna" not in r.text
+    r = login(client, '"><script>x</script>', "x")  # what is typed is data: escaped when it comes back
+    assert "<script>x</script>" not in r.text and "&lt;script&gt;" in r.text
+
+
+@pytest.mark.parametrize("path", ["/login", "/", "/history", "/texte", "/ueben"])
+def test_no_page_prints_a_template_object(client, users, path):
+    """A macro imported at the top of a page is visible to every included component: one named like a component's
+    variable (`mark`) was once printed as "<Macro 'mark'>" in the history table."""
+    login(client)
+    html = client.get(path).text
+    assert "Macro '" not in html and "&lt;Macro" not in html and "<Macro" not in html

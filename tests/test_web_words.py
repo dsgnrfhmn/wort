@@ -475,3 +475,24 @@ def test_a_one_word_list_and_a_one_hit_result_are_in_the_singular(env):
     assert "1 Wort · 1 diese Woche" in c.get("/").text
     result = c.get("/?s=1&q=Haus").text
     assert "1 Treffer" in result and "1 Treffern" not in result
+
+
+def test_the_history_page_is_named_for_both_jobs_and_learn_is_a_button(env):
+    app, store, a, _ = env
+    c = client_for(app, "anna")
+    c.get("/?s=1&q=Hund")
+    page = c.get("/history").text
+    assert page.count("<h1") == 1 and ">Import und Verlauf</h1>" in page
+    assert 'name="file"' in page and 'class="ds-dropzone"' in page and 'type="file"' not in page.split("ds-dropzone__input")[0]  # one file field, in a dropzone
+    assert re.search(r'<button class="wort-btn wort-btn--secondary" type="submit" form="learn-1">Lernen</button>', page)
+    assert "Macro '" not in page and "1 Wort nachgeschlagen" in page
+    assert re.search(r'aria-current="page"><span class="ds-text-button__text">Wörter</span>', page)  # "Words" stays marked in the navigation
+
+
+def test_a_refused_import_answers_with_the_history_still_on_the_page(env):
+    app, store, a, _ = env
+    c = client_for(app, "anna")
+    c.get("/?s=1&q=Hund")
+    r = c.post("/import", data={"csrf": c.cookies.get("wort_csrf")}, files={"file": ("e.json", b"not json")})
+    assert r.status_code == 400 and "Hund" in r.text and "1 Wort nachgeschlagen" in r.text  # its table and counts, not an empty page
+    assert 'data-flash="error"' in r.text

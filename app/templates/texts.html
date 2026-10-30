@@ -117,7 +117,7 @@
     {% set body_html %}
     <div class="wort-text">
       <div class="wort-btn-row wort-text__actions">{{ btn(_('Edit text'), 'secondary', href='/texte/' ~ open_text.id ~ '/bearbeiten') }}</div>
-      <div class="wort-text__body" lang="de">
+      <div class="wort-text__body" lang="de" data-no-gloss>
         {# Every word of the text is a word-token (app/texts.py: expand, reading), as a span (interactive=false): the text of a
            <button> cannot be selected with the mouse, and selecting is how a phrase is added. app.js handles the click and the
            Enter key. trim: the component ends with a line break, which would show as a space before the punctuation. #}

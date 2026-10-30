@@ -3,6 +3,7 @@ pipeline (upload, recognition, translation preview) is tested in tests/test_web_
 
 import re
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import unquote
 
 import pytest
@@ -461,3 +462,15 @@ def test_what_is_not_connected_yet_is_muted_and_still_says_so(env, small):
     empty = c.get("/texte").text
     assert re.search(r'<button[^>]*data-demo[^>]*aria-disabled="true"[^>]*>Paste text</button>', empty)
     assert not re.search(r'<button[^>]*data-popup-open="wort-texts-upload"[^>]*aria-disabled', empty)  # the real upload is not muted
+
+
+def test_the_text_has_its_own_hover_card_so_the_translation_tooltip_stays_off_it(env, small):
+    """app.js shows a lemma / translation tooltip on any German word under the pointer, except inside [data-no-gloss];
+    the words of a text show their own card, and two tooltips on one word were one too many (garv, 2026-10-30)."""
+    c, *_ = env
+    page = c.get(f"/texte/{small}").text
+    body = page.split('class="wort-text__body"')[1].split(">", 1)[0]
+    assert "data-no-gloss" in body
+    assert 'class="ds-word-token__card"' in page  # the card is what stays
+    assert "data-no-gloss" not in c.get("/").text and "data-no-gloss" not in c.get("/history").text  # the other pages keep the tooltip
+    assert ".ds-tooltip-layer, [data-no-gloss]')" in (Path(__file__).parent.parent / "app/static/app.js").read_text()  # the rule itself

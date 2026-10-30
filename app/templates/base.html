@@ -17,13 +17,11 @@
   <link rel="stylesheet" href="/static/ui.css">
 </head>
 <body{% block body_attrs %}{% endblock %}>
-{% from "_ui.html" import btn with context %}
+{% from "_ui.html" import btn, brand_mark with context %}
 <a class="wort-skip" href="#main">{{ _('Skip to content') }}</a>
   {% if user %}
   <header class="wort-head">
-  {# The logo (design canvas "Wort — логотип", D — Піксель): the W alone on the 10×23 grid, strokes and steps three cells wide, the middle four (bolder
-     and wider, garv 2026-10-28), in the text color. #}
-  {% set brand_html %}<svg viewBox="0 0 160 184" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true" focusable="false"><rect x="0" y="0" width="30" height="184"/><rect x="30" y="92" width="30" height="46"/><rect x="60" y="46" width="40" height="46"/><rect x="100" y="92" width="30" height="46"/><rect x="130" y="0" width="30" height="184"/></svg>{% endset %}
+  {% set brand_html %}{{ brand_mark() }}{% endset %}
   {# The interface language (app/i18n.py): nav-bar's switcher (draft prop workspace_items); app.js posts the pick
      through the form below. Words and exercises stay German in both languages. #}
   {% set lang_items = [] %}{% for code, name in ui_langs.items() %}{% set _x = lang_items.append({'value': code, 'label': name}) %}{% endfor %}
