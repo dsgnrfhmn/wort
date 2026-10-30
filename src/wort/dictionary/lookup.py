@@ -121,6 +121,31 @@ class Dictionary:
                 found.setdefault(entry.id, entry)
         return list(found.values()), fixes
 
+    def related(self, entry: Entry, limit: int = 6) -> list[Entry]:
+        """Words that start with the same stem (Entwicklung -> Entwickler, Entwicklungshilfe; Wohnung -> wohnen).
+
+        A heuristic, the dataset has no derivation links: the lemma without its first matching common ending, at
+        least four letters, as a prefix of other lemmas (an index range scan, no table scan), by weight. A stem
+        that would be shorter gives none rather than noise ("gehen" -> "geh" is no stem of "geheim")."""
+        stem = normalize(entry.lemma)
+        for ending in ("ungen", "ung", "heit", "keit", "lich", "chen", "ern", "eln", "en", "er", "e", "n"):
+            if stem.endswith(ending):
+                stem = stem[: -len(ending)]
+                break
+        if len(stem) < 4 or " " in stem:
+            return []
+        rows = self.conn.execute(
+            "SELECT * FROM entries WHERE lemma_norm >= ? AND lemma_norm < ? AND lemma_norm != ? "
+            "AND instr(lemma, ' ') = 0 ORDER BY weight DESC LIMIT ?",
+            (stem, stem + "\uffff", normalize(entry.lemma), limit * 3),
+        ).fetchall()
+        out, seen = [], set()
+        for row in rows:
+            if row["lemma_norm"] not in seen:
+                seen.add(row["lemma_norm"])
+                out.append(Entry.from_row(row))
+        return out[:limit]
+
     def suggest(self, query: str, limit: int = 9) -> list[Entry]:
         """Entries whose lemma, inflected form or English gloss is a typo away from `query`.
 

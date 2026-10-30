@@ -24,7 +24,7 @@ Confirmed by maintainer (date)*.
   as a whole) shows a whole-sentence translation as text (de→en, or en→de when more words are English-only than German), then one card
   per word (picker in the session, cards in the TUI). Engine: Argos Translate,
   offline, two models (de→en, en→de), optional dependency group `mt`, model installed once by hand with
-  `wort install-translation` (~100 MB, the only network use). **CLI/TUI only;
+  `wort install-translation` (~100 MB, the only network use). *Superseded by D00d (2026-10-21): the CLI no longer downloads; `scripts/fetch_data.py models` fetches the files and `wort install-translation FILE...` installs them.* **CLI/TUI only;
   not in the web app** (RAM on the shared Pi not measured).
 - **Why:** D0 forbids an LLM API, not local models; the dictionary only has
   word glosses. No model or no package → a visible "No sentence translation"
@@ -32,6 +32,179 @@ Confirmed by maintainer (date)*.
 - **Limits:** phrase word limit 5 → 30; translation quality is not measured yet.
 - **Open:** quality check on real sentences once the model is installed.
 - **Confirmed by maintainer:** 2026-10-21 (variant A, CLI/TUI only)
+
+## D0r — Revisit D0: Haiku for sentence feedback (CONFIRMED 2026-10-21)
+
+> **Status: confirmed by the maintainer 2026-10-21** ("outbound access for the AI from the server
+> side"): the web backend may call the API. Still open and not decided by this entry: the host egress
+> design (DEPLOY.md §6), the separate spend-limited key, the Haiku-vs-Sonnet test. The code (`app/ai/`)
+> stays behind `WORT_AI_ENABLED`, off until the key is installed.
+
+- **Question:** allow a hosted model (Haiku) for the checks the local stack cannot do well:
+  sentence feedback (corrections, "Natürlicher", per-word results, rule name), "Fehler erklären",
+  "Doch richtig?", more tasks for one rule, free-answer grading in Abfrage.
+- **Proposed:** `claude-haiku-5-5` for all of them. `claude-sonnet-5-5` only for the sentence check,
+  and only if Haiku misses errors on 20-30 real learner mistakes (`spikes/ai_eval.md`, run by the
+  maintainer; record the numbers here).
+- **Rules if confirmed:** backend only, browser never calls the API; one key in a separate workspace
+  with a spend limit, in the server env file only; only the sentence/answer, target forms and task are
+  sent (never photos or whole Texte); structured JSON validated by the backend, invalid reply = no score
+  change; per-user daily cap; fallback to the local check; explanations only on click.
+- **What it costs us (security):** the host gets a spend-capable key and an outbound path to
+  `api.anthropic.com`, so `IPAddressDeny=any` / "no outbound network" in CLAUDE.md no longer hold as
+  written; learner text leaves the network. Blast radius if the service is compromised: spend on the
+  key (capped by the workspace limit) and every sentence sent. Needs the egress design in DEPLOY.md §6.
+- **Call sites and what each sends** (all behind `WORT_AI_FEATURES`, default all, only when
+  `WORT_AI_ENABLED=1`; each falls back to the local behaviour):
+  `check` sentence + required forms + task; `explain` (on click) answer + error list + rule name;
+  `tasks` the selected lemmas (one call per session); `recheck` ("Doch richtig?", once per answer)
+  sentence + forms + task + the learner's objection (max 300 characters); `rule` ("Diese Regel üben")
+  the rule's name only; `answer` (Abfrage free answers) question + answer + dictionary glosses.
+  A revised verdict re-applies the score of that one answer (`WebStore.revise_attempt`); invalid,
+  failed or capped calls change no score.
+- **Still local:** translation and forms (Wiktionary), OCR (Tesseract), tooltips (dictionary + spaCy),
+  scores and filters.
+- **Confirmed by maintainer:** 2026-10-21 (in session: outbound access for the AI from the server side;
+  scope as above: web backend only, one host, off until the key is installed)
+
+## D00d — Network model: CLI offline except one write-only sync port
+
+- **Decision (2026-10-21, requested by the maintainer):** only the web side may have outbound network
+  access (the AI API host only; D0r confirmed 2026-10-21, off until the key is installed). The CLI has none except loopback and one
+  HTTPS endpoint that receives its words JSON.
+- **Mechanism:** `wort sync` → `POST https://<server-ip>:8456/sync` with `Authorization: Bearer <token>`.
+  The token is created on the server (`scripts/synctoken.py`), stored hashed, scoped to one user, can only
+  push words/history, is revocable, and lives in a mode-600 file on the CLI machine. The server side is a
+  separate process/port with exactly one route (`app/sync_app.py`), rate-limited per user and in nginx,
+  size-capped (20 MiB), per-user word cap 20 000, TLS with the server's own certificate pinned on the client.
+- **CLI side:** no downloads (`import --download` and the model download are gone; `scripts/fetch_data.py`
+  does them, separately). `scripts/wort-offline` cuts the network at the OS level (Linux: systemd
+  `IPAddressDeny`, by IP; optional nftables for the port; macOS: sandbox profile, IP and port);
+  `src/wort/netguard.py` also blocks it inside the process. Loopback stays open for a local LanguageTool.
+- **Access and blast radius:** the token bridges the CLI machine to one user's word list on the server:
+  if it leaks, someone on the LAN can add junk words/history to that user (capped, rate-limited, revocable);
+  they cannot read or sign in. The CLI initiates the connection; nothing on the server can reach the CLI
+  machine. The in-process guard is bypassable by code in the same process; the OS rule is the boundary and
+  was **not run in the dev container** (no user systemd/macOS): run `scripts/wort-offline --check` on the
+  real machine.
+- **Open:** the server-side egress rule for the AI API (DEPLOY.md §6). nginx.conf/compose changes are not
+  run here either.
+- **Confirmed by maintainer:** 2026-10-21 (requested in session; variant: HTTPS push + write-only token,
+  OS rule + in-code guard, downloads moved out of the CLI)
+
+## D00f — Deploy form: rootless podman compose
+
+- **Question:** run the web app as the sandboxed systemd unit of PLAN Step 1, or as the podman compose stack that
+  was built and documented (`compose.yaml`, `nginx.conf`, `DEPLOY.md`)?
+- **Decision (2026-10-23):** rootless **podman compose**. The systemd unit is dropped. The sandbox requirements stay
+  and are met by the containers: `read_only`, `cap_drop: ALL`, `no-new-privileges`, tmpfs `/tmp`, repo read-only,
+  writable data volume only, app on `127.0.0.1` in nginx's network namespace, nginx published on the LAN IP only;
+  outbound per DEPLOY.md §6. `CLAUDE.md` "Security boundaries" updated to match.
+- **Still to prove (PLAN Step 1, D6):** other services' files unreadable from the containers; no outbound except the
+  AI host; the app unreachable from outside the LAN/VPN.
+- **Confirmed by maintainer:** 2026-10-23
+
+## D00g — Dev only: "Gesuchte laden" reads the CLI's user.db on the same machine
+
+- **Question:** a button on Wörter that pulls the CLI's searches without `wort export` / `wort sync`.
+- **Decision (2026-10-28, maintainer):** only where web app and CLI share a machine (development). With
+  `WORT_CLI_DB` set to the CLI's `user.db`, `POST /import/cli` opens it read-only, copies it into memory and sends
+  it through the same export → import as an uploaded file (same caps, same checks). Without the variable there is
+  no button and the route answers 404. The server never sets it: there the paths stay export/import and `wort sync`
+  (D00d); the server still never reaches the CLI machine.
+- **Confirmed by maintainer:** 2026-10-28
+
+## D00h — Trial: local look changes before they reach dis-system
+
+- **Question:** try a different look in wort without changing dis-system yet.
+- **Decision (2026-10-28, maintainer):** local only, in `app/static/trial.css` (loaded after `layout.css`), as an
+  explicit exception to CLAUDE.md's "layout only" rule, like D00e. Contents: text buttons without an underline at
+  rest, the underline only on hover / keyboard focus (dis-system keeps a permanent one), and no [ ] brackets on hover; the Wörter hero as low as
+  possible; the search result's type and colors (design "Wörter — Suchergebnis": the word in its article color,
+  examples with the word marked, filled section heads). Also (template, not CSS): the toolbar with "Nachschlagen" and
+  its side panel only on Üben. Whether any of it goes into dis-system `main` is open; if not, the file is deleted.
+- **Draft props in the dis-system submodule, local and uncommitted (2026-10-28):** nav-bar `brand` / `brand_href` /
+  `brand_html` (the pixel W from the design canvas "Wort — логотип"; the language dropdown moves right),
+  table-header-actions `outlined`, disclosure `body_html`, radio `disabled`. Not pushed: they wait for the
+  maintainer's OK, then a branch and a PR. The favicon (the W) is wort's own (`app/static/favicon.svg`); since 2026-10-29 one magenta W
+  (`#C614E1`, dis-system `accent.secondary`) without a border for both themes (garv).
+- **Confirmed by maintainer:** 2026-10-28 (trial)
+
+## D00i — Üben: one task at a time, retries, one open session per tab
+
+- **Decision (2026-10-29, maintainer, in session):**
+  - A practice session shows **one task at a time**; tabs on top (dis-system header-tab) switch between the answered
+    tasks and the current one; the next task opens only with "Nächste Aufgabe". A sidebar lists the session's words;
+    a word keeps the tabs to its tasks.
+  - **"Nochmal antworten"** on any answered sentence task: graded and corrected like the first answer, shown under it
+    as "Versuch N". **Only the first answer counts** (no attempt row, no score change). No cap (garv, 2026-10-29); an AI check still counts against the daily AI cap.
+  - The feedback ends with **"So wäre es richtig"**: the corrected sentence (and the AI's more natural one).
+  - **One open session per Üben tab** (Sätze bilden incl. "Regel üben", Abfrage, Grammatik): every Üben page shows the
+    three tabs; a tab resumes its open session; a new session closes only its own tab's old one (answers kept). The
+    current batch of words is the latest *word* session's, so a grammar session does not lose it.
+  - A sentence mistake links to its **Grammatik topic** without the AI (`grammar.TOPIC_FOR_MISTAKE`: article →
+    Präpositionen und Kasus, adjective/predicative → Adjektivdeklination; other kinds get no link).
+  - Navigation per the design "open-projects" (Figma node 391:23146): the three modes are equal dis-system page-heads
+    in the header under the nav bar; pages with the word sidebar and the Grammatik pages run the full window width.
+  - **Draft prop in the dis-system submodule, local and uncommitted (2026-10-29):** page-head `title_href` / `current`
+    (the title as a link, aria-current on the mode on show). Waits for the maintainer's OK, then a branch and a PR.
+  - (later the same day) Messages carry a tail (task left, answer right); Send shows the answer at once with a
+    progress bar; the feedback is a dis-system disclosure that can be folded; the session's words are dis-system's
+    sidebar-list as in the other apps; the session page is light grey (trial.css, light theme only, base-150).
+    **Draft props in the dis-system submodule, local and uncommitted:** message `tail`, sidebar-list items `caption` /
+    `muted`.
+- **Open:** sentence mistakes do not count toward a topic's progress yet; Abfrage keeps its own page (not one view).
+- **Confirmed by maintainer:** 2026-10-29
+
+## D00j — Interface language: English, switchable to German
+
+- **Decision (2026-10-29, maintainer, in session):** the web interface is **English by default** and switchable to
+  German with a dropdown in the nav bar. Words, forms, tasks and questions, examples, grammar explanations
+  ("Merke", rule tables) and the verdicts **richtig / fast richtig / falsch** stay German in both languages.
+- **How:** own catalog `app/i18n.py` (English source text → German; `_()` in templates, `t()` in Python), no new
+  dependency. The language is stored **only in the profile** (`users.ui_lang`, schema v6); the login page is English.
+  A middleware sets it per request. A feedback text stored with an answer keeps the language it was written in.
+  `tests/test_i18n.py` fails on any interface text without a German entry. The English/Ukrainian tooltips for German
+  labels (`ui_terms.py`) are shown with the German interface only.
+- **Draft prop in the dis-system submodule, local and uncommitted:** nav-bar `workspace_items` / `workspace_name` (the
+  right-hand switcher wired to a dropdown-menu). Waits for the maintainer's OK, then a branch and a PR.
+- **Confirmed by maintainer:** 2026-10-29
+
+## D00e — Temporary local overrides of dis-system components (web UI)
+
+> **Closed 2026-10-23:** every gap below moved into dis-system (branch `dsgnrfhmn/reading-upload-components`):
+> table-cell `plain` links and table-row `href` (gap 1), nav-bar `right_actions` (gap 2), hero-block `data-fit`
+> (gap 3), wrapping nav-bar / page-head / header-block (gap 4), tooltip layer mode + `window.dsTooltip` (gap 5),
+> pane `data-motion` (gap 6), the existing `fade-in` class for the lookup block (gap 7). `app/static/overrides.css`
+> and `app/templates/_nav.html` are deleted. The submodule points at that branch until it is merged (D00b).
+
+- **Question:** the design canvas colours words by gender with verbs/adjectives in the text colour, drops
+  the underline on word links and puts "Abmelden" in the nav bar. dis-system cannot do any of the three
+  today (a `link` cell is always accent-1 and underlined; `nav-bar` has no right-side slot).
+- **Options:** (a) dis-system PR first, then bump the submodule; (b) temporary local overrides in wort.
+- **Decision (2026-10-22):** (b), as an explicit, temporary exception to CLAUDE.md's design-system rules.
+  Everything lives in two places only: `app/static/overrides.css` (gap 1: word-link colour and no
+  underline in `.wort-word-table`; the whole row opens the word, `app.js`) and `app/templates/_nav.html`
+  (gap 2: a fork of `nav-bar/template.html` with the logout form on the right).
+- **Added 2026-10-22 (lookup hero, Figma open-projects 376:12066 adapted):** the Wörter page uses
+  dis-system's *staged* `local-components/hero-block` (CSS served from the submodule, markup written in
+  `words.html`, it has no `template.html` yet). Gap 3: a card (titled box, 260px) in `overrides.css`;
+  Figma's base/50 fill has no themed token, `bg-surface-pressed` stands in. Gap 4: page-head and
+  header-block rows wrap at phone width (`overrides.css`, as the design canvas does; header-block's
+  fixed row height is lifted there). The sticky nav-bar gets a stacking order (`z-index`), else positioned
+  content scrolling under it paints over it.
+- **Added 2026-10-22 (tooltips, opening animation):** gap 5, tooltip: every German button label gets an
+  English + Ukrainian tooltip (`app/ui_terms.py`, matched in `app.js`) after a 500 ms delay, drawn on one
+  fixed layer in `<body>` so no scrolling table or sticky bar clips or covers it (dis-system's tooltip is
+  the trigger's own `::after`, cut by any `overflow` ancestor and has no delay). Gap 6: the word beside
+  the table opens and closes in place (no page load) as a column-width transition, switching words does not animate,
+  not with reduced motion.
+- **Exit:** move all of it into dis-system (a `word` variant of the `link` cell, an `actions_right` slot on
+  `nav-bar`, a card component, hero-block confirmed with a template and a cards slot, wrapping rows),
+  bump the submodule, delete both files. Also open: `table-row` does not pass
+  `submit`/`extra_attrs` to a `1-action` cell (history and favorites build those rows by hand).
+- **Confirmed by maintainer:** 2026-10-22 ("temporary local CSS in wort"; the whole row is the click
+  target instead of an underline).
 
 ## D00 — Scope and note language
 
@@ -72,17 +245,65 @@ Confirmed by maintainer (date)*.
   - CLI/TUI and web keep separate practice progress (scores do not sync).
   - dis-system follows **`main`** (2026-10-18: the `dev-isolated` branch does
     not exist on GitHub; the maintainer's updates are on `main`). Pinned tag
-    vs `main` is still open.
+    vs `main` is still open. *(Superseded 2026-10-31: integration branch,
+    see below.)*
   - Web app: own SQLite DB (`web.db`, history + favorites), UI composed from
     dis-system Jinja templates (`app/ds.py` adds the `vendor/dis-system` root to
     the template loader and serves its tokens/components/icons under `/ds`).
     Forms need dis-system props that were missing (`input` `name`/`label`,
-    `text-button` `submit`, `table-cell` `1-action` `submit`): drafted on
-    dis-system branch `<user>/form-props`, **not yet merged to its `main`**.
+    `text-button` `submit`, `table-cell` `1-action` `submit`): added in
+    dis-system PR #2 (`form-props`), merged to its `main` on 2026-10-21.
     Gaps still without a component: file input (native control used),
     textarea-free sentence result block (empty-state used for text lines).
-- **dis-system commit in use:** `6d58745` (local branch `<user>/form-props` = `b85e517` main
-  + form props, 2026-10-18; not pushed, not yet merged to dis-system `main`). _(record at each bump)_
+- **Temporary local color override (2026-10-27, maintainer request):** in the dark theme the accent
+  (`--ds-color-accent-1` and its hover/pressed) and the input focus border (`--ds-color-input-border-focus`) are set to
+  `--ds-color-text-active` (white) in `app/static/layout.css`,
+  an exception to "no colors in this repo". Move it into dis-system or drop it once decided.
+- **dis-system integration branch (2026-10-31, maintainer):** wort follows `dsgnrfhmn/uiux-dev` instead of `main`
+  (`.gitmodules` branch = `dsgnrfhmn/uiux-dev`). The branch was cut at `bc62167` (the former local
+  `dsgnrfhmn/message-note`) on top of `main` @ `2db2701`. Why: against that `main` it changes 52 existing files
+  (components, tokens, `site.js`, `nav.js`) and adds 3, so it must not reach the other services before it is
+  finished. A submodule pins a commit, so other services are untouched until they bump their own pin; the branch
+  also keeps the pinned commits reachable on GitHub. Rules: not merged into `main` until the maintainer calls the
+  redesign finished; no force-push, rebase or delete while a wort pin is on it; `main` is merged into it (not
+  rebased) at each bump; into `main` only by PR with a merge commit, not a squash (a squash orphans the pinned
+  commits), then wort re-pins to `main`; the other services move to `main` only after that merge, each checked in
+  both themes. dis-system forbids names of consuming applications in anything pushed (checked for the four
+  commits: none; authors are noreply addresses). **Not verified yet:** that the changed components keep their old
+  output with default props. Run dis-system `tests` and the existing demos before any PR into `main`.
+- **dis-system commit in use (2026-10-30):** `bc62167` on branch `dsgnrfhmn/uiux-dev` (renamed 2026-10-31 from
+  `dsgnrfhmn/message-note`; **pushed 2026-10-31**, `origin/dsgnrfhmn/uiux-dev` = `bc62167`, together with the three
+  commits below it), on top of `8f1d0b4`. Commits the draft props that had been in the working tree since 2026-10-29/30: message `tail` /
+  `note_tone` / `inverted`, nav-bar `workspace_items` / `workspace_name`, page-head `title_href` / `current`, popup
+  `body_html` and link/form actions, context-menu `note` rows, sidebar-list `caption` / `muted`. The pages built on
+  them rendered from the uncommitted tree until now. `python -m pytest tests` there: 74 passed. Same rule as below:
+  the branch has to be pushed before this pointer is pushed; a dis-system PR is not needed until the redesign is
+  finished (see the integration-branch decision above).
+  Previous: `8f1d0b4` (2026-10-29) on branch `dsgnrfhmn/message-note` (now part of `dsgnrfhmn/uiux-dev`), on
+  top of `b2ed6ea`. Draft props (D00h): nav-bar `brand` / `brand_href` / `brand_html` and an empty `workspace_label`
+  leaving the dropdown out, table-header-actions `outlined`, disclosure `body_html`, radio `disabled`. Waits for the
+  maintainer's OK before it is pushed (to `dsgnrfhmn/isolated`) and a PR is opened.
+  Previous: `b2ed6ea` (2026-10-28) on the same branch (now part of `dsgnrfhmn/uiux-dev`), on
+  top of `ab5d22e` (Mono style draft). Adds message `note` / `note_tooltip` / `note_more` / `task`, table-cell `wrap`,
+  inline-mark `href` / `current`, textarea `rows`. Push the branch and open a dis-system PR before this pointer is
+  pushed, or the submodule commit will be missing for everyone else.
+  Previous: `2db2701` (2026-10-27), `main` after the merge of dis-system PR #7
+  (`dsgnrfhmn/isolated`), on top of PR #5 (`dsgnrfhmn/reading-upload-components`) and PR #6. Brings motion
+  (fade-in), loading states (skeleton), themed passive tag colors, the tooltip in the top layer, context-menu,
+  date-range and portfolio components. `message` is unchanged.
+  Previous: `cb13772` (2026-10-23, branch `dsgnrfhmn/reading-upload-components`, merged into `main` by PR #5;
+  ancestor of `2db2701`).
+  Previous: `a2404a4` (2026-10-22: `main` after the merge of dis-system PR #4,
+  `dsgnrfhmn/table-row-cell-props`, on top of PR #3). Together they bring the tag cell, `article`, page-head
+  props, header-tab `href`, `inline-mark`, `message`, `disclosure` (with `items`), multi-line tooltip, table-row
+  forwarding of `tag_type`/`tag_subtype`/`article`, and article link colors in the dark theme. The temporary
+  branch pointer (`c607675`, ancestor of this commit) is gone; the submodule follows `main` again.
+  Previous: `bc4e8de` (2026-10-22: `main` after the merge of dis-system PR #2,
+  `dsgnrfhmn/form-props`). The form props (input name/id/label/disabled/required/autocomplete/password,
+  text-button submit/href, table-cell and table-header-actions submit, table-row extra_attrs) are now in `main`;
+  `d8811df` (the branch head wort used until now) is its ancestor, so no component file changed. Earlier hashes:
+  `6d58745` (unpublished), `1e1d505`, `d8811df`. The submodule follows `main` (`.gitmodules` branch = main).
+  _(record at each bump)_
 - **Confirmed by maintainer:** 2026-10-04
 
 ## Step 0 spikes (MVP)
@@ -125,10 +346,31 @@ Confirmed by maintainer (date)*.
 | menu | _ | _ |
 | low light | _ | _ |
 
+- **Dev machine (2026-10-30), generated pages only, not real photos:** `app/ocr.py` runs `tesseract stdin stdout -l deu --psm 3 tsv`
+  (Tesseract 5, `tesseract-ocr-deu` 4.1 data from Debian) after the minimum of preparation: grey, `autocontrast(cutoff=1)`, scaled
+  down to 3000 px on the longer side. A DejaVu Sans letter (12 lines) read 96 % mean confidence and came out word for word (the
+  hyphen at "Miet-|bescheinigung" joined); the same page blurred (σ 2.4), speckled, turned 1.8° and saved as JPEG quality 25 read 80 %
+  with six words under 60 % (one real error, "Ihren" → "ihren", sat above the threshold: not flagged); at σ 3.0 it read 35 % and
+  mostly garbage, 20 words flagged. About 2 s a page here (through a container). **Threshold, deskew and the other rows of the table
+  are still open: they need the real photos** (book page, sign, screenshot, menu, low light) and the server's timings.
 - Decision: _
 - Confirmed by maintainer: _
 
 ### D4 — LanguageTool on the server (Step 6, post-MVP)
+
+- **Dev machine (2026-10-29, not the server):** `scripts/languagetool.sh` runs `erikvl87/languagetool:6.5` (pinned by
+  digest) in rootless podman on `127.0.0.1:8081` only; the app reaches it at its default `WORT_LT_URL`, LAN clients see
+  the results through the app. Tag 6.6 does not start (Java 11 runtime, Java 17 build). Measured here (3.7 GB RAM
+  machine): ~640 MB after start, first check 1.5 s. Catches article/adjective agreement (`den Haus`, `ein schöne
+  Haus`), verb agreement (`Er gehen`) and haben/sein (`habe … gegangen`); misses a wrong case of an object
+  (`Ich sehe der Hund`, `Ich gebe der Mann`). Server numbers below are still open.
+
+- **Starts with the service (2026-10-30):** `scripts/dev.sh` runs `scripts/languagetool.sh ensure` when the LAN dev server
+  starts (a LanguageTool that already answers is used and left alone; one it started is stopped with the server;
+  `WORT_DEV_LT=0` opts out). `compose.yaml` has the service `wort-lt` for the deployed stack: same pinned image and heap,
+  shared network namespace of `wort-tls`, no `ports:`, started without `--public` so it listens on loopback inside that
+  namespace (checked with a throwaway container: 127.0.0.1 answers, the namespace's LAN address refuses; heap 384 MB
+  there). Not yet run through `podman-compose up`; the server numbers below stay open.
 
 - Server model / total RAM: _
 - Setup tried (Java / Docker), unix user: _

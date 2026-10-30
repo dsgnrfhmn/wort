@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_ui.html" import badge, btn with context %}
+{% block title %}{{ _('Result') }} · wort{% endblock %}
+{% block content %}
+{# The result: what it came to in one line, then every task; one main way on (again, with the same words). #}
+{% set names = {'correct': 'richtig', 'almost': 'fast richtig', 'wrong': 'falsch', 'tip': _('Tip'), 'skipped': _('skipped')} %}
+{% set n_right = rows | selectattr('verdict', 'equalto', 'correct') | list | length %}
+{% set gained = rows | sum(attribute='delta') %}
+<div class="wort-page wort-start">
+  <header class="wort-pagehead">
+    <div class="wort-pagehead__text">
+      <h1 class="wort-title">{{ _('Result') }}</h1>
+      <p class="wort-caption">{{ _(kinds[sess.kind]) }} · {{ _('{n} tasks', n=rows | length) }}</p>
+    </div>
+  </header>
+  <p class="wort-summary" role="status">
+    <strong>{{ _('{right} of {total} right', right=n_right, total=rows | length) }}</strong>
+    <span class="wort-caption">{{ _('Score') }} {{ '%+d' | format(gained) }}</span>
+  </p>
+  <table class="wort-resulttable">
+    <caption class="wort-sr">{{ _('Result') }}</caption>
+    <thead><tr><th scope="col">{{ _('Word') }}</th><th scope="col">{{ _('Result') }}</th><th scope="col">{{ _('Score') }}</th><th scope="col">{{ _('Change') }}</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      {% set v = r.verdict if r.verdict in ['correct', 'almost', 'wrong', 'tip', 'skipped'] else 'none' %}
+      <tr>
+        <td lang="de">{{ r.label }}</td>
+        <td>{{ badge(v, names.get(v, _('not graded'))) }}</td>
+        <td>{{ r.score if r.score is not none else '–' }}</td>
+        <td>{{ '%+d' | format(r.delta) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="wort-btn-row">
+    {% if batch %}
+    {# Another round with the same words: they stay the current batch until a new one is chosen. #}
+    <form class="wort-inline" method="post" action="/ueben/{{ batch.kind }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% for id in batch.ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+      {{ btn(_('Another round with the same words'), 'primary', submit=true) }}
+    </form>
+    {{ btn(_('Choose new words'), 'secondary', href='/ueben?neu=1') }}
+    {{ btn(_('To the words'), 'ghost', href='/') }}
+    {% else %}
+    {{ btn(_('Choose new words'), 'primary', href='/ueben?neu=1') }}
+    {{ btn(_('To the words'), 'ghost', href='/') }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

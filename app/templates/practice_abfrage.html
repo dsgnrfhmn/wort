@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "_ui.html" import bubble, badge, btn with context %}
+{% block title %}{{ _('Quiz') }} · wort{% endblock %}
+{# Quiz (design Üben 6): one word at a time on the left, this round's results on the right; stacked on a phone. #}
+{% block content %}
+{% set result = t.result %}
+{% set done = total - left - (0 if result else 1) %}
+{% set keys = {'correct': 'correct', 'almost': 'almost', 'wrong': 'wrong', 'skipped': 'skipped'} %}
+{% set names = {'correct': 'richtig', 'almost': 'teilweise', 'wrong': 'falsch', 'skipped': _('skipped')} %}
+<div class="wort-page">
+  <header class="wort-sess-head">
+    <div class="wort-pagehead">
+      <div class="wort-pagehead__text">
+        <h1 class="wort-title">{{ _('Quiz') }}</h1>
+        <p class="wort-caption">{{ _('Word {n} of {total}', n=pos + 1, total=total) }}</p>
+      </div>
+      <div class="wort-btn-row">
+        {{ btn(_('Choose new words'), 'secondary', href='/ueben?neu=1&modus=abfrage') }}
+        {{ btn(_('Save and leave'), 'ghost', href='/') }}
+      </div>
+    </div>
+    <progress class="wort-progress" value="{{ done }}" max="{{ total }}" aria-label="{{ _('Progress') }}">{{ done }} / {{ total }}</progress>
+    {# The mode starts a new round with the same words (app.js submits this form on ds-radio-change). #}
+    <form class="wort-modeform" method="post" action="/ueben/abfrage" data-abfrage-mode>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="art" value="{{ mode }}">
+      {% for id in (batch.ids if batch else []) %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+      {% set options = [] %}
+      {% for key, name in modes.items() %}{% set _x = options.append({'value': key, 'label': _(name), 'checked': key == mode, 'disabled': key == 'erklaere' and not erklaere_ok}) %}{% endfor %}
+      {% with options=options, label=_('Mode') %}{% include "components/radio/template.html" %}{% endwith %}
+    </form>
+    {% if not erklaere_ok %}<p class="wort-caption">{{ _('“Explain in German” needs the AI (off).') }}</p>{% endif %}
+  </header>
+
+  <div class="wort-quiz" id="jetzt">
+    <section class="wort-card" aria-labelledby="quiz-word">
+      <p class="wort-caption">{{ pos_label }}</p>
+      {# A task for the article does not show it. #}
+      <h2 class="wort-quiz__word" id="quiz-word" lang="de"{% if word_article and t.kind != 'article' %} data-article="{{ word_article }}"{% endif %}>{{ (word_article ~ ' ' if word_article and t.kind != 'article' else '') ~ lemma }}</h2>
+      <p class="wort-lead">{{ t.prompt }}</p>
+      {% if t.hint %}<p class="wort-note">{{ _('Hint: {text}', text=t.hint) }}</p>{% endif %}
+      {% if t.choices and not result %}
+      <div class="wort-choices">
+        <p class="wort-caption">{{ _('Answer with a number or the word.') }}</p>
+        <ol class="wort-chips wort-chips--static" lang="de">{% for c in t.choices %}<li class="wort-chip">{{ loop.index }} · {{ c }}</li>{% endfor %}</ol>
+      </div>
+      {% endif %}
+      {% if t.notice %}<p class="wort-note" role="status">{{ t.notice }}</p>{% endif %}
+      {% if not result %}
+      <form class="wort-form wort-answer" method="post" action="/ueben/s/{{ sess.id }}/answer">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="at" value="{{ pos }}">
+        {% with type=t.input, name='text', label=_('Your answer'), rows=2, fill='filled', required=true, placeholder=_('Your answer') %}{% include "components/input/template.html" %}{% endwith %}
+        <div class="wort-btn-row">
+          {{ btn(_('Skip'), 'ghost', submit=true, attrs='form="abfrage-skip" formnovalidate') }}
+          {{ btn(_('Send'), 'primary', submit=true) }}
+        </div>
+        {% if t.input == 'textarea' %}<p class="wort-composer__hint">{{ _('Enter sends · Shift+Enter starts a new line') }}</p>{% endif %}
+      </form>
+      <form id="abfrage-skip" method="post" action="/ueben/s/{{ sess.id }}/skip" hidden><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+      {% else %}
+      {% set hv = result.verdict if result.verdict in keys else ('skipped' if result.skipped else 'none') %}
+      {{ bubble('answer', _('Your answer'), t.answer, tail='end') }}
+      <section class="wort-verdict" data-v="{{ hv }}" tabindex="-1" data-autofocus aria-label="{{ _('Assessment') }}">
+        <div class="wort-verdict__head">
+          {{ badge(hv, names.get(hv, _('not graded'))) }}
+          {% if result.delta is not none %}<span class="wort-verdict__score">{{ _('Score') }} {{ '%+d' | format(result.delta) }}</span>{% endif %}
+        </div>
+        {% if result.feedback %}<p>{{ result.feedback }}</p>{% endif %}
+        {% if translations %}<p><span class="wort-verdict__name">{{ _('Translation') }}</span> {{ translations }}</p>{% endif %}
+        {% if example %}<p><span class="wort-verdict__name">{{ _('Example') }}</span> <span lang="de">{{ example }}</span></p>{% endif %}
+      </section>
+      {% if t.ai_note %}<p class="wort-note">{{ t.ai_note }}</p>{% endif %}
+      <div class="wort-btn-row">
+        {% if can_downgrade %}
+        <form class="wort-inline" method="post" action="/ueben/s/{{ sess.id }}/doch-falsch">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {{ btn(_('Actually wrong'), 'danger', submit=true) }}
+        </form>
+        {% endif %}
+        <form class="wort-inline" method="post" action="/ueben/s/{{ sess.id }}/next">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {{ btn(_('Next') if pos + 1 < total else _('See the result'), 'primary', submit=true) }}
+        </form>
+      </div>
+      {% endif %}
+    </section>
+
+    <aside class="wort-card" aria-labelledby="quiz-round">
+      <h2 class="wort-card-title" id="quiz-round">{{ _('This round') }}</h2>
+      <p class="wort-btn-row">
+        {{ badge('correct', count.correct ~ ' richtig') }}{{ badge('almost', count.almost ~ ' teilweise') }}{{ badge('wrong', count.wrong ~ ' falsch') }}
+      </p>
+      {% if rows %}
+      <ol class="wort-round">
+        {% for r in rows %}
+        {% set rv = r.verdict if r.verdict in keys else 'none' %}
+        <li{% if loop.last and result %} aria-current="step"{% endif %}><span lang="de">{{ r.label }}</span>{{ badge(rv, names.get(rv, _('not graded'))) }}</li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+      <p class="wort-caption">{{ (_('1 word left.') if left == 1 else _('{n} words left.', n=left)) if left else _('Last word.') }}</p>
+    </aside>
+  </div>
+</div>
+{% endblock %}

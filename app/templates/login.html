@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_ui.html" import btn, brand_mark with context %}
+{% block title %}{{ _('Sign in') }} · wort{% endblock %}
+{% block content %}
+{# GUI refresh (garv, 2026-10-30): the form sits centred under the brand, every field has its label, a wrong
+   name or password (or too many tries) is said in words, with a glyph, and announced (role="alert"); the name stays. #}
+<div class="wort-page wort-login">
+  <p class="wort-login__brand"><span class="wort-login__mark">{{ brand_mark() }}</span><span class="wort-login__name">wort</span></p>
+  <h1 class="wort-title">{{ _('Sign in') }}</h1>
+  {% if error %}<p class="wort-alert" role="alert"><span class="wort-alert__glyph" aria-hidden="true">✗</span><span>{{ error }}</span></p>{% endif %}
+  <form class="wort-login__form" method="post" action="/login">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="wort-field">
+      <label class="wort-label" for="login-name">{{ _('Name') }}</label>
+      {% with id='login-name', name='name', label=_('Name'), value=typed_name, autocomplete='username', required=true, placeholder=_('Name'), fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+    </div>
+    <div class="wort-field">
+      <label class="wort-label" for="login-password">{{ _('Password') }}</label>
+      {% with id='login-password', type='password', name='password', label=_('Password'), autocomplete='current-password', required=true, placeholder=_('Password'), fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+    </div>
+    {{ btn(_('Sign in'), 'primary', submit=true) }}
+  </form>
+</div>
+{% endblock %}

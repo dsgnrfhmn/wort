@@ -113,3 +113,15 @@ def test_other_languages_and_wrong_pos_pointers_are_ignored(tmp_path):
     foreign = {**_form_of("zigtausende", "zigtausend"), "lang_code": "en"}
     d = _build(tmp_path, [_entry("zigtausend", "num"), foreign, {**_form_of("xx", "zigtausend"), "pos": "name"}])
     assert d.lookup_german("zigtausende") == [] and d.lookup_german("xx") == []
+
+
+def test_dump_strings_are_sanitized_and_unsafe_lemmas_skipped():
+    from wort.dictionary.importer import parse_entry
+    raw = {"word": "Haus", "pos": "noun", "lang_code": "de",
+           "senses": [{"glosses": ["house\x1b[31m red\x1b[0m‮"], "examples": [{"text": "Das\x00 Haus", "english": "The​ house"}]}],
+           "forms": [{"form": "Häuser\x07", "tags": ["plural​"]}]}
+    e = parse_entry(raw)
+    assert e["glosses"] == ["house red"] and e["examples"] == [("Das Haus", "The house")]
+    assert e["forms"] == [("Häuser", ["plural"])]
+    assert parse_entry({**raw, "word": "<b>Haus</b>"}) is None
+    assert parse_entry({**raw, "word": "{{x}}"}) is None

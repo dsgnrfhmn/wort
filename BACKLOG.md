@@ -4,19 +4,19 @@
 >-----------
 
 ## Translation
-- [ ] when type english word -- translate it to deutsch
-- [ ] when type phrase or sentence -- translate the sentence with accent on individual words
+- [x] when type english word -- translate it to deutsch *(CLI and web lookup)*
+- [x] when type phrase or sentence -- translate the sentence with accent on individual words *(CLI: Argos, D00c; web: one entry per word)*
 - [ ] Less text in output (to much in a screen)
 
 ## Word list 
-- [ ] Show list-history of last 20-40 words | *with the score of "knowing", more in "Exercises")*
+- [x] Show list-history of last 20-40 words *(CLI `/history`, web Verlauf)* | *with the score of "knowing", more in "Exercises")*
 - [ ] Ability to chose the word and see sentence examples in different forms
 
 
 ## Exercises
-- [ ] Ability to chose the word/words and get exercises to create different types of sentences with these words. (spell check with explanation after)
-- [ ] Ability to chose few words and get randomized exercises to use certain words in answers.
-- [ ] According to the spell-check results each word gets its score (score of user's knowing it)
+- [x] Ability to chose the word/words and get exercises to create different types of sentences with these words. (spell check with explanation after) *(web: Sätze bilden; explanations need the AI key)*
+- [x] Ability to chose few words and get randomized exercises to use certain words in answers. *(web: Abfrage)*
+- [x] According to the spell-check results each word gets its score (score of user's knowing it) *(0-10 per skill)*
 
 ## Score evaluation
 *Score will help to understand which words need more attention*
@@ -24,10 +24,22 @@
 
 ## Web view
 *Web view can give more possibilities to enhance learnings*
-- [ ] Dashboard with words, scores, and exercieses
-- [ ] Ability to upload a text (paste/image) and then work with it by hovering the word and see translations (+save the words and phrases to your base)
+- [x] Dashboard with words, scores, and exercieses
+- [ ] Ability to upload a text (paste/image) and then work with it by hovering the word and see translations (+save the words and phrases to your base) *(hover translations work on every page; Texte upload is not built)*
 
 ## Backend & infra
-- [ ] store words from CLI usage to local file.
+- [x] store words from CLI usage to local file. *(user.db, `wort export`)*
 - [ ] add a auto sync the words after close/time of the app
-- [ ] connect sync action on the web-view (security: web only reads, local only sends)
+- [x] connect sync action on the web-view (security: web only reads, local only sends) *(`wort sync`, write-only token)*
+
+## Ideas & inspiration (brainstorm)
+*Other tools to look at for new exercise types and features. Ideas only: their content is not copied.*
+- [ ] **LearningApps.org** (https://learningapps.org/) — a source of exercise *types*, not content *(added 2026-10-28)*
+  - No public API known (not verified); exercises are user-made, so their authors hold the rights; embedding is an
+    iframe to learningapps.org; some exercises export as SCORM.
+  - Not usable directly: an iframe loads an external site (trackers, cookies) in the learner's browser, and the server
+    has no outbound network except the AI API (CLAUDE.md, Security boundaries).
+  - Use instead: rebuild the types natively on wort's own data, graded locally, as Grammatik and Abfrage are —
+    matching pairs, Lückentext, ordering, quiz, crossword, grouping.
+  - Possible later: import one's own exported exercises as a file, treated as untrusted data (same rules as the CLI's
+    JSON import).

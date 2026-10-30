@@ -1,0 +1,352 @@
+/* GUI refresh (garv, 2026-10-30): dis-system is a visual reference, not a rulebook, for this work. The pieces below are
+   wort's own (buttons, badges, cards, steps, the verdict, the mode bar). They still read dis-system's tokens
+   (--ds-*) for every colour, size and space, so both themes follow, and they sit on top of the component CSS that
+   base.html loads first. Loaded last. Built for Practice first; the other pages adopt it one by one (GUI-REFRESH.org). */
+
+/* ---- Tokens of its own ------------------------------------------------------------------------------------------ */
+:root {
+  --wort-ok: #386a2f;        /* 5.7:1 on white, 4.7:1 on the grey page */
+  --wort-bad: var(--ds-color-row-status-declined-text);
+  --wort-mid: #7a4a00;       /* amber for "almost right": 7.5:1 on white */
+  --wort-line: var(--ds-color-object-dark-passive);
+  --wort-focus: var(--ds-color-accent-1);
+  --wort-target: 44px;       /* smallest pointer target (WCAG 2.5.5) */
+}
+[data-theme="dark"] {
+  --wort-ok: var(--ds-color-row-status-approved-text);
+  --wort-mid: var(--ds-color-row-status-for-review-text);
+}
+/* Contrast: dis-system's muted text tiers are 2.8-3.2:1 on white (WCAG 1.4.3 asks 4.5:1). Light theme only; dark is
+   already above 4.4:1 and header labels get a small lift. */
+:root:not([data-theme="dark"]) {
+  --ds-color-text-subactive: rgba(0, 0, 0, 0.62);
+  --ds-color-header-cell-label: #666666;
+}
+[data-theme="dark"] { --ds-color-header-cell-label: #9a9a9a; }
+
+.ds-nav-bar__brand { min-width: var(--wort-target); min-height: var(--wort-target); justify-content: center; box-sizing: border-box; }
+
+/* ---- Reading helpers --------------------------------------------------------------------------------------------- */
+.wort-skip { position: absolute; left: var(--ds-spacing-3); top: -100px; z-index: 10; padding: var(--ds-spacing-3) var(--ds-spacing-5); background: var(--ds-color-bg-surface); color: var(--ds-color-text-active); border: 2px solid var(--wort-focus); }
+.wort-skip:focus { top: var(--ds-spacing-3); }
+#main:focus { outline: none; }
+.wort-title { margin: 0; font-family: var(--ds-font-heading-3-family, inherit); font-size: var(--ds-font-heading-3-size); font-weight: var(--ds-font-title-weight); line-height: 1.2; color: var(--ds-color-text-active); }
+.wort-caption { margin: 0; color: var(--ds-color-text-subactive); font-size: var(--ds-font-body-text-size); line-height: 1.3; }
+.wort-lead { margin: 0; max-width: calc(var(--ds-spacing-9) * 18); color: var(--ds-color-text-active); }
+.wort-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+[lang="uk"] { font-style: normal; }
+
+/* ---- Buttons: one filled primary per screen, outlined secondary, quiet ghost ------------------------------------- */
+.wort-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--ds-spacing-3); box-sizing: border-box; min-height: var(--wort-target); padding: 0 var(--ds-spacing-6); font: inherit; font-weight: var(--ds-font-title-weight); line-height: 1.2; text-decoration: none; cursor: pointer; border: 1px solid transparent; border-radius: 0; background: none; color: var(--ds-color-accent-1); }
+.wort-btn--primary { background: var(--ds-color-accent-1); color: var(--ds-color-bg-surface); border-color: var(--ds-color-accent-1); }
+.wort-btn--primary:hover { background: var(--ds-color-accent-1-hover); border-color: var(--ds-color-accent-1-hover); }
+.wort-btn--primary:active { background: var(--ds-color-accent-1-pressed); }
+.wort-btn--secondary { border-color: var(--ds-color-accent-1); }
+.wort-btn--secondary:hover { background: var(--ds-color-bg-surface-pressed); }
+.wort-btn--ghost { padding: 0 var(--ds-spacing-4); font-weight: normal; }
+.wort-btn--ghost:hover { text-decoration: underline; text-underline-offset: 3px; }
+.wort-btn--danger { color: var(--wort-bad); }
+.wort-btn:focus-visible, .wort-chip:focus-visible, .wort-step:focus-visible, .wort-modes a:focus-visible, .wort-hints > summary:focus-visible { outline: 2px solid var(--wort-focus); outline-offset: 2px; }
+.wort-btn[disabled], .wort-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.wort-btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-3) var(--ds-spacing-5); }
+form.wort-inline { display: inline; margin: 0; }
+
+/* ---- Badges: the verdict by text, glyph and colour ----------------------------------------------------------------- */
+.wort-badge { display: inline-flex; align-items: center; gap: var(--ds-spacing-2); padding: 1px var(--ds-spacing-3); font-size: var(--ds-font-data-size); font-weight: var(--ds-font-title-weight); line-height: 1.5; white-space: nowrap; color: var(--ds-color-text-active); border: 1px solid currentColor; border-radius: 0; }
+.wort-badge[data-v="correct"] { color: var(--wort-ok); }
+.wort-badge[data-v="wrong"] { color: var(--wort-bad); }
+.wort-badge[data-v="almost"] { color: var(--wort-mid); }
+/* Tags (score, "in your words", uncertain spots) look like the verdict badges: a border, the text colour of the verdict,
+   a glyph for the colour-blind (UX-21). dis-system's own passive tags are 2.1-3.4:1 on their tints in the light theme. */
+.ds-tag[data-subtype="passive"] { padding: 1px var(--ds-spacing-3); background: none; border: 1px solid currentColor; border-radius: 0; font-size: var(--ds-font-data-size); font-weight: var(--ds-font-title-weight); line-height: 1.5; color: var(--ds-color-text-active); }
+.ds-tag[data-subtype="passive"][data-type="success"] { background-color: transparent; color: var(--wort-ok); }
+.ds-tag[data-subtype="passive"][data-type="warning"] { background-color: transparent; color: var(--wort-mid); }
+.ds-tag[data-subtype="passive"][data-type="danger"] { background-color: transparent; color: var(--wort-bad); }
+.ds-tag[data-subtype="passive"][data-type="neutral"] { background-color: transparent; color: var(--ds-color-text-active); border-style: dashed; }
+.ds-tag[data-subtype="passive"]:is([data-type="success"], [data-type="warning"], [data-type="danger"])::before { margin-right: var(--ds-spacing-2); font-weight: bold; }
+.ds-tag[data-subtype="passive"][data-type="success"]::before { content: "✓" / ""; }
+.ds-tag[data-subtype="passive"][data-type="warning"]::before { content: "~" / ""; }
+.ds-tag[data-subtype="passive"][data-type="danger"]::before { content: "✗" / ""; }
+/* The destructive popup action ("Delete", "Remove") is 3.9:1 in the light theme and 4.4:1 in the dark one in the system's red; the red used for "wrong" is not. */
+.ds-popup .ds-text-button[data-status="error"] { color: var(--wort-bad); }
+.wort-badge[data-v="tip"], .wort-badge[data-v="none"], .wort-badge[data-v="skipped"] { color: var(--ds-color-text-active); border-style: dashed; }
+.wort-badge__glyph { font-weight: bold; }
+
+/* ---- Cards and the quiet note ------------------------------------------------------------------------------------- */
+.wort-card { display: grid; gap: var(--ds-spacing-5); align-content: start; padding: var(--ds-spacing-6); background: var(--ds-color-bg-surface); border: 1px solid var(--wort-line); }
+.wort-card > h2, .wort-card > h3, .wort-card-title { margin: 0; font-size: var(--ds-font-title-size); font-weight: var(--ds-font-title-weight); }
+.wort-note { margin: 0; padding: var(--ds-spacing-3) var(--ds-spacing-5); border-left: 3px solid var(--wort-line); color: var(--ds-color-text-active); }
+.wort-page { display: grid; gap: var(--ds-spacing-6); align-content: start; }
+.wort-pagehead { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--ds-spacing-4) var(--ds-spacing-6); }
+.wort-pagehead__text { display: grid; gap: var(--ds-spacing-2); min-width: 0; }
+
+/* ---- Chips: choices that filter (topic) or preview (the words of a session) -------------------------------------- */
+.wort-chips { display: flex; flex-wrap: wrap; gap: var(--ds-spacing-3); margin: 0; padding: 0; list-style: none; }
+a.wort-chip, .wort-chip { display: inline-flex; align-items: center; min-height: var(--wort-target); box-sizing: border-box; padding: 0 var(--ds-spacing-5); text-decoration: none; color: var(--ds-color-text-active); background: var(--ds-color-bg-surface); border: 1px solid var(--wort-line); }
+a.wort-chip:hover { border-color: var(--ds-color-text-active); }
+a.wort-chip[aria-current="true"], a.wort-chip[aria-current="page"] { background: var(--ds-color-text-active); color: var(--ds-color-bg-surface); border-color: var(--ds-color-text-active); }
+.wort-chips--static .wort-chip { min-height: 0; padding: 2px var(--ds-spacing-4); font-size: var(--ds-font-data-size); }
+
+/* ---- Corrections: the words to remove and to add, and the clean corrected line, readable on their fill ---------------- */
+/* The add mark's fill is light in both themes, so its text is dark in both: the theme's ok colour in light, the dark
+   surface colour in dark (3.6:1 before). */
+.ds-inline-mark[data-kind="remove"] { color: var(--wort-bad); }
+:root:not([data-theme="dark"]) .ds-inline-mark[data-kind="add"] { color: var(--wort-ok); }
+[data-theme="dark"] .ds-inline-mark[data-kind="add"] { color: var(--ds-color-bg-surface); }
+.ds-message__note[data-tone="success"] { color: var(--wort-ok); }
+
+/* ---- Mode bar under the main navigation: three equal sections, the open one marked, "Look up" at the end ----------- */
+.wort-modebar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; border-bottom: 1px solid var(--wort-line); }
+.wort-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.wort-modes a { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ds-spacing-1) var(--ds-spacing-4); box-sizing: border-box; min-height: calc(var(--ds-spacing-9) + var(--ds-spacing-5)); padding: var(--ds-spacing-4) var(--ds-spacing-cell) var(--ds-spacing-3); text-decoration: none; color: var(--ds-color-text-subactive); border-bottom: 3px solid transparent; font-size: var(--ds-font-heading-4-size); }
+.wort-modes a:hover { color: var(--ds-color-text-active); }
+.wort-modes a[aria-current="page"] { color: var(--ds-color-text-active); border-bottom-color: var(--ds-color-text-active); font-weight: var(--ds-font-title-weight); }
+.wort-modes__count { font-size: var(--ds-font-data-size); font-weight: normal; color: var(--ds-color-text-subactive); }
+.wort-modebar__tools { display: flex; align-items: center; padding: 0 var(--ds-spacing-cell); }
+
+/* ---- A session's header: title, "Task 2 of 5", the finished tasks as steps -------------------------------------- */
+.wort-sess-head { display: grid; gap: var(--ds-spacing-4); }
+.wort-progress { appearance: none; -webkit-appearance: none; width: 100%; height: 6px; border: 0; background: var(--ds-color-bg-surface-pressed); color: var(--ds-color-text-active); }
+.wort-progress::-webkit-progress-bar { background: var(--ds-color-bg-surface-pressed); }
+.wort-progress::-webkit-progress-value { background: var(--ds-color-text-active); }
+.wort-progress::-moz-progress-bar { background: var(--ds-color-text-active); }
+.wort-steps { display: flex; flex-wrap: wrap; gap: var(--ds-spacing-3); margin: 0; padding: 0; list-style: none; }
+.wort-step { display: inline-flex; align-items: center; gap: var(--ds-spacing-2); min-width: var(--wort-target); min-height: var(--wort-target); box-sizing: border-box; padding: 0 var(--ds-spacing-4); justify-content: center; text-decoration: none; color: var(--ds-color-text-active); background: var(--ds-color-bg-surface); border: 1px solid var(--wort-line); font-size: var(--ds-font-data-size); }
+.wort-step[data-v="correct"] .wort-step__glyph { color: var(--wort-ok); }
+.wort-step[data-v="wrong"] .wort-step__glyph { color: var(--wort-bad); }
+.wort-step[data-v="almost"] .wort-step__glyph { color: var(--wort-mid); }
+.wort-step__glyph { font-weight: bold; }
+a.wort-step:hover { border-color: var(--ds-color-text-active); }
+.wort-step[aria-current="step"] { background: var(--ds-color-text-active); color: var(--ds-color-bg-surface); border-color: var(--ds-color-text-active); font-weight: var(--ds-font-title-weight); }
+.wort-step[aria-current="step"] .wort-step__glyph { color: inherit; }
+
+/* ---- The verdict: always visible under the answer; the explanation stays behind "Explain more" -------------------- */
+.wort-verdict { display: grid; gap: var(--ds-spacing-4); justify-self: start; box-sizing: border-box; width: min(100%, calc(var(--ds-spacing-9) * 18)); padding: var(--ds-spacing-5) var(--ds-spacing-6); background: var(--ds-color-bg-surface); border: 1px solid var(--wort-line); border-left-width: 4px; }
+.wort-verdict[data-v="correct"] { border-left-color: var(--wort-ok); }
+.wort-verdict[data-v="wrong"] { border-left-color: var(--wort-bad); }
+.wort-verdict[data-v="almost"] { border-left-color: var(--wort-mid); }
+.wort-verdict[data-v="tip"], .wort-verdict[data-v="none"] { border-left-color: var(--ds-color-text-active); border-left-style: dashed; }
+.wort-verdict__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-3) var(--ds-spacing-5); }
+.wort-verdict__score { color: var(--ds-color-text-subactive); font-size: var(--ds-font-data-size); }
+.wort-verdict__rows { display: grid; gap: var(--ds-spacing-3); margin: 0; padding: 0; list-style: none; }
+.wort-verdict__rows li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--ds-spacing-1) var(--ds-spacing-4); align-items: baseline; }
+.wort-verdict__name { font-weight: var(--ds-font-title-weight); }
+.wort-verdict p, .wort-verdict__rows p, .wort-card p { margin: 0; }
+.wort-card p.wort-btn-row { gap: var(--ds-spacing-3); }
+.wort-review { border: 0; }
+.wort-verdict:focus { outline: none; }
+.wort-choices { display: grid; gap: var(--ds-spacing-3); }
+ol.wort-chips { counter-reset: none; }
+
+/* ---- Hints: one disclosure instead of boxes, the example answer included ------------------------------------------- */
+.wort-hints { max-width: calc(var(--ds-spacing-9) * 18); }
+.wort-hints > summary { display: inline-flex; align-items: center; min-height: var(--wort-target); cursor: pointer; color: var(--ds-color-accent-1); font-weight: var(--ds-font-title-weight); }
+.wort-hints > summary::marker { content: ""; }
+.wort-hints > summary::before { content: "▸"; display: inline-block; margin-right: var(--ds-spacing-3); }
+.wort-hints[open] > summary::before { content: "▾"; }
+.wort-hints__body { display: grid; gap: var(--ds-spacing-3); padding: var(--ds-spacing-4) var(--ds-spacing-5); margin: 0 0 var(--ds-spacing-3); border-left: 3px solid var(--wort-line); }
+.wort-hints__body p { margin: 0; white-space: pre-line; }
+.wort-hints__label { font-weight: var(--ds-font-title-weight); }
+.wort-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-2) var(--ds-spacing-5); }
+
+/* ---- The answer bar ------------------------------------------------------------------------------------------------ */
+.wort-composer { padding: var(--ds-spacing-5) var(--ds-spacing-6) var(--ds-spacing-6); }
+.wort-composer .wort-answer { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--ds-spacing-3) var(--ds-spacing-5); }
+.wort-composer__hint { grid-column: 1 / -1; margin: 0; color: var(--ds-color-text-subactive); font-size: var(--ds-font-data-size); }
+.wort-composer__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ds-spacing-3) var(--ds-spacing-6); }
+.wort-composer__bar .wort-btn-row { margin-left: auto; }
+.wort-composer .ds-input { min-height: calc(var(--wort-target) * 1.5); }
+
+/* ---- Start pages -------------------------------------------------------------------------------------------------- */
+.wort-start { display: grid; gap: var(--ds-spacing-6); max-width: calc(var(--ds-spacing-9) * 24); }
+.wort-start__main { display: grid; gap: var(--ds-spacing-5); }
+.wort-start__main h2 { margin: 0; font-size: var(--ds-font-heading-4-size); font-weight: var(--ds-font-title-weight); }
+.wort-resume { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ds-spacing-4) var(--ds-spacing-6); padding: var(--ds-spacing-5) var(--ds-spacing-6); border: 1px solid var(--ds-color-text-active); background: var(--ds-color-bg-surface); }
+.wort-resume p { margin: 0; }
+
+/* ---- Quiz --------------------------------------------------------------------------------------------------------- */
+.wort-quiz { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--ds-spacing-6); align-items: start; }
+.wort-quiz__word { margin: 0; font-size: var(--ds-font-heading-2-size); line-height: 1.15; font-weight: var(--ds-font-title-weight); }
+.wort-quiz__word[data-article="der"] { color: var(--ds-color-accent-1); }
+.wort-quiz__word[data-article="die"] { color: var(--ds-color-row-status-declined-text); }
+.wort-quiz__word[data-article="das"] { color: var(--wort-ok); }
+.wort-round { display: grid; gap: var(--ds-spacing-3); margin: 0; padding: 0; list-style: none; }
+.wort-round li { display: flex; justify-content: space-between; align-items: center; gap: var(--ds-spacing-4); padding-bottom: var(--ds-spacing-3); border-bottom: 1px solid var(--ds-color-border-table); }
+.wort-round li[aria-current="step"] { font-weight: var(--ds-font-title-weight); }
+.wort-modeform .ds-radio-group { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-2) var(--ds-spacing-6); }
+.wort-modeform .ds-radio { min-height: var(--wort-target); }
+
+/* ---- Result -------------------------------------------------------------------------------------------------------- */
+.wort-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--ds-spacing-3) var(--ds-spacing-6); }
+.wort-summary strong { font-size: var(--ds-font-heading-3-size); line-height: 1.2; }
+.wort-resulttable { width: 100%; border-collapse: collapse; }
+.wort-resulttable th { text-align: left; font-weight: normal; font-size: var(--ds-font-data-size); text-transform: uppercase; color: var(--ds-color-header-cell-label); padding: var(--ds-spacing-3) var(--ds-spacing-cell); border-bottom: 1px solid var(--wort-line); }
+.wort-resulttable td { padding: var(--ds-spacing-4) var(--ds-spacing-cell); border-bottom: 1px solid var(--ds-color-border-table); }
+.wort-resulttable td:nth-child(n+3), .wort-resulttable th:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
+
+.wort-section-title, .wort-bar { margin: 0; padding: var(--ds-spacing-cell) var(--ds-spacing-6); background: var(--ds-color-bg-surface-pressed); border: 1px solid var(--wort-line); font-size: var(--ds-font-title-size); font-weight: var(--ds-font-title-weight); line-height: 1.3; }
+/* ---- Grammar ------------------------------------------------------------------------------------------------------- */
+.wort-grammar__uk { padding: var(--ds-spacing-3) var(--ds-spacing-5); border-left: 3px solid var(--wort-line); color: var(--ds-color-text-active); }
+.wort-topiclist { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--wort-line); }
+.wort-topiclist a { display: grid; grid-template-columns: minmax(0, 2fr) max-content minmax(0, 5fr) max-content; gap: var(--ds-spacing-2) var(--ds-spacing-6); align-items: baseline; min-height: var(--ds-spacing-row); box-sizing: border-box; padding: var(--ds-spacing-4) var(--ds-spacing-cell); text-decoration: none; color: var(--ds-color-text-active); border-bottom: 1px solid var(--ds-color-border-table); }
+.wort-topiclist a:hover { background: var(--ds-color-bg-surface-pressed); }
+.wort-topiclist a:focus-visible { outline: 2px solid var(--wort-focus); outline-offset: -2px; }
+.wort-topiclist__title { font-weight: var(--ds-font-title-weight); color: var(--ds-color-accent-1); text-decoration: underline; text-underline-offset: 3px; }
+.wort-topiclist__meta { color: var(--ds-color-text-subactive); }
+
+/* ---- Words of the session on a phone: a disclosure instead of a column above the task -------------------------------- */
+.wort-words-m { display: none; }
+@media (max-width: 720px) {
+  .wort-words-m { display: block; border-bottom: 1px solid var(--wort-line); background: var(--ds-color-bg-surface); }
+  .wort-words-m > summary { display: flex; justify-content: space-between; align-items: center; min-height: var(--wort-target); padding: 0 var(--ds-spacing-5); cursor: pointer; font-weight: var(--ds-font-title-weight); }
+  .wort-words-m ul { margin: 0; padding: 0 0 var(--ds-spacing-3); list-style: none; }
+  .wort-words-m__row { display: flex; justify-content: space-between; gap: var(--ds-spacing-4); min-height: var(--wort-target); box-sizing: border-box; align-items: center; padding: 0 var(--ds-spacing-5); text-decoration: none; color: var(--ds-color-text-active); }
+  .wort-words-m__row[aria-current="true"] { font-weight: var(--ds-font-title-weight); background: var(--ds-color-bg-surface-pressed); }
+  .wort-words-m__row--muted { color: var(--ds-color-text-subactive); }
+  .wort-practice--words > .wort-practice__words { display: none; }
+  /* The header scrolls away on a phone: nav bar, modes and Look up together are a quarter of the screen. */
+  .wort-head { position: static; }
+  /* The nav bar's right part (language, sign out, theme) is max-content wide in dis-system: it let the theme toggle run off the screen. */
+  .ds-nav-bar__right { flex: 1 1 100%; min-width: 0; flex-wrap: wrap; justify-content: space-between; }
+  .ds-nav-bar__switcher { flex: 0 1 8rem; min-width: 0; }
+  .ds-nav-bar__switcher .ds-input-dropdown { width: 100%; min-width: 0; }
+  .wort-side { top: 0; }
+  .wort-modes a { font-size: var(--ds-font-body-text-size); padding: var(--ds-spacing-3) var(--ds-spacing-3) var(--ds-spacing-2); min-height: var(--wort-target); }
+  .wort-modebar__tools { padding: 0 var(--ds-spacing-2); }
+  .wort-modebar__tools .wort-btn { padding: 0 var(--ds-spacing-3); }
+  .wort-quiz { grid-template-columns: minmax(0, 1fr); }
+  .wort-topiclist a { grid-template-columns: minmax(0, 1fr) max-content; }
+  .wort-topiclist__what { grid-column: 1 / -1; }
+  .wort-composer .wort-answer { grid-template-columns: minmax(0, 1fr); }
+  .wort-composer .wort-btn { width: 100%; }
+  .wort-verdict { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .wort-btn, .wort-chip { transition: none; } }
+
+/* A section heading with a note at its end ("2 of 5"); the grammar topic's title is the same bar. */
+.wort-bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--ds-spacing-2) var(--ds-spacing-5); }
+.wort-bar__info { font-size: var(--ds-font-data-size); font-weight: normal; color: var(--ds-color-text-subactive); }
+.wort-label { font-weight: var(--ds-font-title-weight); color: var(--ds-color-text-active); }
+button.wort-chip { font: inherit; cursor: pointer; }
+button.wort-chip:hover { border-color: var(--ds-color-text-active); }
+button.wort-chip:focus-visible { outline: 2px solid var(--wort-focus); outline-offset: 2px; }
+
+/* ---- Words: title with its count, the labelled lookup, the filter and the selection bar, the table, the open word ---- */
+.wort-wordspage { display: grid; gap: var(--ds-spacing-6); align-content: start; padding: var(--ds-spacing-7) 0 var(--ds-spacing-9); }
+.wort-wordspage > .wort-pagehead, .wort-lookupbar { padding-inline: var(--ds-spacing-6); }
+.wort-lookupbar { box-sizing: border-box; max-width: calc(var(--ds-spacing-9) * 24); }
+.wort-lookupbar__form, .wort-ownform { display: grid; gap: var(--ds-spacing-3); }
+.wort-lookupbar__row { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--ds-spacing-4); }
+.wort-lookupbar__row .ds-input { flex: 1 1 calc(var(--ds-spacing-9) * 4); width: auto; min-width: 0; min-height: var(--wort-target); }
+.wort-listbar { display: grid; gap: var(--ds-spacing-5); }
+.wort-listbar__tools, .wort-selbar, .wort-empty { margin-inline: var(--ds-spacing-6); }
+.wort-listbar__tools { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--ds-spacing-4) var(--ds-spacing-7); }
+.wort-filter { display: grid; gap: var(--ds-spacing-2); flex: 1 1 calc(var(--ds-spacing-9) * 8); max-width: calc(var(--ds-spacing-9) * 12); }
+.wort-filter .ds-input { width: auto; min-height: var(--wort-target); }
+.wort-quick { display: grid; gap: var(--ds-spacing-2); }
+.wort-selbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ds-spacing-3) var(--ds-spacing-6); padding: var(--ds-spacing-3) var(--ds-spacing-5); background: var(--ds-color-bg-surface-pressed); border: 1px solid var(--wort-line); }
+.wort-selbar__state { margin: 0; color: var(--ds-color-text-subactive); }
+.wort-selbar:has([data-status="active"]) .wort-selbar__state { color: var(--ds-color-text-active); font-weight: var(--ds-font-title-weight); }
+.wort-empty { display: grid; gap: var(--ds-spacing-5); justify-items: center; padding-top: var(--ds-spacing-6); }
+.wort-more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ds-spacing-3) var(--ds-spacing-5); padding: var(--ds-spacing-5) var(--ds-spacing-6); border-top: 1px solid var(--ds-color-border-table); }
+/* The row checkbox is there at all times (dis-system shows it only under the pointer): a touch screen has no hover. */
+.wort-words .ds-table-row:not(:hover):not(:focus-within):not([data-selected="true"]) > .ds-table-cell[data-type="checkbox-cell"] .ds-table-cell__icon { opacity: 1; }
+.wort-word__title { margin: 0; font-size: var(--ds-font-heading-3-size); line-height: 1.2; }
+.wort-word__title[data-article="der"] { color: var(--ds-color-accent-1); }
+.wort-word__title[data-article="die"] { color: var(--ds-color-row-status-declined-text); }
+.wort-word__title[data-article="das"] { color: var(--wort-ok); }
+.wort-word__summary { display: grid; gap: var(--ds-spacing-3); }
+.wort-word__summary p { margin: 0; }
+.wort-word__translation { font-size: var(--ds-font-heading-5-size); }
+.wort-word .ds-pane__head { flex-wrap: wrap; gap: var(--ds-spacing-2) var(--ds-spacing-5); }
+.wort-detail .wort-note { margin: 0; }
+/* A plain button at the start of a line sits on the text's edge, not on its own padding. */
+.wort-detail .wort-btn--ghost { margin-left: calc(-1 * var(--ds-spacing-4)); }
+.wort-wordspage > .wort-pagehead > .wort-pagehead__text { flex: 1 1 calc(var(--ds-spacing-9) * 5); }
+.wort-wordspage > .wort-pagehead > .wort-btn-row { flex: 0 0 auto; }
+
+/* ---- Texts: the actions of a text together, the legend as a caption, the list of texts on a phone ------------------------ */
+.wort-text__actions { margin-bottom: calc(-1 * var(--ds-spacing-3)); }
+.wort-text .wort-btn-row > .wort-btn--ghost:first-child { margin-left: calc(-1 * var(--ds-spacing-4)); }
+/* "in list" in a note: the word is in the word list, which is good news: the success look of the badges. */
+.ds-note-item .ds-tag[data-type="neutral"] { color: var(--wort-ok); border-style: solid; }
+.ds-note-item .ds-tag[data-type="neutral"]::before { content: "✓" / ""; margin-right: var(--ds-spacing-2); font-weight: bold; }
+.wort-text .ds-word-token-legend { font-style: normal; font-size: var(--ds-font-data-size); color: var(--ds-color-text-subactive); }
+.wort-notes { display: grid; align-content: start; }
+.wort-notes > .wort-btn-row { padding: var(--ds-spacing-4) var(--ds-spacing-6); border-bottom: 1px solid var(--ds-color-border-table); }
+.wort-upload__title { display: grid; gap: var(--ds-spacing-2); }
+.wort-check__photo .wort-btn-row { gap: var(--ds-spacing-2); }
+.wort-check__doubts { display: grid; gap: var(--ds-spacing-3); }
+.wort-check__doubts p { margin: 0; }
+.wort-note[role="note"] { margin: 0; }
+.wort-texts-m { display: none; }
+/* The create row of the list of texts ("Upload photo") is the one filled button of the page. */
+.wort-texts__side .ds-sidebar-item[data-role="create"] { padding: var(--ds-spacing-4) var(--ds-spacing-5); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button { box-sizing: border-box; width: 100%; min-height: var(--wort-target); justify-content: center; background: var(--ds-color-accent-1); border: 1px solid var(--ds-color-accent-1); color: var(--ds-color-bg-surface); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button:hover { background: var(--ds-color-accent-1-hover); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button__text { text-decoration: none; font-weight: var(--ds-font-title-weight); }
+.wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button::before, .wort-texts__side .ds-sidebar-item[data-role="create"] .ds-text-button::after { display: none; }
+@media (max-width: 720px) {
+  .wort-texts-m { display: block; border-bottom: 1px solid var(--wort-line); }
+  .wort-texts-m__bar { padding: var(--ds-spacing-4) var(--ds-spacing-5); }
+  .wort-texts-m__bar .wort-btn { width: 100%; }
+  .wort-texts-m .wort-words-m { border-bottom: 0; border-top: 1px solid var(--wort-line); }
+  .wort-texts-m__row { flex-wrap: wrap; align-items: center; padding-block: var(--ds-spacing-3); }
+  .wort-texts__side { display: none; }
+}
+
+/* ---- Popups: their actions are buttons like the rest of wort (dis-system draws them as text links) ----------------- */
+.ds-popup__bottom { flex-wrap: wrap; height: auto; min-height: calc(var(--ds-spacing-9) + var(--ds-spacing-6)); padding: var(--ds-spacing-5) var(--ds-spacing-6); gap: var(--ds-spacing-3) var(--ds-spacing-4); }
+.ds-popup__bottom .ds-text-button { box-sizing: border-box; min-height: var(--wort-target); justify-content: center; padding: 0 var(--ds-spacing-6); color: var(--ds-color-accent-1); border: 1px solid var(--ds-color-accent-1); }
+.ds-popup__bottom .ds-text-button .ds-text-button__text, .ds-popup__bottom .ds-text-button .ds-text-button__label { text-decoration: none; font-weight: var(--ds-font-title-weight); }
+.ds-popup__bottom .ds-text-button::before, .ds-popup__bottom .ds-text-button::after { display: none; }
+.ds-popup__bottom .ds-text-button:hover { background: var(--ds-color-bg-surface-pressed); }
+.ds-popup__bottom .ds-text-button[data-priority="primary"] { background: var(--ds-color-accent-1); color: var(--ds-color-bg-surface); }
+.ds-popup__bottom .ds-text-button[data-priority="primary"]:hover { background: var(--ds-color-accent-1-hover); }
+.ds-popup__bottom .ds-text-button[data-status="error"] { border-color: var(--wort-bad); }
+.ds-popup__bottom .ds-text-button:focus-visible { outline: 2px solid var(--wort-focus); outline-offset: 2px; }
+
+/* ---- Sign in: centred under the brand; a wrong password is said in words, with a glyph ---------------------------------- */
+.wort-login { max-width: calc(var(--ds-spacing-9) * 10); margin: var(--ds-spacing-9) auto 0; gap: var(--ds-spacing-6); }
+.wort-login__brand { display: flex; align-items: center; gap: var(--ds-spacing-4); margin: 0; }
+.wort-login__mark { display: inline-flex; width: calc(var(--ds-spacing-9) * 0.9); color: var(--ds-color-text-active); }
+.wort-login__mark svg { width: 100%; height: auto; }
+.wort-login__name { font-size: var(--ds-font-heading-3-size); font-weight: var(--ds-font-title-weight); }
+.wort-login__form { display: grid; gap: var(--ds-spacing-5); }
+.wort-login__form .wort-btn { justify-self: stretch; }
+.wort-field { display: grid; gap: var(--ds-spacing-2); }
+.wort-field .ds-input { width: auto; min-height: var(--wort-target); }
+.wort-alert { display: flex; gap: var(--ds-spacing-3); align-items: baseline; margin: 0; padding: var(--ds-spacing-4) var(--ds-spacing-5); border: 1px solid var(--wort-bad); border-left-width: 4px; background: var(--ds-color-bg-surface); color: var(--ds-color-text-active); }
+.wort-alert__glyph { color: var(--wort-bad); font-weight: bold; }
+
+/* ---- Import and history ------------------------------------------------------------------------------------------- */
+.wort-histpage { max-width: calc(var(--ds-spacing-9) * 24); }
+.wort-importform { display: grid; gap: var(--ds-spacing-5); }
+.wort-histsection { display: grid; gap: var(--ds-spacing-3); align-content: start; }
+.wort-history .ds-table-cell.wort-history__learn { align-items: center; padding: var(--ds-spacing-2) var(--ds-spacing-cell); }
+/* In a dense table the button is 36 px (the row is 45 px); everywhere else the kit's 44 px stands. */
+.wort-history__learn .wort-btn { min-height: calc(var(--wort-target) - var(--ds-spacing-3)); padding: 0 var(--ds-spacing-5); }
+.wort-histsection .wort-more { padding-inline: 0; }
+@media (max-width: 720px) {
+  /* A row is a small card (the word and "Learn", the translation, how often and when): nothing is left out, nothing
+     scrolls sideways. The column heads stay for a screen reader only. */
+  .wort-history { display: block; overflow: visible; }
+  .wort-history > .ds-table-header-cell { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .wort-history .ds-table-row { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; grid-auto-rows: auto; align-items: center; column-gap: var(--ds-spacing-4); padding: var(--ds-spacing-3) 0; border-bottom: 1px solid var(--ds-color-border-table); }
+  .wort-history .ds-table-row > .ds-table-cell { border: 0; min-width: 0; height: auto; min-height: 0; padding-block: var(--ds-spacing-1); }
+  .wort-history .ds-table-row > :nth-child(1) { grid-column: 1 / 3; grid-row: 1; font-weight: var(--ds-font-title-weight); }
+  .wort-history .ds-table-row > :nth-child(2) { grid-column: 1 / 3; grid-row: 2; }
+  .wort-history .ds-table-row > :nth-child(3) { grid-column: 1; grid-row: 3; }
+  .wort-history .ds-table-row > :nth-child(3) .ds-table-cell__text::after { content: "×"; }
+  .wort-history .ds-table-row > :nth-child(4) { grid-column: 2 / 4; grid-row: 3; }
+  .wort-history .ds-table-row > :nth-child(5) { grid-column: 3; grid-row: 1 / 3; }
+}
+
+/* Look-up side panel (440px, even on a wide window): its result is one column, the forms table at full width. */
+.wort-side__results .wort-lookup__item.wort-result { grid-template-columns: minmax(0, 1fr); }
+.wort-side__results .wort-result__side { border-left: 0; border-top: 1px solid var(--wort-line); }
+
+/* A phone's browser bar changes the window height: 100vh is taller than what is visible, so the pinned answer bar
+   sat under it. dvh follows the visible height; a browser without it keeps layout.css's vh rule. */
+.wort-practice__main { min-height: calc(100dvh - var(--wort-head-h)); }
+.wort-practice__words { height: calc(100dvh - var(--wort-head-h)); }

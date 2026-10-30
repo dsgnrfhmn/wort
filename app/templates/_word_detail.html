@@ -1,0 +1,97 @@
+{# The open word beside the table on the Wörter page. Expects `d` (words.word_detail's detail dict),
+   `list_params` (the table's sort/dir/limit, kept by "Schließen") and `csrf`. GUI refresh 2026-10-30: the word as
+   a heading, its score as a badge, section bars as real headings, the label of the own-translation field visible,
+   and removing asks first (app.js; the form below still works without it). #}
+{% from "_ui.html" import btn, badge, bar with context %}
+{% set v = d.v %}
+{% set level = {'success': 'correct', 'warning': 'almost', 'danger': 'wrong'}.get(v.score_type, 'none') %}
+<section class="ds-pane wort-word" id="detail" aria-labelledby="detail-title">
+  <form id="practice-one" method="post" action="/ueben/saetze" hidden>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="ids" value="{{ v.id }}">
+  </form>
+  <div class="ds-pane__head">
+    <div class="ds-pane__heading">
+      <h2 class="ds-pane__title wort-word__title" data-emphasis="true" id="detail-title" lang="de"{% if v.article %} data-article="{{ v.article }}"{% endif %}>{{ v.label }}</h2>
+      <span class="ds-pane__caption">{{ v.pos_label }}{% if v.entry and v.entry.gender in ('m', 'f', 'n') %} · {{ {'m': 'maskulin', 'f': 'feminin', 'n': 'neutral'}[v.entry.gender] }}{% endif %}</span>
+    </div>
+    <div class="wort-btn-row">
+      {{ btn(_('Practice'), 'secondary', submit=true, attrs='form="practice-one"') }}
+      {{ btn(_('Close'), 'ghost', href='/?' ~ list_params ~ '#wort-table') }}
+    </div>
+  </div>
+  <div class="ds-pane__body"><div class="wort-detail">
+
+    <section class="wort-word__summary" aria-label="{{ _('Summary') }}">
+      <p class="wort-word__translation">{{ v.translation }}</p>
+      <div class="wort-row">
+        {{ badge(level, _('Score') ~ ' ' ~ (v.word.score | string) if v.word.score is not none else _('No score yet')) }}
+        <span>{{ _('{right} right · {wrong} wrong', right=d.right, wrong=d.wrong) }}</span>
+      </div>
+      <p class="wort-caption">{{ _('last practised {date}', date=german_date(v.word.last_seen)) if v.word.last_seen else _('not practised yet') }} · {{ _('added {date}', date=german_date(v.word.added_at)) }}</p>
+    </section>
+
+    {# Only what the word has: a section without content (no forms table, no examples, no mistakes, never
+       searched) is left out, e.g. for a verb the dictionary knows little about. #}
+    {% if d.table and d.table.rows %}
+    <section class="wort-section" aria-labelledby="forms-title">
+      <h3 class="wort-bar" id="forms-title"><span class="wort-bar__title" lang="de">{{ d.table.title }}</span>{% if d.marks %}<span class="wort-bar__info">{{ _('mistakes marked') }}</span>{% endif %}</h3>
+      <div class="wort-table {{ 'wort-conjugation' if d.table.headers | length == 4 else 'wort-declension' }}" role="table" aria-label="{{ d.table.title }}" lang="de">
+        {% for h in d.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+        {% for row in d.table.rows %}
+        {% set r = loop.index0 %}
+        {% set cells = [{'type': 'text-passive-cell', 'content': row[0]}] %}
+        {% for c in row[1:] %}{% set n = d.marks.get((r, loop.index)) %}{% set _x = cells.append({'type': 'text-active-cell', 'content': c, 'mark': ('✗' ~ n) if n else none, 'mark_label': (n ~ '× falsch') if n else none}) %}{% endfor %}
+        {% with cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if d.examples or d.mistakes %}
+    <section class="wort-section">
+      {% if d.examples %}
+      {% set ex_items = [] %}
+      {% for de, en in d.examples %}{% set _x = ex_items.append(de ~ ' — ' ~ en if en else de) %}{% endfor %}
+      {% with title=_('Examples'), caption=_('{shown} of {total}', shown=d.examples | length, total=v.examples | length), items=ex_items, open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
+      {% endif %}
+      {% if d.mistakes %}
+      {# Each mistake as the design shows it: the answer with the wrong run struck through and the right one
+         beside it, then the rule (or the asked form) and the date. #}
+      {% set body_html %}{% for m in d.mistakes %}{% with variant='answer', label=none, segments=m.segments, text=m.a.answer, note=m.note, note_tooltip=none %}{% include "components/message/template.html" %}{% endwith %}{% endfor %}{% endset %}
+      {% with title=_('Your mistakes'), caption='✓' ~ d.right ~ ' ✗' ~ d.wrong, body_html=body_html, items=none, open=true %}{% include "components/disclosure/template.html" %}{% endwith %}
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if d.searches %}
+    <section class="wort-section">
+      {{ bar(_('Search history'), _('searched {n}×', n=d.searches)) }}
+    </section>
+    {% endif %}
+
+    {# Not in the design canvas; kept until the next stage decides where they go. #}
+    {% if d.facts %}
+    <section class="wort-section">
+      {{ bar(_('Grammar')) }}
+      {% for line in d.facts %}<p class="wort-note" lang="de">{{ line }}</p>{% endfor %}
+    </section>
+    {% endif %}
+
+    <section class="wort-section">
+      {{ bar(_('Own translation')) }}
+      <form class="wort-ownform" method="post" action="/words/{{ v.id }}/translation">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="wort-lookupbar__row">
+          {% with id='own-translation', name='text', label=_('Own translation'), value=v.word.own_translation, placeholder=_('Translation'), fill='filled' %}{% include "components/input/template.html" %}{% endwith %}
+          {{ btn(_('Save'), 'secondary', submit=true) }}
+        </div>
+      </form>
+      {# The button asks first (app.js opens the confirmation); the form is the way without scripts. #}
+      <form class="wort-btn-row" method="post" action="/words/{{ v.id }}/delete">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {{ btn(_('Remove word'), 'ghost wort-btn--danger', submit=true, attrs='data-remove-word="' ~ v.id ~ '"') }}
+      </form>
+    </section>
+  </div></div>
+</section>

@@ -1,0 +1,37 @@
+{# Building blocks of the GUI refresh (garv, 2026-10-30; styles in static/ui.css). Import with
+   {% from "_ui.html" import bubble, badge, btn with context %}. #}
+
+{# One turn of the exchange. Same markup and classes as dis-system's message (its CSS draws it), plus `lang`: the
+   words of a task and of an answer are German even when the interface is English or Ukrainian. #}
+{% macro bubble(variant, label, text, segments=none, note=none, note_tone=none, tail=none, lang='de') %}
+<div class="ds-message" data-variant="{{ variant }}"{% if tail in ['start', 'end'] %} data-tail="{{ tail }}"{% endif %}>
+  {% if label %}<div class="ds-message__label">{{ label }}</div>{% endif %}
+  <div class="ds-message__text" lang="{{ lang }}">
+  {%- if segments -%}
+    {%- for seg in segments -%}
+      {%- if seg.kind in ['remove', 'add'] -%}
+        {%- with kind=seg.kind, text=seg.text, tooltip=seg.tooltip, href=seg.href, current=seg.current -%}{%- include "components/inline-mark/template.html" -%}{%- endwith -%}
+      {%- else -%}{{ seg.text }}{%- endif -%}
+    {%- endfor -%}
+  {%- else -%}{{ text }}{%- endif -%}
+  </div>
+  {% if note %}<div class="ds-message__note" lang="{{ lang }}"{% if note_tone == 'success' %} data-tone="success"{% endif %}>{{ note }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{# A verdict by glyph, word and colour. `v`: correct | almost | wrong | tip | none | skipped. #}
+{% macro badge(v, label) %}<span class="wort-badge" data-v="{{ v }}"><span class="wort-badge__glyph" aria-hidden="true">{{ {'correct': '✓', 'almost': '~', 'wrong': '✗', 'tip': 'i', 'skipped': '→'}.get(v, '–') }}</span><span>{{ label }}</span></span>{% endmacro %}
+
+{# The logo (design canvas "Wort — логотип", D — Піксель): the W alone on the 10×23 grid, strokes and steps three cells wide, the middle four (bolder
+   and wider, garv 2026-10-28), in the text color. One source for the header (base.html) and the sign-in page. #}
+{% macro brand_mark() %}<svg viewBox="0 0 160 184" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true" focusable="false"><rect x="0" y="0" width="30" height="184"/><rect x="30" y="92" width="30" height="46"/><rect x="60" y="46" width="40" height="46"/><rect x="100" y="92" width="30" height="46"/><rect x="130" y="0" width="30" height="184"/></svg>{% endmacro %}
+
+{# A section heading as a filled bar, with an optional note at its end ("2 of 5"). A real heading (h2 / h3), unlike
+   dis-system's table-header, which is a div; `lang` is for a title that is a German word, `id` for aria-labelledby. #}
+{% macro bar(title, info=none, level=3, lang=none, id=none) %}<h{{ level }} class="wort-bar"{% if id %} id="{{ id }}"{% endif %}><span class="wort-bar__title"{% if lang %} lang="{{ lang }}"{% endif %}>{{ title }}</span>{% if info %}<span class="wort-bar__info">{{ info }}</span>{% endif %}</h{{ level }}>{% endmacro %}
+
+{# A button or link that looks like one. kind: primary | secondary | ghost | danger. `submit`: a form button; `href`: a link. #}
+{% macro btn(label, kind='secondary', href=none, submit=false, attrs='') %}
+{%- if href -%}<a class="wort-btn wort-btn--{{ kind }}" href="{{ href | safe_url }}"{% if attrs %} {{ attrs | safe }}{% endif %}>{{ label }}</a>
+{%- else -%}<button class="wort-btn wort-btn--{{ kind }}" type="{{ 'submit' if submit else 'button' }}"{% if attrs %} {{ attrs | safe }}{% endif %}>{{ label }}</button>{%- endif -%}
+{% endmacro %}

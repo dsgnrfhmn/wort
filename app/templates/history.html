@@ -1,46 +1,74 @@
 {% extends "base.html" %}
+{% from "_ui.html" import btn, bar with context %}
 {% set page = 'history' %}
-{% block title %}History · wort{% endblock %}
+{% block title %}{{ _('Import and history') }} · wort{% endblock %}
 {% block content %}
-<section class="wort-section">
-  {% with type='title-info', title='Import', info='wort export file' %}{% include "components/table-header/template.html" %}{% endwith %}
-  <form id="import-form" class="wort-row" method="post" action="/import" enctype="multipart/form-data">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input type="file" name="file" accept="application/json,.json" aria-label="wort export file" required>
-    {% with priority='primary', underline='dotted', label='Import', submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-  </form>
-</section>
+{# GUI refresh (garv, 2026-10-30): one page for both jobs and named for both ("Import" on the word list leads here; the
+   navigation keeps "Words" marked, since it belongs to it). The import takes the file in a dropzone, the history is a
+   table whose "Learn" is a button, with the same dates and counts as the word list. #}
+<div class="wort-page wort-histpage">
+  <header class="wort-pagehead">
+    <div class="wort-pagehead__text">
+      <h1 class="wort-title">{{ _('Import and history') }}</h1>
+      <p class="wort-caption">{{ _('Words you looked up, and what the CLI exported.') }}</p>
+    </div>
+    {{ btn(_('To the words'), 'secondary', href='/') }}
+  </header>
 
-<section class="wort-section">
-  {% with type='title-info', title='History', info=(rows | length) ~ ' words' %}{% include "components/table-header/template.html" %}{% endwith %}
-  {% if rows %}
-  <div class="wort-table" role="table" aria-label="History" style="grid-template-columns: max-content 1fr max-content max-content max-content;">
-    {% with label='Favorite' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Word' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Found' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Count' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% with label='Last' %}{% include "components/table-header-cell/template.html" %}{% endwith %}
-    {% for r in rows %}
-    {% with selected=false, cells=[
-      {'type': '1-action', 'content': 'Remove' if r.favorite else 'Add', 'priority': 'secondary', 'submit': true, 'extra_attrs': 'form="fav-' ~ loop.index ~ '"'},
-      {'type': 'text-active-cell', 'content': r.query},
-      {'type': 'status-label', 'content': 'found' if r.found else 'not found'},
-      {'type': 'text-passive-cell', 'content': r.count},
-      {'type': 'date', 'content': r.last_at.strftime('%Y-%m-%d %H:%M')}
-    ] %}{% include "components/table-row/template.html" %}{% endwith %}
-    {% endfor %}
-  </div>
-  <div class="wort-forms">
-    {% for r in rows %}
-    <form id="fav-{{ loop.index }}" method="post" action="/favorites/toggle">
+  <section class="wort-card" aria-labelledby="import-title">
+    <h2 id="import-title">{{ _('Import') }}</h2>
+    <p class="wort-caption">{{ _('Export file from “wort export”') }}</p>
+    <form id="import-form" class="wort-importform" method="post" action="/import" enctype="multipart/form-data">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="lemma" value="{{ r.query }}">
-      <input type="hidden" name="next" value="/">
+      {% with id='wort-import-file', name='file', required=true, accept='application/json,.json', prompt=_('Drop the export file here or'), choose_label=_('choose a file'), hint=_('JSON · up to 20 MB'), remove_label=_('Remove') %}{% include "components/dropzone/template.html" %}{% endwith %}
+      <div class="wort-btn-row">{{ btn(_('Import'), 'primary', submit=true) }}</div>
     </form>
-    {% endfor %}
-  </div>
-  {% else %}
-  {% with message='No history yet. Run `wort export` and import the file above.' %}{% include "components/empty-state/template.html" %}{% endwith %}
-  {% endif %}
-</section>
+  </section>
+
+  <section class="wort-histsection" aria-labelledby="history-title">
+    {{ bar(_('History'), _('{n} word looked up', n=total) if total == 1 else _('{n} words looked up', n=total), level=2, id='history-title') }}
+    {% if not has_dictionary %}
+    {% with message=_('The dictionary is not imported: “Learn” works only after that (wort import --file …).') %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% endif %}
+    {% if rows %}
+    <div class="wort-table wort-history" role="table" aria-label="{{ _('History') }}">
+      {% with label=_('Word') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+      {% with label=_('Translation') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+      {% with label=_('Count') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+      {% with label=_('Last') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+      {% with label=_('Learn') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
+      {% for item in rows %}
+      {% set r = item.row %}
+      {# Built cell by cell: table-row does not pass submit/extra_attrs on to a 1-action cell, and "Learn" is a
+         button of the kit here, not dis-system's text link. #}
+      <div class="ds-table-row" data-selected="false">
+        {% with type='text-active-cell', content=r.query %}{% include "components/table-cell/template.html" %}{% endwith %}
+        {% with type='text-active-cell', content=((item.entry.glosses[:2] | join(', ')) if item.entry else (_('not found') if not r.found else '–')) %}{% include "components/table-cell/template.html" %}{% endwith %}
+        {% with type='text-passive-cell', content=r.count | string %}{% include "components/table-cell/template.html" %}{% endwith %}
+        {% with type='date', content=german_date(r.last_at) ~ ' · ' ~ r.last_at.strftime('%H:%M') %}{% include "components/table-cell/template.html" %}{% endwith %}
+        {% if item.entry and not item.learned %}
+        <div class="ds-table-cell wort-history__learn" data-type="1-action">{{ btn(_('Learn'), 'secondary', submit=true, attrs='form="learn-' ~ loop.index ~ '"') }}</div>
+        {% else %}
+        {% with type='text-passive-cell', content=_('in words') if item.learned else '–' %}{% include "components/table-cell/template.html" %}{% endwith %}
+        {% endif %}
+      </div>
+      {% if item.entry and not item.learned %}
+      <form id="learn-{{ loop.index }}" method="post" action="/words/learn" hidden>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="query" value="{{ r.query }}">
+      </form>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% if total > rows | length %}
+    <div class="wort-more">
+      <span class="wort-caption">{{ _('{shown} of {total}', shown=rows | length, total=total) }}</span>
+      {{ btn(_('Load more'), 'secondary', href='/history?limit=' ~ (limit + 100)) }}
+    </div>
+    {% endif %}
+    {% else %}
+    {% with message=_('No history yet. Import the export file from “wort export”.') %}{% include "components/empty-state/template.html" %}{% endwith %}
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

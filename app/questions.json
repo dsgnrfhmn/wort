@@ -1,0 +1,1013 @@
+{
+  "design": {
+    "label": "Design",
+    "questions": [
+      {
+        "q": "Woran arbeitest du gerade?",
+        "a": "Gerade arbeite ich an einem Logo für ein kleines Café.",
+        "k": [
+          "work",
+          "job",
+          "project",
+          "task",
+          "design",
+          "create",
+          "make",
+          "finish",
+          "complete",
+          "handle",
+          "current",
+          "busy"
+        ],
+        "general": true
+      },
+      {
+        "q": "Welches Werkzeug benutzt du am liebsten?",
+        "a": "Am liebsten benutze ich Figma, weil es schnell und einfach ist.",
+        "k": [
+          "tool",
+          "use",
+          "software",
+          "program",
+          "computer",
+          "device",
+          "instrument",
+          "prefer",
+          "favourite",
+          "favorite"
+        ]
+      },
+      {
+        "q": "Wie beginnst du ein neues Projekt?",
+        "a": "Zuerst spreche ich mit dem Kunden und sammle Ideen.",
+        "k": [
+          "begin",
+          "start",
+          "new",
+          "project",
+          "plan",
+          "idea",
+          "first",
+          "prepare",
+          "open"
+        ]
+      },
+      {
+        "q": "Was macht ein gutes Plakat aus?",
+        "a": "Ein gutes Plakat hat eine klare Botschaft und große Schrift.",
+        "k": [
+          "poster",
+          "picture",
+          "image",
+          "good",
+          "design",
+          "print",
+          "colour",
+          "color",
+          "text",
+          "font",
+          "message"
+        ]
+      },
+      {
+        "q": "Welche Schrift magst du besonders?",
+        "a": "Ich mag Helvetica, weil sie ruhig und gut lesbar ist.",
+        "k": [
+          "font",
+          "letter",
+          "type",
+          "write",
+          "writing",
+          "script",
+          "like",
+          "prefer"
+        ]
+      },
+      {
+        "q": "Wie gehst du mit Kritik an deinem Entwurf um?",
+        "a": "Ich höre zuerst zu und frage dann nach Beispielen.",
+        "k": [
+          "criticism",
+          "critique",
+          "feedback",
+          "opinion",
+          "react",
+          "answer",
+          "listen",
+          "accept",
+          "change",
+          "improve",
+          "draft"
+        ]
+      },
+      {
+        "q": "Was war dein schwierigstes Projekt?",
+        "a": "Mein schwierigstes Projekt war eine App mit sehr vielen Bildschirmen.",
+        "k": [
+          "difficult",
+          "hard",
+          "problem",
+          "project",
+          "challenge",
+          "mistake",
+          "fail",
+          "solve",
+          "fix",
+          "resolve"
+        ]
+      },
+      {
+        "q": "Wie erklärst du einem Kunden deine Idee?",
+        "a": "Ich zeige ihm einfache Skizzen und erkläre jeden Schritt.",
+        "k": [
+          "explain",
+          "idea",
+          "customer",
+          "client",
+          "show",
+          "present",
+          "talk",
+          "speak",
+          "describe",
+          "convince",
+          "meeting"
+        ]
+      },
+      {
+        "q": "Welche Farben benutzt du oft?",
+        "a": "Ich benutze oft Schwarz, Weiß und ein kräftiges Rot.",
+        "k": [
+          "colour",
+          "color",
+          "paint",
+          "red",
+          "black",
+          "white",
+          "often",
+          "use"
+        ]
+      },
+      {
+        "q": "Was inspiriert dich bei der Arbeit?",
+        "a": "Mich inspirieren alte Bücher und Plakate auf der Straße.",
+        "k": [
+          "inspire",
+          "inspiration",
+          "idea",
+          "book",
+          "picture",
+          "art",
+          "nature",
+          "street",
+          "city"
+        ]
+      },
+      {
+        "q": "Wie testest du, ob ein Entwurf funktioniert?",
+        "a": "Ich zeige den Entwurf drei Personen und beobachte sie.",
+        "k": [
+          "test",
+          "check",
+          "try",
+          "work",
+          "function",
+          "person",
+          "user",
+          "observe",
+          "watch",
+          "draft"
+        ]
+      },
+      {
+        "q": "Was ist dir an einer Website wichtig?",
+        "a": "Mir ist wichtig, dass man alles schnell findet.",
+        "k": [
+          "website",
+          "internet",
+          "page",
+          "find",
+          "search",
+          "read",
+          "important",
+          "fast"
+        ]
+      },
+      {
+        "q": "Arbeitest du lieber allein oder im Team?",
+        "a": "Ich arbeite lieber im Team, weil ich dabei mehr lerne.",
+        "k": [
+          "team",
+          "alone",
+          "together",
+          "colleague",
+          "people",
+          "friend",
+          "group",
+          "accompany",
+          "help",
+          "work"
+        ]
+      },
+      {
+        "q": "Was machst du, wenn dir keine Idee kommt?",
+        "a": "Dann gehe ich spazieren und zeichne später weiter.",
+        "k": [
+          "idea",
+          "think",
+          "walk",
+          "draw",
+          "rest",
+          "break",
+          "stop",
+          "wait"
+        ],
+        "general": true
+      },
+      {
+        "q": "Welches Design im Alltag findest du schlecht?",
+        "a": "Ich finde viele Fahrkartenautomaten schlecht, weil sie kompliziert sind.",
+        "k": [
+          "bad",
+          "everyday",
+          "machine",
+          "ticket",
+          "thing",
+          "object",
+          "device",
+          "complicated"
+        ]
+      },
+      {
+        "q": "Wie lange brauchst du für ein Logo?",
+        "a": "Für ein Logo brauche ich meistens zwei Wochen.",
+        "k": [
+          "long",
+          "time",
+          "week",
+          "day",
+          "hour",
+          "need",
+          "logo",
+          "finish"
+        ]
+      },
+      {
+        "q": "Was hast du zuletzt gelernt?",
+        "a": "Zuletzt habe ich gelernt, wie man Animationen baut.",
+        "k": [
+          "learn",
+          "study",
+          "course",
+          "skill",
+          "know",
+          "understand",
+          "new",
+          "last"
+        ],
+        "general": true
+      },
+      {
+        "q": "Wie sieht dein Arbeitsplatz aus?",
+        "a": "Mein Arbeitsplatz ist klein, aber hell und ordentlich.",
+        "k": [
+          "workplace",
+          "desk",
+          "office",
+          "room",
+          "table",
+          "chair",
+          "computer",
+          "lamp",
+          "light",
+          "place"
+        ]
+      }
+    ]
+  },
+  "fahrrad": {
+    "label": "Fahrradreparatur",
+    "questions": [
+      {
+        "q": "Was hast du zuletzt an deinem Fahrrad repariert?",
+        "a": "Zuletzt habe ich die Bremsen an meinem Fahrrad repariert.",
+        "k": [
+          "repair",
+          "fix",
+          "bicycle",
+          "bike",
+          "brake",
+          "wheel",
+          "tyre",
+          "tire",
+          "chain",
+          "part",
+          "broken",
+          "resolve"
+        ]
+      },
+      {
+        "q": "Wie flickst du einen Platten?",
+        "a": "Ich nehme den Schlauch heraus, suche das Loch und klebe einen Flicken darauf.",
+        "k": [
+          "repair",
+          "fix",
+          "patch",
+          "tyre",
+          "tire",
+          "hole",
+          "tube",
+          "glue",
+          "flat",
+          "wheel"
+        ]
+      },
+      {
+        "q": "Wie oft ölst du die Kette?",
+        "a": "Ich öle die Kette ungefähr einmal im Monat.",
+        "k": [
+          "oil",
+          "chain",
+          "often",
+          "clean",
+          "bicycle",
+          "bike"
+        ]
+      },
+      {
+        "q": "Welches Werkzeug brauchst du für die Bremsen?",
+        "a": "Für die Bremsen brauche ich einen Inbusschlüssel.",
+        "k": [
+          "tool",
+          "brake",
+          "need",
+          "key",
+          "screw",
+          "bicycle"
+        ]
+      },
+      {
+        "q": "Was machst du, wenn die Gangschaltung springt?",
+        "a": "Dann stelle ich die Schaltung mit der kleinen Schraube neu ein.",
+        "k": [
+          "gear",
+          "shift",
+          "jump",
+          "adjust",
+          "screw",
+          "bicycle",
+          "problem",
+          "fix"
+        ]
+      },
+      {
+        "q": "Wie prüfst du den Reifendruck?",
+        "a": "Ich prüfe den Reifendruck mit einer Pumpe mit Manometer.",
+        "k": [
+          "check",
+          "test",
+          "tyre",
+          "tire",
+          "pressure",
+          "pump",
+          "air"
+        ]
+      },
+      {
+        "q": "Was kostet eine neue Kette?",
+        "a": "Eine neue Kette kostet ungefähr zwanzig Euro.",
+        "k": [
+          "cost",
+          "price",
+          "money",
+          "pay",
+          "buy",
+          "euro",
+          "chain",
+          "new"
+        ]
+      },
+      {
+        "q": "Warum quietschen die Bremsen?",
+        "a": "Die Bremsen quietschen, weil die Beläge schmutzig sind.",
+        "k": [
+          "brake",
+          "noise",
+          "sound",
+          "squeak",
+          "dirty",
+          "why"
+        ]
+      },
+      {
+        "q": "Wie stellst du den Sattel richtig ein?",
+        "a": "Ich stelle den Sattel so hoch, dass das Bein fast gestreckt ist.",
+        "k": [
+          "saddle",
+          "seat",
+          "adjust",
+          "high",
+          "leg",
+          "set",
+          "position"
+        ]
+      },
+      {
+        "q": "Was gehört in eine Fahrradwerkstatt?",
+        "a": "In eine Werkstatt gehören ein Montageständer und viel Werkzeug.",
+        "k": [
+          "workshop",
+          "tool",
+          "stand",
+          "part",
+          "belong",
+          "room",
+          "garage"
+        ]
+      },
+      {
+        "q": "Wie putzt du dein Fahrrad?",
+        "a": "Ich putze mein Fahrrad mit Wasser, einer Bürste und etwas Seife.",
+        "k": [
+          "clean",
+          "wash",
+          "water",
+          "soap",
+          "brush",
+          "bicycle",
+          "bike"
+        ]
+      },
+      {
+        "q": "Was tust du, wenn das Licht nicht geht?",
+        "a": "Dann prüfe ich zuerst das Kabel und die Batterie.",
+        "k": [
+          "light",
+          "lamp",
+          "battery",
+          "cable",
+          "check",
+          "dark",
+          "night"
+        ]
+      },
+      {
+        "q": "Wie wechselst du einen Schlauch?",
+        "a": "Ich nehme das Rad ab, ziehe den alten Schlauch heraus und lege den neuen ein.",
+        "k": [
+          "change",
+          "replace",
+          "tube",
+          "tyre",
+          "tire",
+          "wheel",
+          "remove"
+        ]
+      },
+      {
+        "q": "Was ist bei einem gebrauchten Fahrrad wichtig?",
+        "a": "Bei einem gebrauchten Fahrrad sind der Rahmen und die Bremsen wichtig.",
+        "k": [
+          "used",
+          "buy",
+          "sell",
+          "frame",
+          "brake",
+          "bicycle",
+          "bike",
+          "important",
+          "second-hand"
+        ]
+      },
+      {
+        "q": "Wann bringst du dein Fahrrad in die Werkstatt?",
+        "a": "Ich bringe es in die Werkstatt, wenn ich ein Teil nicht selbst wechseln kann.",
+        "k": [
+          "bring",
+          "take",
+          "carry",
+          "workshop",
+          "accompany",
+          "go",
+          "repair"
+        ]
+      },
+      {
+        "q": "Wie machst du dein Fahrrad winterfest?",
+        "a": "Ich öle die Kette und montiere bessere Reifen.",
+        "k": [
+          "winter",
+          "cold",
+          "snow",
+          "tyre",
+          "tire",
+          "prepare",
+          "oil",
+          "weather"
+        ]
+      },
+      {
+        "q": "Welche Reparatur findest du schwierig?",
+        "a": "Ich finde es schwierig, ein Laufrad zu zentrieren.",
+        "k": [
+          "repair",
+          "difficult",
+          "hard",
+          "wheel",
+          "fix"
+        ]
+      },
+      {
+        "q": "Was hast du beim Reparieren gelernt?",
+        "a": "Beim Reparieren habe ich gelernt, geduldig zu sein.",
+        "k": [
+          "learn",
+          "repair",
+          "patience",
+          "patient",
+          "fix"
+        ]
+      }
+    ]
+  },
+  "alltag": {
+    "label": "Alltag & Stadt",
+    "questions": [
+      {
+        "q": "Wie kommst du zur Arbeit?",
+        "a": "Ich fahre jeden Tag mit dem Fahrrad zur Arbeit.",
+        "k": [
+          "go",
+          "come",
+          "travel",
+          "drive",
+          "ride",
+          "walk",
+          "bus",
+          "train",
+          "bicycle",
+          "bike",
+          "car",
+          "way",
+          "work"
+        ],
+        "general": true
+      },
+      {
+        "q": "Was hast du heute gegessen?",
+        "a": "Heute habe ich Suppe mit Brot gegessen.",
+        "k": [
+          "eat",
+          "food",
+          "meal",
+          "lunch",
+          "dinner",
+          "breakfast",
+          "cook",
+          "soup",
+          "bread",
+          "today"
+        ]
+      },
+      {
+        "q": "Wo kaufst du am liebsten ein?",
+        "a": "Am liebsten kaufe ich auf dem Wochenmarkt ein.",
+        "k": [
+          "buy",
+          "shop",
+          "market",
+          "store",
+          "sell",
+          "pay",
+          "money"
+        ]
+      },
+      {
+        "q": "Wie ist das Wetter heute?",
+        "a": "Heute ist es kalt, aber die Sonne scheint.",
+        "k": [
+          "weather",
+          "rain",
+          "sun",
+          "cold",
+          "warm",
+          "wind",
+          "snow",
+          "today"
+        ]
+      },
+      {
+        "q": "Was machst du am Wochenende?",
+        "a": "Am Wochenende treffe ich Freunde und gehe ins Kino.",
+        "k": [
+          "weekend",
+          "free",
+          "friend",
+          "meet",
+          "visit",
+          "go",
+          "cinema",
+          "accompany",
+          "do"
+        ],
+        "general": true
+      },
+      {
+        "q": "Wie sieht deine Wohnung aus?",
+        "a": "Meine Wohnung hat zwei Zimmer und einen kleinen Balkon.",
+        "k": [
+          "flat",
+          "apartment",
+          "home",
+          "house",
+          "room",
+          "live",
+          "building",
+          "balcony"
+        ]
+      },
+      {
+        "q": "Was gefällt dir an deiner Stadt?",
+        "a": "Mir gefallen die vielen Parks in meiner Stadt.",
+        "k": [
+          "city",
+          "town",
+          "park",
+          "street",
+          "like",
+          "place",
+          "live",
+          "building"
+        ]
+      },
+      {
+        "q": "Was stört dich in deiner Stadt?",
+        "a": "Mich stört der laute Verkehr am Abend.",
+        "k": [
+          "city",
+          "town",
+          "noise",
+          "traffic",
+          "disturb",
+          "bother",
+          "street",
+          "car"
+        ]
+      },
+      {
+        "q": "Wie verbringst du einen freien Abend?",
+        "a": "An einem freien Abend lese ich ein Buch oder koche.",
+        "k": [
+          "evening",
+          "free",
+          "read",
+          "book",
+          "cook",
+          "watch",
+          "spend",
+          "relax"
+        ],
+        "general": true
+      },
+      {
+        "q": "Wohin gehst du gern spazieren?",
+        "a": "Ich gehe gern am Fluss spazieren.",
+        "k": [
+          "walk",
+          "go",
+          "river",
+          "park",
+          "forest",
+          "stroll",
+          "accompany"
+        ]
+      },
+      {
+        "q": "Was kochst du gern?",
+        "a": "Ich koche gern Borschtsch und Pasta.",
+        "k": [
+          "cook",
+          "food",
+          "meal",
+          "kitchen",
+          "prepare",
+          "boil",
+          "fry",
+          "bake",
+          "recipe"
+        ]
+      },
+      {
+        "q": "Wie oft fährst du mit dem Bus?",
+        "a": "Ich fahre fast nie mit dem Bus, nur im Winter.",
+        "k": [
+          "bus",
+          "travel",
+          "ride",
+          "drive",
+          "often",
+          "transport"
+        ]
+      },
+      {
+        "q": "Was hast du gestern gemacht?",
+        "a": "Gestern habe ich lange gearbeitet und dann Deutsch gelernt.",
+        "k": [
+          "yesterday",
+          "do",
+          "make",
+          "day",
+          "happen"
+        ],
+        "general": true
+      },
+      {
+        "q": "Wen hast du zuletzt besucht?",
+        "a": "Zuletzt habe ich meine Schwester besucht.",
+        "k": [
+          "visit",
+          "friend",
+          "family",
+          "sister",
+          "brother",
+          "person",
+          "accompany",
+          "meet",
+          "guest"
+        ]
+      },
+      {
+        "q": "Was machst du, wenn es regnet?",
+        "a": "Wenn es regnet, bleibe ich zu Hause und trinke Tee.",
+        "k": [
+          "rain",
+          "weather",
+          "home",
+          "stay",
+          "tea",
+          "read"
+        ]
+      },
+      {
+        "q": "Welches Café magst du?",
+        "a": "Ich mag das kleine Café an der Ecke, weil es dort ruhig ist.",
+        "k": [
+          "cafe",
+          "coffee",
+          "drink",
+          "like",
+          "quiet",
+          "place"
+        ]
+      },
+      {
+        "q": "Was planst du für den Sommer?",
+        "a": "Im Sommer plane ich eine Reise ans Meer.",
+        "k": [
+          "plan",
+          "summer",
+          "travel",
+          "trip",
+          "holiday",
+          "vacation",
+          "sea",
+          "journey"
+        ],
+        "general": true
+      },
+      {
+        "q": "Wie beginnt dein Morgen?",
+        "a": "Mein Morgen beginnt mit einem Kaffee und den Nachrichten.",
+        "k": [
+          "morning",
+          "begin",
+          "start",
+          "coffee",
+          "wake",
+          "get",
+          "up",
+          "breakfast"
+        ]
+      }
+    ]
+  },
+  "arbeit": {
+    "label": "Arbeit & Lernen",
+    "questions": [
+      {
+        "q": "Was machst du beruflich?",
+        "a": "Ich arbeite als Designer in einer kleinen Agentur.",
+        "k": [
+          "job",
+          "work",
+          "profession",
+          "office",
+          "company",
+          "employ"
+        ]
+      },
+      {
+        "q": "Wie sieht ein normaler Arbeitstag aus?",
+        "a": "Ich beginne um neun, habe zwei Meetings und arbeite dann an Entwürfen.",
+        "k": [
+          "day",
+          "work",
+          "meeting",
+          "begin",
+          "finish",
+          "office",
+          "normal"
+        ],
+        "general": true
+      },
+      {
+        "q": "Was lernst du gerade?",
+        "a": "Gerade lerne ich Deutsch und ein bisschen Programmieren.",
+        "k": [
+          "learn",
+          "study",
+          "language",
+          "course",
+          "school"
+        ]
+      },
+      {
+        "q": "Warum lernst du Deutsch?",
+        "a": "Ich lerne Deutsch, weil ich in Deutschland lebe und arbeite.",
+        "k": [
+          "learn",
+          "german",
+          "language",
+          "live",
+          "country",
+          "why"
+        ]
+      },
+      {
+        "q": "Was fällt dir beim Deutschlernen schwer?",
+        "a": "Mir fallen die Artikel und die Fälle schwer.",
+        "k": [
+          "difficult",
+          "hard",
+          "german",
+          "language",
+          "grammar",
+          "word",
+          "learn"
+        ]
+      },
+      {
+        "q": "Wie bereitest du dich auf ein Gespräch vor?",
+        "a": "Ich schreibe mir vorher die wichtigsten Fragen auf.",
+        "k": [
+          "prepare",
+          "conversation",
+          "talk",
+          "interview",
+          "meeting",
+          "question",
+          "speak"
+        ]
+      },
+      {
+        "q": "Was magst du an deinen Kollegen?",
+        "a": "Ich mag, dass meine Kollegen hilfsbereit und lustig sind.",
+        "k": [
+          "colleague",
+          "people",
+          "help",
+          "friend",
+          "team",
+          "like"
+        ]
+      },
+      {
+        "q": "Wie organisierst du deine Woche?",
+        "a": "Am Montag plane ich alle Aufgaben in einem Kalender.",
+        "k": [
+          "organize",
+          "organise",
+          "plan",
+          "week",
+          "calendar",
+          "task"
+        ]
+      },
+      {
+        "q": "Was war dein erster Job?",
+        "a": "Mein erster Job war in einem Fahrradladen.",
+        "k": [
+          "job",
+          "work",
+          "first",
+          "shop"
+        ]
+      },
+      {
+        "q": "Welchen Kurs würdest du gern besuchen?",
+        "a": "Ich würde gern einen Kurs für Fotografie besuchen.",
+        "k": [
+          "course",
+          "class",
+          "learn",
+          "visit",
+          "attend",
+          "photo"
+        ]
+      },
+      {
+        "q": "Wie lernst du neue Wörter?",
+        "a": "Ich schreibe neue Wörter auf und übe sie jeden Tag.",
+        "k": [
+          "learn",
+          "word",
+          "write",
+          "practise",
+          "practice",
+          "remember"
+        ]
+      },
+      {
+        "q": "Was machst du in der Mittagspause?",
+        "a": "In der Mittagspause esse ich mit Kollegen und gehe kurz raus.",
+        "k": [
+          "lunch",
+          "break",
+          "eat",
+          "colleague",
+          "walk"
+        ]
+      },
+      {
+        "q": "Wie gehst du mit Stress um?",
+        "a": "Bei Stress mache ich eine Pause und fahre Rad.",
+        "k": [
+          "stress",
+          "tired",
+          "rest",
+          "break",
+          "relax",
+          "ride"
+        ]
+      },
+      {
+        "q": "Was möchtest du in fünf Jahren machen?",
+        "a": "In fünf Jahren möchte ich ein eigenes Studio haben.",
+        "k": [
+          "future",
+          "year",
+          "want",
+          "plan",
+          "own"
+        ],
+        "general": true
+      },
+      {
+        "q": "Was hast du diese Woche geschafft?",
+        "a": "Diese Woche habe ich ein großes Projekt abgeschlossen.",
+        "k": [
+          "week",
+          "finish",
+          "complete",
+          "manage",
+          "achieve",
+          "handle",
+          "project"
+        ],
+        "general": true
+      },
+      {
+        "q": "Wie schreibst du eine Bewerbung?",
+        "a": "Ich schreibe kurz, wer ich bin und warum die Stelle zu mir passt.",
+        "k": [
+          "write",
+          "application",
+          "job",
+          "letter",
+          "apply"
+        ]
+      },
+      {
+        "q": "Arbeitest du lieber zu Hause oder im Büro?",
+        "a": "Ich arbeite lieber im Büro, weil ich dort Kollegen treffe.",
+        "k": [
+          "home",
+          "office",
+          "work",
+          "house",
+          "prefer"
+        ]
+      },
+      {
+        "q": "Wer war dein bester Lehrer?",
+        "a": "Mein bester Lehrer war mein Kunstlehrer in der Schule.",
+        "k": [
+          "teacher",
+          "school",
+          "teach",
+          "learn",
+          "best"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Run `wort` with the network cut off at the OS level, except loopback and the one sync endpoint.
+#
+#   scripts/wort-offline [wort arguments...]      e.g. scripts/wort-offline sync
+#   scripts/wort-offline --check                  prove the rule works (tries a public address, must fail)
+#
+# Reads the sync endpoint from sync.json (same file as `wort sync`). Alias it: alias wort=.../wort-offline
+# Linux: systemd-run --user with IPAddressDeny/Allow (limits by IP; for a PORT limit see deploy/cli/wort-cli.nft).
+# macOS: sandbox-exec with deploy/cli/wort.sb (limits by IP and port).
+# The in-process guard (src/wort/netguard.py) is a second layer; this script is the boundary.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cfg="${WORT_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/wort}/sync.json"
+wort_cmd=("${WORT_BIN:-wort}")
+
+endpoint() {  # prints "IP PORT" from sync.json, or nothing when sync is not configured
+  [ -f "$cfg" ] || return 0
+  python3 - "$cfg" <<'PY'
+import json, sys
+from urllib.parse import urlsplit
+u = urlsplit(json.load(open(sys.argv[1]))["url"])
+print(u.hostname, u.port)
+PY
+}
+
+read -r ip port < <(endpoint || true) || true
+ip="${ip:-}"; port="${port:-}"
+
+check_code='import socket,sys
+s=socket.socket(); s.settimeout(3)
+try:
+    s.connect(("1.1.1.1",443)); print("FAIL: a public address was reachable"); sys.exit(1)
+except OSError:
+    print("PASS: a public address is not reachable")'
+
+if [ "${1:-}" = "--check" ]; then wort_cmd=(python3 -c "$check_code"); shift; fi
+
+case "$(uname -s)" in
+  Linux)
+    allow=(-p "IPAddressAllow=127.0.0.0/8" -p "IPAddressAllow=::1")
+    [ -n "$ip" ] && allow+=(-p "IPAddressAllow=$ip")
+    exec systemd-run --user --quiet --wait --collect --pty --same-dir \
+      -p IPAddressDeny=any "${allow[@]}" \
+      -E WORT_CONFIG_HOME -E WORT_HOME -E PATH -E HOME -E TERM -- "${wort_cmd[@]}" "$@"
+    ;;
+  Darwin)
+    profile="$(mktemp)"; trap 'rm -f "$profile"' EXIT
+    sed -e "s|@SYNC_IP@|${ip:-0.0.0.0}|g" -e "s|@SYNC_PORT@|${port:-9}|g" "$here/deploy/cli/wort.sb" > "$profile"
+    exec sandbox-exec -f "$profile" "${wort_cmd[@]}" "$@"
+    ;;
+  *) echo "unsupported OS: $(uname -s)" >&2; exit 1 ;;
+esac
