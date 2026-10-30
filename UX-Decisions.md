@@ -109,10 +109,12 @@ Status `draft`: agreed here, not yet in the design system; `in DS`: moved, with 
 
 - **Rule:** in a question-and-answer exchange, each message box has a small triangle at its bottom corner on its
   speaker's side (the other voice on the left, the user on the right), in the box's own fill or outline. In a
-  practice exchange the user's answers have the same strong (inverted) fill as the task, so both voices weigh the
-  same and stand out from the page; colors inside them (corrections) are chosen to keep their contrast on that fill.
+  practice exchange the task has the strong (inverted) fill and the user's answers are outlined boxes on the page's
+  surface color (white in the light theme), so the two voices are told apart by fill as well as by side; colors
+  inside an answer (corrections) are chosen to keep their contrast on that surface.
 - **Why:** the tail turns boxes into turns of a conversation and shows who speaks without reading the label.
-- **Source:** 2026-10-29, garv. **Status:** draft
+- **Source:** 2026-10-29, garv; the answers' fill changed from inverted to outlined on the surface color 2026-10-30,
+  garv. **Status:** draft
 
 ### UX-17: Sending shows the sent content at once, then a progress indicator until the result
 
