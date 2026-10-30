@@ -1,60 +1,89 @@
 {% extends "base.html" %}
-{% block title %}{{ _('Practice') }} · wort{% endblock %}
+{% from "_ui.html" import btn with context %}
+{% block title %}{{ _(kinds[modus]) }} · wort{% endblock %}
 {% block body_attrs %}{% if modus == 'grammatik' %} data-layout="wide"{% endif %}{% endblock %}
 {% block content %}
-<section class="wort-section">
-  {% with type='title-info', title=_('Practice'), info=_('{n} words', n=count) %}{% include "components/table-header/template.html" %}{% endwith %}
-    {% if resume %}
-  {# This tab's open session: the start page was opened on purpose (neu); a new one would close it. #}
-  <div class="wort-row">
-    {% with priority='primary', underline='dotted', label=_('Continue {kind} (task {pos} / {total})', kind=_(kinds[resume.kind]), pos=resume.pos + 1, total=resume['items'] | length), href='/ueben/s/' ~ resume.id ~ '#jetzt' %}{% include "components/text-button/template.html" %}{% endwith %}
-  </div>
+{# One page per mode: what it is, the open session (if any), one main way to start, the others quietly. The words
+   a start would use are named, so nobody starts blind. #}
+{% set lead = {'saetze': _('Write a sentence for each task with one of your words. The word, its form and the grammar are checked.'),
+               'abfrage': _('One word at a time: give its meaning, its article or its forms.'),
+               'grammatik': _('Choose a topic: read the explanation first, then practise.')}[modus] %}
+<div class="wort-page wort-start">
+  <header class="wort-pagehead">
+    <div class="wort-pagehead__text">
+      <h1 class="wort-title">{{ _(kinds[modus]) }}</h1>
+      <p class="wort-caption">{{ lead }}</p>
+    </div>
+    {% if modus != 'grammatik' %}<p class="wort-caption">{{ _('Words in your list: {n}', n=count) }}</p>{% endif %}
+  </header>
+
+  {% if resume %}
+  {# This tab's open session: the start page was opened on purpose (neu); starting a new one would close it. #}
+  <section class="wort-resume" aria-label="{{ _('Open session') }}">
+    <p><strong>{{ _('You have an open session') }}</strong><br><span class="wort-caption">{{ _('Task {pos} of {total}', pos=resume.pos + 1, total=resume['items'] | length) }}</span></p>
+    {{ btn(_('Continue'), 'primary', href='/ueben/s/' ~ resume.id ~ '#jetzt') }}
+  </section>
   {% endif %}
+
   {% if modus == 'grammatik' %}
-  {# Grammar: B1/B2 topics, each with an explanation and its exercises (app/grammar.json). #}
-  {% with message=_('Choose a topic: read the explanation first, then practise.') %}{% include "components/empty-state/template.html" %}{% endwith %}
-  <div class="wort-table wort-topics" role="table" aria-label="{{ _('Grammar') }}">
-    {% for label in (_('Topic'), _('Level'), _('What it is about'), _('Correct')) %}{% with label=label %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
-    {% for t in topics %}
-    {% with selected=false, cells=[
-      {'type': 'link', 'content': t.title, 'href': '/grammatik/' ~ t.id},
-      {'type': 'text-passive-cell', 'content': t.level},
-      {'type': 'text-passive-cell', 'content': t.summary, 'wrap': true},
-      {'type': 'text-active-cell', 'content': (t.progress[0] ~ ' / ' ~ t.progress[1]) if t.progress else '–'}
-    ] %}{% include "components/table-row/template.html" %}{% endwith %}
-    {% endfor %}
-  </div>
+  {# Grammar: B1/B2 topics, each with an explanation and its exercises (app/grammar.json). Every row is one link. #}
+  <nav aria-label="{{ _('Grammar') }}">
+    <ul class="wort-topiclist">
+      {% for t in topics %}
+      <li><a href="/grammatik/{{ t.id }}">
+        <span class="wort-topiclist__title" lang="de">{{ t.title }}</span>
+        <span class="wort-topiclist__meta">{{ t.level }}{% if t.progress %} · {{ _('{right} / {total} correct', right=t.progress[0], total=t.progress[1]) }}{% endif %}</span>
+        <span class="wort-topiclist__what wort-topiclist__meta" lang="de">{{ t.summary }}</span>
+      </a></li>
+      {% endfor %}
+    </ul>
+  </nav>
   {% elif count %}
-  {% with message=_('Choose words on the “Words” page, or start with your weakest words.') %}{% include "components/empty-state/template.html" %}{% endwith %}
   {% if modus == 'saetze' %}
-  <div class="wort-tabs" role="tablist" aria-label="{{ _('Topic of the questions') }}">
-    {% for key, name in themen.items() %}
-    {% with active=(thema == key), label=name, count=none, href='/ueben?neu=1&modus=saetze&thema=' ~ key %}{% include "components/header-tab/template.html" %}{% endwith %}
-    {% endfor %}
-  </div>
+  <nav aria-label="{{ _('Topic of the questions') }}">
+    <ul class="wort-chips">
+      {% for key, name in themen.items() %}
+      <li><a class="wort-chip" lang="de" href="/ueben?neu=1&amp;modus=saetze&amp;thema={{ key }}"{% if thema == key %} aria-current="true"{% endif %}>{{ name }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
   {% endif %}
+
+  <section class="wort-card wort-start__main" aria-labelledby="start-weakest">
+    <h2 id="start-weakest">{{ _('Your weakest words') }}</h2>
+    <ul class="wort-chips wort-chips--static" lang="de">{% for l in weakest %}<li class="wort-chip">{{ l }}</li>{% endfor %}</ul>
+    <p class="wort-caption">{{ _('The five words with the lowest score.') }}</p>
+    <form class="wort-btn-row" method="post" action="/ueben/{{ modus }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="thema" value="{{ thema }}">
+      <input type="hidden" name="preset" value="weakest">
+      {{ btn(_('Start'), 'primary', submit=true) }}
+    </form>
+  </section>
+
   {% if batch %}
   {# The last batch of words, until a new one is chosen. #}
-  <form class="wort-row" method="post" action="/ueben/{{ modus }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input type="hidden" name="thema" value="{{ thema }}">
-    {% for id in batch.ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
-    {% with priority='primary', underline='dotted', label=_('{kind} with the same words', kind=_(kinds[modus])), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-    <span>{{ batch.lemmas[:8] | join(', ') }}{% if batch.lemmas | length > 8 %} …{% endif %}</span>
-  </form>
+  <section class="wort-card wort-start__main" aria-labelledby="start-same">
+    <h2 id="start-same">{{ _('The same words again') }}</h2>
+    <ul class="wort-chips wort-chips--static" lang="de">{% for l in batch.lemmas[:8] %}<li class="wort-chip">{{ l }}</li>{% endfor %}{% if batch.lemmas | length > 8 %}<li class="wort-chip">…</li>{% endif %}</ul>
+    <form class="wort-btn-row" method="post" action="/ueben/{{ modus }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="thema" value="{{ thema }}">
+      {% for id in batch.ids %}<input type="hidden" name="ids" value="{{ id }}">{% endfor %}
+      {{ btn(_('Start again'), 'secondary', submit=true) }}
+    </form>
+  </section>
   {% endif %}
-  <form class="wort-row" method="post" action="/ueben/{{ modus }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input type="hidden" name="thema" value="{{ thema }}">
-    <input type="hidden" name="preset" value="weakest">
-    {% with priority='primary', underline='dotted', label=_('{kind} with the 5 weakest', kind=_(kinds[modus])), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-  </form>
-  <div class="wort-row">
-    {% with priority='secondary', underline='solid', label=_('Choose words'), href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
-  </div>
+
+  <p class="wort-btn-row">
+    <span class="wort-caption">{{ _('Or pick the words yourself in your word list.') }}</span>
+    {{ btn(_('Choose words'), 'secondary', href='/') }}
+  </p>
   {% else %}
-  {% with message=_('No words to practise yet. Import words first.') %}{% include "components/empty-state/template.html" %}{% endwith %}
-  {% with priority='primary', underline='solid', label=_('To the words'), href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
+  <section class="wort-card wort-start__main">
+    <p class="wort-lead">{{ _('No words to practise yet. Import words first.') }}</p>
+    <p class="wort-btn-row">{{ btn(_('To the words'), 'primary', href='/') }}</p>
+  </section>
   {% endif %}
-</section>
+</div>
 {% endblock %}

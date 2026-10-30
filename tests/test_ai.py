@@ -131,7 +131,7 @@ def test_sentence_graded_by_provider_and_explained_on_click(env, dict_path):
     assert len(sent) == 3 and sent[1] == req  # exactly: sentence, required forms, task
     assert sent[2].startswith("Schreibe einen Satz mit «Haus»")  # the task text really is sent
     page = c.get(loc).text
-    assert "Fehler erklären" in page and "Prüfung: KI" in page
+    assert "Fehler erklären" in page and "Von der KI geprüft" in page
     c.post(f"/ueben/s/{sid}/explain", data={"csrf": c.cookies.get("wort_csrf")})
     assert [n for n, _ in fake.calls] == ["check_sentence", "explain"]
     assert "Merke dir das." in c.get(loc).text

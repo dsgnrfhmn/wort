@@ -213,15 +213,15 @@ def test_sentence_task_shows_question_bold_and_instruction_as_note(env):
     assert 'name="thema" value="alle"' in c.get("/ueben?modus=saetze&thema=evil").text
     r = c.post("/ueben/saetze", data={"csrf": c.cookies.get("wort_csrf"), "preset": "weakest", "thema": "design"})
     html = c.get(r.headers["location"]).text
-    text = html.split('class="ds-message__text">', 1)[1].split("</div>", 1)[0].strip()
-    note = html.split('class="ds-message__note">', 1)[1].split("</div>", 1)[0]
+    text = html.split('class="ds-message__text" lang="de">', 1)[1].split("</div>", 1)[0].strip()
+    note = html.split('class="ds-message__note" lang="de">', 1)[1].split("</div>", 1)[0]
     assert text in [q["q"] for q in questions.TOPICS["design"]["questions"]]
     assert note.startswith("Schreibe einen Satz mit")
-    # hints: the instruction explains the asked form, the button shows an example answer
-    assert '(<span class="ds-message__more" data-tooltip="Gesucht: ' in html and '">mehr</span>)' in html
+    # hints: one disclosure holds what the asked form means and an example answer, no hover tooltip
+    assert 'class="wort-hints"' in html and "Gesucht: " in html and "ds-message__more" not in html
     assert ">Beispielantwort<" in html
     asked = html.split("Gesucht: ", 1)[1].split("&#10;", 1)[0].split("\n", 1)[0]
-    example = html.split('class="wort-tip-wrap" data-tooltip="', 1)[1].split('"', 1)[0]
+    example = html.split('<span class="wort-hints__label">Beispielantwort</span><br><span lang="de">', 1)[1].split("</span>", 1)[0]
     assert all(w in example for w in asked.split()), (asked, example)  # the example has the asked form
 
 
@@ -248,12 +248,13 @@ def test_tip_answer_changes_no_score_and_shows_tipp(tmp_path, dict_path):
     sid = loc.rsplit("/", 1)[1]
     c.post(f"/ueben/s/{sid}/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": "Ich sehe der Garten dort"})
     html = c.get(loc).text
-    assert ">Tipp<" in html and "Verwende:" in html and "richtig" not in html.split("Feedback", 1)[1].split("Grammatik")[0]
-    assert ">Grammatik<" in html and ">falsch<" in html and ">1 Fehler, siehe unten.<" in html
+    verdict = html.split('class="wort-verdict"', 1)[1].split("</section>", 1)[0]  # the verdict is on the page, not behind "Mehr erklären"
+    assert ">Tipp<" in html and "Verwende:" in verdict and "richtig" not in verdict
+    assert ">Grammatik<" in html and ">falsch<" in html and "1 Fehler, siehe unten." in verdict
     assert 'data-kind="remove">der<' in html  # the wrong article is marked
     # the right sentence in green under the marked answer; each mistake explained in the hidden feedback
     assert 'data-tone="success">Ich sehe den Garten dort<' in html
-    assert ">Fehler 1<" in html and "«der» → den" in html and "<p>Falscher Artikel" in html
+    assert ">Fehler 1<" in html and "«der» → den" in html and '<p lang="de">Falscher Artikel' in html
     assert 'class="wort-review" id="fb-0-1" hidden' in html and ">Mehr erklären<" in html
     # once checked, one bubble shows: the corrected version carries the marks; the answer as written lies in the
     # same cell, invisible, behind "Original anzeigen" (app.js swaps them, data-shown), both the white outlined `answer` message
@@ -289,7 +290,7 @@ def test_one_task_at_a_time_next_opens_the_next_and_tabs_switch_back(env):
     # the first task's tab shows it again, read-only apart from the retry, with a way back
     old = c.get(f"{loc}?a=0").text
     assert "Das ist ein Satz hier" in old and ">Zur aktuellen Aufgabe (2)<" in old and 'action="/ueben/s/%d/answer"' % sid not in old
-    assert 'aria-selected="true"' in old.split("Aufgabe 1</span>")[0].rsplit("<a", 1)[1]
+    assert 'aria-current="step"' in old.split(">1</span>")[0].rsplit("<a", 1)[1]  # task 1 is the step shown
     # a tab beyond the current task falls back to the current one
     assert 'name="at" value="1"' in c.get(f"{loc}?a=4").text
     # a stale form (the first task again) changes nothing
@@ -342,9 +343,9 @@ def test_other_form_shows_richtig_magenta_tip_and_grammar_rows(tmp_path, dict_pa
     other = next(f for f in ("ging", "gegangen", "gehst") if f not in {r.casefold() for r in required})
     c.post(f"/ueben/s/{sid}/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": f"Wir {other} gestern dorthin"})
     html = c.get(loc).text
-    assert 'data-type="accent-2"' in html and ">Tipp<" in html and f"statt «{other}»." in html
-    assert html.count(">richtig<") == 2  # the word and the grammar
-    assert ">Bewertung<" in html and ">Kommentar<" in html and ">Form<" in html
+    assert 'data-v="tip"' in html and ">Tipp<" in html and f"statt «{other}»." in html
+    assert html.count(">richtig<") == 3  # the verdict, the word and the grammar
+    assert 'aria-label="Bewertung"' in html and ">Form<" in html
     assert store.practice(uid, sid)["items"][0]["result"]["verdict"] == "correct"
 
 
@@ -358,7 +359,8 @@ def test_toolbar_and_lookup_side_panel_are_on_the_practice_pages_only(env):
     assert 'class="wort-toolbar"' not in html and "data-side-toggle" not in html and 'id="wort-lookup-side"' not in html
     for path in ("/ueben",):
         html = c.get(path).text
-        assert 'class="wort-toolbar"' in html and "data-side-toggle" in html and 'aria-controls="wort-lookup-side"' in html
+        assert 'class="wort-modebar"' in html and 'class="wort-toolbar"' not in html  # the toggle shares the mode bar's row
+        assert "data-side-toggle" in html and 'aria-controls="wort-lookup-side"' in html
         assert 'id="wort-lookup-side" data-resizable' in html and 'class="wort-side__search"' in html
         assert 'class="ds-split__handle"' in html  # the panel's width can be dragged (dis-system pane)
         assert html.count('id="wort-lookup-side"') == 1
@@ -415,8 +417,8 @@ def test_only_the_latest_result_is_held_for_its_entrance(env):
     for i in range(2):
         c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": f"Das ist Satz Nummer {i}", "at": i})
     html = c.get(loc).text
-    assert html.count('data-result-step="0"') == 1 and html.count('data-result-step="2"') == 1
-    assert 'class="wort-row wort-retry" data-fade-hold data-result-step="3"' in html
+    assert all(html.count(f'data-result-step="{n}"') == 1 for n in (0, 1, 2))  # answer, verdict, then the retry row
+    assert 'class="wort-actions wort-retry" data-fade-hold data-result-step="2"' in html
     assert "data-result-step" not in c.get(f"{loc}?a=0").text  # an earlier task does not arrive again
 
 
@@ -430,7 +432,7 @@ def test_ueben_returns_to_the_running_session_and_keeps_the_batch_until_a_new_on
     r = c.get("/ueben")  # back from another page: the running session, not the start page
     assert r.status_code == 303 and r.headers["location"] == f"/ueben/s/{sid}#jetzt"
     html = c.get("/ueben?neu=1").text  # the start page offers the same words again
-    assert "mit denselben Wörtern" in html and f'name="ids" value="{first[0]}"' in html
+    assert "Dieselben Wörter noch einmal" in html and f'name="ids" value="{first[0]}"' in html
     total = len(store.practice(a, sid)["items"])
     for i in range(total):
         c.post(f"/ueben/s/{sid}/answer", data={"csrf": csrf, "text": f"Das ist Satz Nummer {i}", "at": i})
@@ -653,13 +655,13 @@ def test_abfrage_doch_falsch_downgrades_once(env, dict_path):
     res = store.practice(a, sid)["items"][0]["result"]
     assert res["verdict"] == "correct"
     page = c.get(loc).text
-    assert "Doch falsch" in page and 'data-type="success" data-subtype="passive">richtig' in page
+    assert "Doch falsch" in page and 'data-v="correct"' in page and ">richtig<" in page
     c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": c.cookies.get("wort_csrf")})
     item = store.practice(a, sid)["items"][0]
     assert item["result"]["verdict"] == "wrong" and item["downgraded"]
     assert store.conn.execute("SELECT verdict FROM attempts").fetchone()[0] == "wrong"
     page = c.get(loc).text
-    assert "Doch falsch" not in page and "0 ✓ · 0 ~ · 1 ✗" in page
+    assert "Doch falsch" not in page and "0 richtig" in page and "1 falsch" in page
     c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": c.cookies.get("wort_csrf")})  # once only: no change
     assert store.conn.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 1
     assert c.post(f"/ueben/s/{sid}/doch-falsch", data={"csrf": "forged"}).status_code == 403
@@ -698,7 +700,7 @@ def test_answer_again_keeps_the_first_answer_adds_an_attempt_and_changes_no_scor
     assert store.words(uid)[0].score == score  # only the first answer counts
     assert len(store.attempts(uid, word.id)) == attempts
     html = c.get(loc).text
-    assert "Aufgabe 1 · Versuch 2 · Deine Antwort" in html and "Feedback · Versuch 2" in html and "ohne Score" in html
+    assert "Aufgabe 1 · Versuch 2 · Deine Antwort" in html and 'aria-label="Aufgabe 1 · Versuch 2 · Bewertung"' in html and "ohne Score" in html
     assert html.count('data-kind="remove">der<') == 1  # the first correction is still on the page
     # the first attempt's correction comes first; the clean retry is shown as written
     assert html.index('data-kind="remove">der<') < html.index(">Ich sehe den Garten dort<")
@@ -779,11 +781,11 @@ def test_each_tab_keeps_its_own_open_session_and_the_word_batch_survives_grammar
     html = c.get(f"/ueben/s/{grammar}").text
     for key in ("saetze", "abfrage", "grammatik"):
         assert f'href="/ueben?modus={key}"' in html
-    assert '<span class="ds-page-head__meta">1 / ' in html.split('href="/ueben?modus=saetze"')[1].split("</div>")[0]
+    assert '<span class="wort-modes__count">1 / ' in html.split('href="/ueben?modus=saetze"')[1].split("</li>")[0]
     assert 'href="/ueben?modus=grammatik" aria-current="page"' in html
     # the start page (neu) offers to resume this tab's session, and still the words of the last word session
     page = c.get("/ueben?neu=1&modus=saetze").text
-    assert f'href="/ueben/s/{saetze}#jetzt"' in page and "fortsetzen" in page and "mit denselben Wörtern" in page
+    assert f'href="/ueben/s/{saetze}#jetzt"' in page and ">Fortsetzen<" in page and "Dieselben Wörter noch einmal" in page
     # a new session of a tab closes that tab's old one, not the others
     start(c, store, a, "saetze")
     assert store.practice(a, saetze)["pos"] == len(store.practice(a, saetze)["items"])
@@ -827,6 +829,60 @@ def test_feedback_is_always_hidden_under_its_answer_behind_explain_more(env):
     feedback = lambda html: re.findall(r'<div class="wort-review" id="fb-0-\d+"( hidden)?>', html)
     for i in range(2):
         html = c.get(loc).text
-        assert feedback(html) == [" hidden"] * (i + 1)  # every attempt's feedback starts hidden
-        assert html.count('aria-expanded="false">Mehr erklären<') == i + 1
+        # the first answer has something to explain and starts hidden; a retry with nothing more has no extra block
+        assert feedback(html) == [" hidden"] and html.count('aria-expanded="false">Mehr erklären<') == 1
+        assert html.count('class="wort-verdict"') == i + 1  # every attempt's verdict is on the page
         c.post(f"/ueben/s/{sid}/again", data={"csrf": csrf, "text": f"Noch ein Satz Nummer {i}", "at": 0})
+
+
+# --- GUI refresh (2026-10-30): the pieces that were wrong on the screen and are guarded here ----------------------
+
+def test_quiz_page_does_not_colour_buttons_by_the_words_article_and_keeps_send_in_the_card(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    haus = [w.id for w in store.words(a) if w.lemma == "Haus"]  # a noun: it has an article (a verb would not)
+    loc = start(c, store, a, "abfrage", ids=haus)
+    html = c.get(loc).text
+    # the word's article lives on its own heading; text-button reads a context variable `article` and would paint
+    # every button of the page (sign out, theme, look up, send …) in the article's colour
+    assert not re.findall(r"<(?:a|button)\b[^>]*data-article", html)
+    assert 'class="wort-quiz__word"' in html
+    card = html.split('class="wort-card"', 1)[1].split("</section>", 1)[0]
+    assert 'action="/ueben/s/%s/answer"' % loc.rsplit("/", 1)[1] in card and ">Senden<" in card  # form and Send together
+
+
+def test_the_verdict_is_on_the_page_before_explain_more_is_pressed(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    loc = start(c, store, a, "saetze")
+    sid = loc.rsplit("/", 1)[1]
+    c.post(f"/ueben/s/{sid}/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": "Das ist ein Satz hier", "at": 0})
+    html = c.get(loc).text
+    verdict = html.split('class="wort-verdict"', 1)[1].split("</section>", 1)[0]
+    assert 'aria-label="Bewertung"' in html and "wort-badge" in verdict  # a badge: glyph, word and colour
+    # the verdict card comes before the hidden explanation, never inside it
+    assert html.index('class="wort-verdict"') < html.index('class="wort-review"')
+    assert 'class="wort-review"' in html and "wort-verdict" not in html.split('class="wort-review"', 1)[1].split("</section>", 1)[0]
+
+
+def test_practice_pages_have_one_h1_a_skip_link_the_open_mode_marked_and_german_text_marked_as_german(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    pages = {"start": c.get("/ueben?neu=1&modus=saetze").text, "grammar": c.get("/ueben?neu=1&modus=grammatik").text}
+    loc = start(c, store, a, "saetze")
+    pages["session"] = c.get(loc).text
+    pages["quiz"] = c.get(start(c, store, a, "abfrage")).text
+    for name, html in pages.items():
+        assert html.count("<h1") == 1, name
+        assert 'class="wort-skip" href="#main"' in html and 'id="main"' in html, name
+        assert html.count('aria-current="page"') >= 1 and 'role="tablist"' not in html, name  # mode bar, no fake tabs
+    assert 'class="ds-message__text" lang="de"' in pages["session"]  # the task is German text in any interface language
+    assert 'class="wort-modes"' in pages["start"] and html.count('<ul class="wort-modes">') == 1
+
+
+def test_start_page_names_the_words_it_would_use(env):
+    app, store, a, _ = env
+    c = login(app, "anna")
+    html = c.get("/ueben?neu=1&modus=saetze").text
+    weakest = html.split('aria-labelledby="start-weakest"', 1)[1].split("</section>", 1)[0]
+    assert ">Haus<" in weakest and ">gehen<" in weakest and 'name="preset" value="weakest"' in weakest

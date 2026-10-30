@@ -1,0 +1,268 @@
+#+TITLE: wort — GUI refresh
+#+DATE: 2026-10-30
+#+OPTIONS: toc:2 num:nil
+#+TODO: TODO WIP BLOCKED | DONE DROPPED
+#+STARTUP: overview indent logdone
+#+COLUMNS: %ITEM(Step) %TODO(State) %LEFT(What is left)
+
+Page-by-page UX/UI review of the wort web app, tracked here. Branch =gui-improvements= (from =wip/web-view= at =a389a01=). Three lenses: design critique, design-system audit, accessibility review (WCAG 2.1 AA). Every finding below was checked in a browser (Chromium 151, demo data, 1440 and 390 px, light and dark), in the DOM, in computed styles or in the code; the evidence column says which. A box is ticked only where it was verified (the evidence is in the line). *Practice was refreshed on 2026-10-30*; the other pages are untouched. Severity: 🔴 critical (blocks a task or fails WCAG badly), 🟡 moderate, 🟢 minor. Order of work: Practice first, then Words, Texts, History/Import, Login.
+
+*Decision 2026-10-30 (garv): dis-system is a visual reference for this work, not a guideline.* Practice therefore uses wort's own small kit: =app/static/ui.css= (buttons, badges, cards, steps, verdict, mode bar; every colour, size and space still comes from the =--ds-*= tokens, so both themes follow) and =app/templates/_ui.html= (macros =bubble=, =badge=, =btn=). Nothing was changed inside =vendor/dis-system=. *This contradicts the "Design-system rules (hard)" section of =CLAUDE.md=, which still says layout-only CSS and a dis-system component for every new pattern; the file is not changed yet (Open decisions).* The rest of the rules stay: both themes checked on every touched screen; new strings through =_()= with a German entry; tests green (=PYTHONPATH=.:src uv run pytest=); a rule worth keeping goes to =UX-Decisions.md= (no wort context, status draft); commits only on garv's word.
+
+* Status at a glance
+| Step | Title                              | State | What is left                                                        |
+|------+------------------------------------+-------+---------------------------------------------------------------------|
+| 0    | Setup                              | DONE  | decision on the 17 uncommitted dis-system files (Open decisions)   |
+| 1    | Global shell                       | WIP   | Practice header done; Words, Texts, History, Login still on the old header, skip link and lang there |
+| 2    | Practice (start, session, quiz, grammar, result) | WIP | all fixes in and measured; left: keyboard and phone walkthrough by a person, one decision (two explanation surfaces) |
+| 3    | Words (list, lookup, word detail)  | TODO  | 6 fixes; touch selection, lookup field, plurals                     |
+| 4    | Texts                              | TODO  | mobile review not looked at yet; 3 fixes                            |
+| 5    | History / Import                   | TODO  | native file input, page name, legacy routes                         |
+| 6    | Login                              | TODO  | layout and labels                                                   |
+| 7    | Cross-cutting: contrast and dis-system gaps | WIP | contrast fixed for Practice; other pages not re-audited; dis-system changes now optional |
+
+* DONE 0 — Setup [/]
+:PROPERTIES:
+:CUSTOM_ID: step-0
+:LEFT:     decision on the 17 uncommitted dis-system files
+:END:
+
+*Definition of done:* a branch to work on, a browser that renders the app in both themes, demo data that does not touch the real database, and a baseline to compare against.
+- [X] Branch =gui-improvements= created in worktree =.worktrees/web-view= from =wip/web-view= (=a389a01=); nothing committed or pushed on it.
+- [X] Baseline of the 17 uncommitted files in =vendor/dis-system= (branch =dsgnrfhmn/message-note=, =8f1d0b4=) saved as a patch (629 lines, session scratchpad =dis-system-baseline.patch=) so later component edits can be told apart from them.
+- [X] Headless browser: Chromium 151 through the existing Playwright venv (=~/.venvs/arta-playwright=, browsers in =~/.cache/ms-playwright=). Installing from PyPI was refused by the sandbox network allowlist; nothing was installed and no dependency was added to =pyproject.toml= or =uv.lock=.
+- [X] Demo data outside the repo: own =WORT_HOME= with a fresh =web.db=, user =demo=, 12 words with a spread of scores, dictionaries symlinked read-only, grammar checker stubbed (LanguageTool is not running), AI off. The real =~/.local/share/wort/web.db= was not opened. Server and browser have to run in one sandboxed command (loopback is per command).
+- [X] Evidence: 73 screenshots (login, Words, word detail, lookup, History, Texts, every Practice state; light and dark; 1440 and 390 px), DOM measurements and a computed-contrast audit of 10 pages × 2 themes. They live in the session scratchpad, not in the repo.
+
+* WIP 1 — Global shell [/]
+:PROPERTIES:
+:CUSTOM_ID: step-1
+:LEFT:     header height, current mode, lang, mobile header, skip link
+:END:
+
+*Definition of done:* the header takes at most one nav row plus one mode row on Practice, the current mode is visible, every page has one =<h1>=, a skip link and =lang= on German and Ukrainian text, and the header fits 390 px without clipping.
+
+** Findings
+| ID  | Sev | Finding                                                                                                                                                                  | Evidence                                   |
+|-----+-----+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------|
+| G-a | 🟡  | The sticky header on Practice is 166 px at 1440×900 (nav 65 + mode bars 60 + toolbar 41 = 18 % of the window) and 215 px at 390×844 (25 %). On Words it is 65 px.          | DOM =.wort-head= height                    |
+| G-b | 🟡  | The toolbar row holds one button ("Look up"); its left half is an empty =.wort-toolbar__settings= div (=base.html:52-57=).                                                | screenshot, template                       |
+| G-c | 🔴  | The current mode (Build sentences / Quiz / Grammar) is not marked visually: three identical black titles. Only a counter ("2 / 5") shows an open session; with none open nothing says where you are. =aria-current= is in the markup, no style. | screenshots start + session                |
+| G-d | 🟡  | No skip link (0 found). No =<h1>= on any Practice page (mode bars are links via =title_href=); Words has one.                                                             | DOM                                        |
+| G-e | 🟡  | =<html lang>= is the interface language, but 0 elements carry =lang="de"= or =lang="uk"= although words, tasks, answers, topics are German and notes Ukrainian (WCAG 3.1.2).| DOM                                        |
+| G-f | 🔴  | At 390 px the nav bar wraps to two rows and the theme toggle is clipped ("Da…"); mode bar titles truncate ("Build …", "Gram…"); Words bulk buttons overflow.              | screenshots 390                            |
+| G-g | 🔴  | "Look up" side panel (440 px): a result keeps its two-column layout because the stacking rule is a viewport media query (=layout.css:254=). The declension table is cut ("das Hau", "die Häus", "dem Hau") and the examples column overlaps it. | screenshot side panel                      |
+| G-h | 🟡  | Link strips use =role="tablist"= / =role="tab"= / =aria-selected= (topic filter, task strip; DS =header-tab=). They navigate to URLs: no tabpanel, no arrow keys; on the session page =role="tablist"= also replaces the =<nav>= landmark (=practice.html:206=). | DOM: tablist 1, role=tab 5                 |
+| G-i | 🟡  | =100vh= is used for full-height regions (=layout.css:91, 97, 147=): on phones the pinned composer sits under the browser's address bar. Code only; headless Chromium has no URL bar. | code                                       |
+| G-j | 🟢  | Text buttons carry no resting underline (=trial.css=, D00h; measured =text-decoration: none= on every one); only colour says "clickable", against DS "Interaction conventions". Heights are 39 px, row links 19 px. | computed style                             |
+
+** Plan
+- [X] G-1 Current mode marked: heavy underline and bold on the open mode, muted text on the others (=ui.css=, =base.html=). Evidence: screenshots of all three modes; =aria-current="page"= and no =role="tablist"= on every Practice page (=tests/test_web_practice.py=, DOM).
+- [X] G-2 Empty settings row removed; "Look up" sits at the end of the mode row. Evidence: header 166 → 122 px at 1440×900 (DOM); the toggle still opens the panel (screenshot).
+- [-] G-3 One =<h1>= and a skip link to =<main id="main">=: done on every Practice page (DOM: 1 h1 and 1 skip link on every captured Practice state, both widths) and the skip link is in =base.html= so it is on every page; =<h1>= on Words, Texts, History and Login is open.
+- [-] G-4 =lang="de"= on German text and =lang="uk"= on Ukrainian notes: done in Practice (macro =bubble=, hints, Quiz word, results, grammar). Open: Words, word detail, lookup, Texts.
+- [X] G-5 Header at 390 px: nav bar no longer runs off the screen (scrollWidth 490 → 390 on Words, History, Texts and Practice; the Words table scrolls inside its own box), the mode row fits with counts under the names; the theme toggle wraps to a third nav row; the header scrolls away on a phone. Evidence: screenshots 390, DOM.
+- [X] G-6 Side panel: a result is one column in the 440 px panel, the forms table fits. Evidence: screenshot (before: "das Hau", "die Häus" cut).
+- [-] G-7 Link strips: Practice has none left (steps and topic chips are plain links with =aria-current=); dis-system =header-tab= itself is unchanged and still used elsewhere.
+- [X] G-8 =100dvh= for the session column and its word list (=ui.css=, falls back to =layout.css= =100vh=). Not tried on a real phone. =.wort-texts= still =100vh=.
+- [ ] G-9 Decide on the permanent underline for text buttons (D00h trial). Practice buttons are real buttons now and do not depend on it; nav links and table links still do.
+- [-] G-10 44 px targets: all Practice buttons, steps, chips and the brand link are ≥ 44 px (DOM). Nav links are 39 px, table row links 19 px: open.
+
+* WIP 2 — Practice [/]
+:PROPERTIES:
+:CUSTOM_ID: step-2
+:LEFT:     keyboard + phone walkthrough by a person; two explanation surfaces
+:END:
+
+*Definition of done:* a learner can start, answer, see at once whether the answer was right and what it scored, continue and finish a session in all three modes, on desktop and phone, in both themes, using the keyboard only; contrast ≥ 4.5:1 for text.
+
+** DONE 2.1 Start page (Build sentences / Quiz / Grammar) [/]
+| ID  | Sev | Finding                                                                                                                                                                 | Evidence             |
+|-----+-----+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------|
+| S-a | 🟡  | One screen, about 55 % empty. The main action ("… with the 5 weakest") is bold blue text, the same size as "Choose words". With an open session three bold actions stack ("Continue …", "… with the same words", "… with the 5 weakest"). | screenshots          |
+| S-b | 🟡  | Topic filter: the selected topic is black without underline (looks disabled), the others are grey (3.14:1) dotted links. The strip is =role=tablist= on links.             | screenshot, contrast |
+| S-c | 🟡  | The hint "Choose words on the “Words” page …" is an =empty-state= component in grey italic (2.85:1). "12 words" counts the whole list, not the session; the title "Practice" repeats the mode bar. | screenshot, contrast |
+| S-d | 🟢  | Grammar list: links are 19 px high and only the first column is a link; "Correct" shows "–" for untouched topics.                                                       | DOM                  |
+*** Plan
+- [X] P-1.1 One primary action ("Start") with the five weakest words named as chips; "The same words again" and "Choose words" are secondary; an open session is a bordered "Continue" bar on top. Evidence: screenshots; =test_start_page_names_the_words_it_would_use=.
+- [X] P-1.2 Topic filter: chips as links, the selected one filled, =aria-current="true"=, no =role="tablist"=. Evidence: screenshot, DOM tablist = 0.
+- [X] P-1.3 Hints as plain captions; the count reads "Words in your list: 12" (no plural problem).
+- [X] P-1.4 Grammar list: the whole row is one link (44 px high), level and progress as caption. Evidence: screenshot.
+
+** WIP 2.2 Session: Build sentences (the chat) [/]
+| ID  | Sev | Finding                                                                                                                                                                                                                       | Evidence                                      |
+|-----+-----+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------|
+| C-a | 🔴  | *The verdict and the score are hidden.* After an answer =.wort-review= has =hidden=; the tags "Tip", "falsch", "richtig" and the caption exist only inside it and are invisible. A correct answer and an answer without the required word look the same: "YOUR ANSWER … / Explain more". Screen readers do not get the verdict either. | DOM (=visible: false=) + screenshots          |
+| C-b | 🟡  | "Task 1" appears five times at once: mode bar, title bar ("Task 1 / 5 · checked: local"), tab strip, message label "TASK 1", sidebar "Task 1 of 5".                                                                              | screenshot                                    |
+| C-c | 🟡  | In the task message the topic question is bold, the instruction the learner must follow ("Schreibe einen Satz mit «Kind»: Plural") is the small note line, with a "(more)" tooltip that touch cannot open.                       | screenshot                                    |
+| C-d | 🟡  | Actions are scattered: "Show original" and "Explain more" right under the bubble, "Answer again" left, "Next task" alone in the bottom bar, "Choose new words" and "Finish" at the top, "Example answer" under the task.           | screenshot                                    |
+| C-e | 🟡  | "Finish" is a link to =/= (=practice.html:200=): it leaves, the session stays open and the mode bar keeps its counter. "checked: local" in the title is jargon.                                                                | code, screenshot                              |
+| C-f | 🟡  | Before the answer up to three grey boxes (hint, choices, notice) are =empty-state= components; "Example answer" is a hover/focus tooltip only.                                                                                  | code (=practice.html:12-25=)                  |
+| C-g | 🟡  | Composer: placeholder-only field (aria-label is set), grey fill, "Send" as bare bold text far to the right; Enter sends, Shift+Enter newline, nowhere explained; after an answer the bar holds only "Next task".                  | screenshot, DOM                               |
+| C-h | 🟡  | 390 px: the word list stacks above the task (=layout.css:100-103=) and the header is 215 px, so the task starts below the fold.                                                                                                | screenshot, code                              |
+| C-i | 🟢  | Two surfaces for one explanation: the inline "Explain more" block and the side pane "Mistake explained" (=?fehler=). Ukrainian text follows German in the same paragraph style, no =lang=.                                      | code                                          |
+| C-j | 🟢  | "Tip" tag 3.96:1; "YOUR ANSWER" / "CORRECTED" labels 2.85:1 (13 px).                                                                                                                                                          | computed contrast                             |
+*** Works well (kept)
+- The chat metaphor with tails, the struck-through red and green corrections in one bubble with the clean corrected line under it (UX-9, UX-15), "Show original" without size jump, the task strip with done and current tasks only (UX-5), "not scored" on retries, the pinned composer, the rule table with the right cell marked.
+*** Plan
+- [X] P-2.1 🔴 The verdict is always visible under the answer: badge + "Score +1" / "not scored" + one line per judged part; "Explain more" only when there is something to explain. Evidence: DOM (verdict visible, review hidden), screenshots of a wrong, a partly right and a right answer, =test_the_verdict_is_on_the_page_before_explain_more_is_pressed=. The newest verdict takes the focus (DOM: =activeElement= is the verdict section).
+- [X] P-2.2 One progress statement: "Task 2 of 5", a bar and steps that carry how each task went (✓ ~ ✗ i). The title suffix, the tab strip and the sidebar caption are gone (sidebar says "5 tasks"). Evidence: screenshots.
+- [X] P-2.3 The instruction is the main line under the question; the "(more)" tooltip is gone, its text moved into Hints.
+- [X] P-2.4 Actions grouped: "Show original" under the bubble, "Explain more" in the verdict card, "Answer again" under the exchange, "Next task" as the one filled button in the answer bar.
+- [X] P-2.5 "Finish" became "Save and leave"; "checked: local" is gone; an AI check shows a "Checked by AI" badge (AI is off in the demo: covered by =tests/test_ai.py=, not seen on screen). 24 German entries added (=tests/test_i18n.py=).
+- [X] P-2.6 One "Hints" disclosure (hint, what the form means, example answer); the options of a choice task stay visible as numbered chips.
+- [-] P-2.7 Answer bar: "Send" is a filled button, the line "Enter sends · Shift+Enter starts a new line" is under the field, the field takes focus when a task waits (not on touch). Open: the field has an =aria-label= and a placeholder but no visible label.
+- [X] P-2.8 390 px: the word list is a "Words · 5" disclosure above the task (opened in a screenshot), the header scrolls away, the Send button is full width. =100dvh= not tried on a real phone.
+- [ ] P-2.9 Keep one explanation surface: both the inline "Explain more" and the side pane "Mistake explained" still exist (Open decisions). Ukrainian notes now carry =lang="uk"= and a left rule.
+- [-] P-2.10 Both themes and 390 px re-captured after the changes (59 screenshots) and the contrast audit re-run (below). Not done: a keyboard-only walkthrough and a screen-reader pass by a person.
+
+** DONE 2.3 Quiz (Abfrage) [/]
+| ID  | Sev | Finding                                                                                                                                                                                                                              | Evidence                                          |
+|-----+-----+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------------------------------------|
+| Q-a | 🔴  | *The word panel and "This round" collapse to their head row.* =.wort-abfrage= is 57 px high at 1440×900; the word, the answer field and "Send" lie outside it ("Send" at y=694, the container ends at y=421) and a pointer hit-test on the centre of "Send" returns =<html>=: it cannot be clicked. Cause in the code: =.ds-pane__body { flex: 1 1 0 }= in an auto-height grid; Words (=layout.css:199=) and the feedback pane (=:72=) override it, =.wort-abfrage= does not. Not checked whether this is new. | DOM boxes, hit-test, screenshot                   |
+| Q-b | 🔴  | *The word's article colour leaks into every text button on the page.* 8 of 14 text buttons carry =data-article="das"= (nav "Sign out", theme toggle, "Look up", "Choose new words", "Finish", "Skip", "Send", "Close"): the route passes a context variable =article= (=app/practice.py:504=, used in =practice_abfrage.html:27=) and =components/text-button/template.html= reads =article= from the context (=data-article= when it is der, die or das). With "das" they are green, "der" blue, "die" red. | DOM (=[data-article]= on buttons) + screenshot    |
+| Q-c | 🟡  | Mode radios stack vertically (140 px) and the note "“Explain in German” needs the AI (off)" and the links "Choose new words" / "Finish" sit between them; the progress bar is a 2 px line.                                          | screenshot, DOM                                   |
+| Q-d | 🟡  | The counters "0 ✓ · 0 ~ · 0 ✗" carry meaning in glyphs only.                                                                                                                                                                          | code                                              |
+*** Plan
+- [X] P-3.1 🔴 Quiz panes: the two panes are cards now, no =.ds-pane= flex body. Evidence: word, answer field and "Send" lie inside the card (=test_quiz_page_does_not_colour_buttons_by_the_words_article_and_keeps_send_in_the_card=); screenshots.
+- [X] P-3.2 🔴 Article leak: the route passes =word_article=, no longer =article= (=app/practice.py=). The test fails 5 of 5 runs with the old name put back and passes 5 of 5 with the fix. The word's own heading carries =data-article= for its colour and hides the article when the task asks for it (code only, not seen on screen).
+- [X] P-3.3 Modes as one horizontal radio row; the "needs the AI (off)" note under it; a labelled progress bar.
+- [X] P-3.4 After the answer: the same verdict card as the session, "Next" is the one filled button, "Actually wrong" is a quiet red button.
+- [X] P-3.5 Round counters as badges with words ("0 richtig · 0 teilweise · 1 falsch") and a list of the words with their verdicts.
+
+** DONE 2.4 Grammar (topic page and session) [/]
+| ID  | Sev | Finding                                                                                                                                                       | Evidence                |
+|-----+-----+---------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------|
+| R-a | 🟡  | On a topic page the German and Ukrainian explanations are the same paragraph style one after the other; the class =wort-grammar__uk= has no CSS (=layout.css=).   | screenshot, code        |
+| R-b | 🟢  | The session's topic chip ("Modalverben") looks like a disabled control (grey fill); the grammar session has no word list, so it differs from Build sentences.     | screenshot              |
+| R-c | 🟢  | Not looked at yet: topic page and session at 390 px, topic page in dark.                                                                                       | none                    |
+*** Plan
+- [X] P-4.1 Ukrainian notes: left rule, =lang="uk"=; German text =lang="de"=; section titles are real =<h2>=.
+- [X] P-4.2 The topic is a caption under the title in a grammar session (no grey chip).
+- [X] P-4.3 Topic page and session captured at 390 px and in dark (screenshots looked at: topic page dark 390).
+
+** DONE 2.5 Result [/]
+| ID  | Sev | Finding                                                                                                                                                                | Evidence   |
+|-----+-----+------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------|
+| E-a | 🟡  | A plain table (Word / Result / Score / Change), no summary. The verdict is plain text ("falsch" German, "skipped" English) while Quiz and the session use tags.        | screenshot |
+| E-b | 🟡  | Two bold primaries in two rows ("To the words", "Another round with the same words") and a secondary; the most useful action is not first.                              | screenshot |
+*** Plan
+- [X] P-5.1 Summary line ("0 of 5 right · Score -2") above a real =<table>= (caption, column headers, scope); verdict as badge.
+- [X] P-5.2 One filled button ("Another round with the same words"); the others outlined or plain.
+
+* TODO 3 — Words [/]
+:PROPERTIES:
+:CUSTOM_ID: step-3
+:LEFT:     touch selection, lookup field, plurals, mobile table
+:END:
+
+*Definition of done:* words can be selected and practised by touch and keyboard, the lookup field is labelled, the table reads at 390 px, counts are grammatical.
+| ID  | Sev | Finding                                                                                                                                                                              | Evidence                |
+|-----+-----+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------|
+| W-a | 🟡  | Row checkboxes show only on the hovered or selected row (checked on the list: one visible, 11 blank); touch has no hover. The bulk buttons ("Build sentences", "Quiz") stay greyed with no word why. | screenshot              |
+| W-b | 🟡  | The lookup field is a grey box with a placeholder only: no visible label, no submit button (Enter only).                                                                              | screenshot              |
+| W-c | 🟡  | At 390 px the table scrolls sideways and "Score" is off-screen; the bulk buttons overflow and the search field sits under them.                                                       | screenshot 390          |
+| W-d | 🟢  | "Result for “Haus” · 1 hits", "1 words looked up": no plural forms.                                                                                                                   | screenshot, code        |
+| W-e | 🟡  | Score chips: "–" 2.81:1, "1" 3.34:1, "in your words" 3.64:1.                                                                                                                          | computed contrast       |
+*** Works well (keep)
+- Article-coloured words with the article written out, the word pane beside the table with its own scroll, translations Ukrainian first then English, the context menu on rows.
+*** Plan
+- [ ] W-1 Checkboxes always visible where there is no hover (=@media (hover: none)= in DS =table-row=); a caption on the disabled bulk buttons ("Select words").
+- [ ] W-2 Label or button on the lookup field; placeholder contrast.
+- [ ] W-3 390 px: wrap the bulk buttons, keep Score visible (hide Added first).
+- [ ] W-4 Plural forms in =app/i18n.py= for the two counts.
+- [ ] W-5 Score chip colours through DS-1/DS-6.
+- [ ] W-6 Word detail and lookup result re-checked at 390 px and in dark after G-6.
+
+* TODO 4 — Texts [/]
+:PROPERTIES:
+:CUSTOM_ID: step-4
+:LEFT:     mobile not looked at, legend contrast
+:END:
+
+*Definition of done:* the three panes work at 390 px and the legend is readable. The page runs on mock texts (=data-demo=).
+| ID  | Sev | Finding                                                                                                                                  | Evidence          |
+|-----+-----+------------------------------------------------------------------------------------------------------------------------------------------+-------------------|
+| T-a | 🟡  | The legend lines under the text ("Word in notes · already in the word list", "Hover: translation · Click: add word …") are grey italic 2.85:1. | computed contrast |
+| T-b | 🟢  | Desktop layout works: three panes, highlighted note words, "Add to list" per note. 390 px screenshot exists but was not looked at.        | screenshot        |
+*** Plan
+- [ ] T-1 Legend contrast (DS-1) and wording.
+- [ ] T-2 Review 390 px (stacked panes) and the upload/edit popups in both themes.
+- [ ] T-3 =100dvh= for =.wort-texts= (G-8).
+
+* TODO 5 — History / Import [/]
+:PROPERTIES:
+:CUSTOM_ID: step-5
+:LEFT:     native file input, page name, legacy routes
+:END:
+
+*Definition of done:* import uses a DS control, the page is named for what it holds and is reachable from the navigation, dead routes are gone or restyled.
+| ID  | Sev | Finding                                                                                                                                                                                  | Evidence             |
+|-----+-----+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------|
+| H-a | 🟡  | The browser's native "Choose File / No file chosen" button sits in a dis-system page.                                                                                                      | screenshot           |
+| H-b | 🟡  | The page is "History" but is reached only through the link "Import" on Words; the nav highlights "Words"; the import form comes before the history.                                        | screenshot, =base.html:28= |
+| H-c | 🟢  | "1 words looked up"; dates as =30.10.2026 18:47= while Words says "30 October 2026".                                                                                                      | screenshot           |
+| H-d | 🟢  | =/favorites= and =/exercise/{lemma}= (=favorites.html=, =exercise.html=) have no inbound link in the templates except each other.                                                          | code                 |
+*** Plan
+- [ ] H-1 Import with the DS =dropzone= (JSON only), keep the CSRF form.
+- [ ] H-2 Name the page for both jobs or split it; give it a place in the navigation.
+- [ ] H-3 One date format and plural forms.
+- [ ] H-4 Decide on =/favorites= and =/exercise/{lemma}= (Open decisions).
+
+* TODO 6 — Login [/]
+:PROPERTIES:
+:CUSTOM_ID: step-6
+:LEFT:     layout, labels, error state not looked at
+:END:
+
+*Definition of done:* the form is centred under the brand, fields have visible labels, errors are announced.
+| ID  | Sev | Finding                                                                                                                                  | Evidence   |
+|-----+-----+------------------------------------------------------------------------------------------------------------------------------------------+------------|
+| L-a | 🟡  | The form sits in the top-left of a 928 px column under a "Sign in · wort" bar, no brand mark; fields have placeholders only; no =<h1>=.   | screenshot, DOM |
+| L-b | 🟢  | Wrong-password state, field labels in the accessibility tree and dark theme not looked at yet.                                           | none       |
+*** Plan
+- [ ] L-1 Centred block with the brand, visible labels, =<h1>=.
+- [ ] L-2 Check the error message (=aria-live=) and the throttle message in both themes.
+
+* WIP 7 — Cross-cutting: contrast and dis-system gaps [/]
+:PROPERTIES:
+:CUSTOM_ID: step-7
+:LEFT:     other pages not re-audited; dis-system changes optional
+:END:
+
+*Definition of done:* every page passes 4.5:1 for text in both themes, and the gaps found in dis-system are either fixed there or recorded as known.
+- [X] DS-1 Contrast without touching dis-system: =ui.css= overrides =--ds-color-text-subactive= (0.4 → 0.62 black alpha, 2.85 → 5.7:1 on white) and =--ds-color-header-cell-label= (#909090 → #666666; dark #808080 → #9a9a9a) and sets its own ok / bad / amber text colours (5.7, 7.7, 7.5:1 on white). *These overrides are global*, so Words, Texts and History change too; they have not been re-audited. Dis-system's own tokens are unchanged.
+- [X] DS-2 =role="tablist"= on navigation links: gone from Practice (own markup).
+- [X] DS-3 Mode bar with the current section marked and one =<h1>= per page: own markup on Practice.
+- [-] DS-4 =lang= on content: own macro =bubble= and attributes in the Practice templates; dis-system components still have no =lang= prop.
+- [X] DS-5 Pane body collapse in Quiz: no longer used there; =.ds-pane= still has =flex: 1 1 0= for auto-height hosts (not fixed upstream).
+- [X] DS-6 Passive tag colours below 4.5:1: Practice uses its own badge. Words score chips and "in your words" still use =ds-tag= (open for step 3).
+- [ ] DS-7 =table-row= checkbox under =(hover: none)= and 44 px rows: Words.
+- [ ] DS-8 =text-button= reads a context variable =article=: the Quiz route no longer sets one, the trap remains for any other route that does.
+
+** Colour contrast check (computed styles of every visible text)
+Before (2026-10-30 morning, 10 pages × 2 themes, 1440 px): light 119 failing text elements in 14 groups, dark 60 in 7 groups. After the Practice refresh (Practice start ×3, grammar topic, session with the explanation open, Quiz before and after an answer; 388 text elements per theme):
+| Theme | Failing now | What is left                                                                                           | Pass?  |
+|-------+-------------+--------------------------------------------------------------------------------------------------------+--------|
+| Light | 10 of 388   | disabled radio "Explain in German" (3.0:1); muted, not yet reachable words in the session list (3.1:1) | ✅ (both are inactive controls, exempt from 1.4.3) |
+| Dark  | 2 of 388    | the same disabled radio (2.4:1)                                                                        | ✅ (inactive) |
+Fixed on the way: muted captions, column heads and labels (2.8–3.2 → ≥ 5.4:1), the correction marks (3.6 → ≥ 4.5), the green corrected line (4.3 → 5.7), verdict badges (own colours, ≥ 5.7:1). Words, word detail, lookup, History, Texts and Login were *not* re-audited after the global token change.
+
+* Open decisions
+- *17 uncommitted files in =vendor/dis-system=* (branch =dsgnrfhmn/message-note=, =8f1d0b4=): the current UI needs them (message =tail= and =note_tone=, nav-bar =workspace_items=, page-head =title_href= are in the working tree only; =git show HEAD:= has none of them). They have to be committed in dis-system before =gui-improvements= is merged anywhere, otherwise another checkout renders a different UI. garv decides where and when. :garv:decision:
+- dis-system pin: =main= or a tag (temporary exception since 2026-10-18). :garv:decision:
+- Keep the screenshot, measuring and contrast scripts (session scratchpad: =serve_demo.py=, =run_shots.sh=, =shoot*.py=) in the repo, e.g. under =spikes/gui-review/=, or leave them out? :garv:decision:
+- One explanation surface in a session: the inline "Explain more" block or the side pane "Mistake explained". :garv:decision:
+- =/favorites= and =/exercise/{lemma}=: delete or restyle. :garv:decision:
+- Is the Quiz collapse (Q-a) new? Not bisected; it is fixed by a layout that does not use =.ds-pane=, so the cause was not looked for. :garv:
+- Figma canvas ("Üben 1–6", =open-projects 391:23146=) for Practice: not looked at; the refresh follows current practice and the running app, not the canvas. :garv:decision:
+- =CLAUDE.md= "Design-system rules (hard)" and its Modules list: now out of date for Practice (own CSS, =_ui.html=, =ui.css=). Update it, or fold =ui.css= back into dis-system component by component. :garv:decision:
+- The global colour overrides in =ui.css= (DS-1) change every page. Keep them global, or scope them to Practice until each page is reviewed. :garv:decision:
+- Not committed: the refresh sits in the working tree of =gui-improvements= (14 changed files, =ui.css=, =_ui.html= and this file new). :garv:
+
+* Out of scope
+- New features (AI feedback, the real Texte pipeline, OCR), backend logic beyond renaming a template variable, the CLI/TUI look, the Mono style, a native mobile app.
+
+* Log
+- 2026-10-30: branch created, review of all pages done with demo data (Setup, findings above). No UI code changed.
+- 2026-10-30 (evening): Practice refreshed (start, session, Quiz, result, grammar, mode bar). =PYTHONPATH=.:src uv run pytest=: 503 passed, 1 skipped. 3 new tests guard the verdict, the article leak (mutation-checked) and the page structure; existing assertions in 4 test files updated to the new markup (82 lines added, 26 removed in =tests/=). 24 German entries added. UX-20 … UX-29 added to =UX-Decisions.md=.

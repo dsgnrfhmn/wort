@@ -14,8 +14,11 @@
   {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="/static/layout.css">
   <link rel="stylesheet" href="/static/trial.css">
+  <link rel="stylesheet" href="/static/ui.css">
 </head>
 <body{% block body_attrs %}{% endblock %}>
+{% from "_ui.html" import btn with context %}
+<a class="wort-skip" href="#main">{{ _('Skip to content') }}</a>
   {% if user %}
   <header class="wort-head">
   {# The logo (design canvas "Wort — логотип", D — Піксель): the W alone on the 10×23 grid, strokes and steps three cells wide, the middle four (bolder
@@ -36,30 +39,26 @@
     <input type="hidden" name="lang" value="{{ lang }}">
     <input type="hidden" name="next" value="/">{# app.js puts the current path here on submit: the page never echoes its own URL #}
   </form>
-  {# Üben (design "open-projects" 391:23146): the three modes as equal page-heads under the nav bar; each title links
-     to its mode (practice.mode_tabs: resumes its open session, whose progress is the caption). #}
-  {% if page == 'practice' and ueben_tabs is defined %}
-  <nav class="wort-modes" aria-label="{{ _('Kind of practice') }}">
-    {% for m in ueben_tabs %}
-    {% with title=m.label, title_href=m.href, current=m.active, meta_text=m.count, actions_left=[], actions_right=[] %}{% include "components/page-head/template.html" %}{% endwith %}
-    {% endfor %}
-  </nav>
-  {% endif %}
-  {# Second header row: settings (to come) on the left, the lookup side panel's toggle on the right. Only on Üben
-     (garv, 2026-10-28): the Wörter page has its own lookup field. #}
+  {# Üben: the three modes as equal sections under the nav bar, the open one marked (UX-2); each links to its mode
+     (practice.mode_tabs: resumes its open session, whose progress is the caption). "Look up" (the side panel) sits
+     at the end of the same row, so the header is two rows, not three (garv, 2026-10-30). #}
   {% set side_lookup = page == 'practice' %}
-  {% if side_lookup %}
-  <div class="wort-toolbar">
-    <div class="wort-row wort-toolbar__settings"></div>
-    <div class="wort-row">
-      {% with priority='secondary', underline='dotted', label=_('Look up'), extra_attrs='data-side-toggle aria-controls="wort-lookup-side" aria-expanded="false"' %}{% include "components/text-button/template.html" %}{% endwith %}
-    </div>
+  {% if page == 'practice' and ueben_tabs is defined %}
+  <div class="wort-modebar">
+    <nav aria-label="{{ _('Kind of practice') }}">
+      <ul class="wort-modes">
+        {% for m in ueben_tabs %}
+        <li><a href="{{ m.href | safe_url }}"{% if m.active %} aria-current="page"{% endif %}><span>{{ m.label }}</span>{% if m.count %}<span class="wort-modes__count">{{ m.count }}</span>{% endif %}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+    {% if side_lookup %}<div class="wort-modebar__tools">{{ btn(_('Look up'), 'ghost', attrs='data-side-toggle aria-controls="wort-lookup-side" aria-expanded="false"') }}</div>{% endif %}
   </div>
   {% endif %}
   </header>
   {% endif %}
   <div class="wort-shell">
-  <main class="wort-main">
+  <main class="wort-main" id="main" tabindex="-1">
     {% block content %}{% endblock %}
   </main>
   {% if user and side_lookup %}

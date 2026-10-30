@@ -67,7 +67,7 @@ def test_the_interface_is_english_by_default_and_the_exercises_stay_german(clien
     assert "Schreibe einen Satz mit «Haus»" in html  # the task itself stays German
     c.post(loc + "/answer", data={"csrf": c.cookies.get("wort_csrf"), "text": "Das Haus ist sehr groß hier", "at": 0})
     html = c.get(loc).text
-    assert ">Feedback<" in html and ">richtig<" in html  # verdicts stay German
+    assert 'aria-label="Assessment"' in html and ">richtig<" in html  # the verdict is on the page; verdicts stay German
 
 
 def test_the_language_is_stored_in_the_profile_and_switches_the_whole_interface(client):

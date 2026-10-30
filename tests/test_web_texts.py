@@ -269,4 +269,4 @@ def test_phrases_show_in_the_word_list_without_a_checkbox_and_are_not_practised(
     mixed = c.post("/ueben/saetze", data={"csrf": csrf, "ids": [phrase.id, haus.id]})
     assert mixed.status_code == 303 and mixed.headers["location"].startswith("/ueben/s/")
     assert "Phrases are skipped" in unquote(mixed.headers["set-cookie"])
-    assert "1 words" in c.get("/ueben?neu=1").text  # the phrase is not counted as a word to practise
+    assert "Words in your list: 1" in c.get("/ueben?neu=1").text  # the phrase is not counted as a word to practise

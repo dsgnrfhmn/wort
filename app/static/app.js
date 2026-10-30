@@ -478,11 +478,21 @@ window.wortPrepare = (root) => {
   });
 })();
 
+/* Üben: where the focus starts. A task waiting for an answer: the answer box (not on a phone, where it would open the
+   keyboard and cover the task). An answer already given on a page without steps (the Quiz): its verdict. */
+(() => {
+  const coarse = window.matchMedia('(hover: none)').matches;
+  const box = document.querySelector('.wort-composer textarea, .wort-composer input[name="text"], .wort-quiz form.wort-answer textarea, .wort-quiz form.wort-answer input[name="text"]');
+  if (box && !coarse) { box.focus({ preventScroll: true }); return; }
+  const verdict = document.querySelector('.wort-verdict[data-autofocus]');
+  if (verdict) verdict.focus({ preventScroll: true });
+})();
+
 /* Üben: Enter in the answer box sends it, like "Senden"; Shift+Enter starts a new line. An Enter that confirms an
    input-method composition (e.g. a dead key or IME) is left alone. An empty answer is not sent. */
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
-  const box = e.target instanceof HTMLTextAreaElement ? e.target.closest('.wort-composer form') && e.target : null;
+  const box = e.target instanceof HTMLTextAreaElement ? e.target.closest('.wort-composer form, .wort-quiz form.wort-answer') && e.target : null;
   if (!box) return;
   e.preventDefault();
   if (box.value.trim()) box.form.requestSubmit();
@@ -644,6 +654,8 @@ document.addEventListener('keydown', (e) => {
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const release = (el) => {
     el.removeAttribute('data-fade-hold');
+    // The verdict takes the focus when it appears, so a screen reader reads it (it is a section with tabindex="-1").
+    if (el.matches('.wort-verdict[tabindex]')) el.focus({ preventScroll: true });
     if (still) return;
     el.classList.add('ds-fade-in');
     el.addEventListener('animationend', () => el.classList.remove('ds-fade-in'), { once: true });

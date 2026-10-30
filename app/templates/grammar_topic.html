@@ -1,42 +1,47 @@
 {% extends "base.html" %}
+{% from "_ui.html" import btn with context %}
 {% block title %}{{ topic.title }} · {{ _('Grammar') }} · wort{% endblock %}
 {% block body_attrs %} data-layout="wide"{% endblock %}
 {% block content %}
-<section class="wort-section">
-  {% with type='title-info', title=topic.title, info=topic.level ~ ((' · ' ~ _('{right} / {total} correct', right=progress[0], total=progress[1])) if progress else '') %}{% include "components/table-header/template.html" %}{% endwith %}
-  <div class="wort-row">
-    <form method="post" action="/ueben/grammatik/{{ topic_id }}">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      {% with priority='primary', underline='dotted', label=_('Practise ({n} tasks)', n=topic.exercises | length), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
-    </form>
-    {% with priority='secondary', underline='solid', label=_('All topics'), href='/ueben?neu=1&modus=grammatik' %}{% include "components/text-button/template.html" %}{% endwith %}
-  </div>
-  <p class="wort-grammar__lead">{{ topic.summary }}</p>
-</section>
+{# A topic: what it is, the way into its exercises, then the explanation section by section. German text is German,
+   the Ukrainian note under it is marked as such (lang) and set apart. #}
+<div class="wort-page">
+  <header class="wort-pagehead">
+    <div class="wort-pagehead__text">
+      <h1 class="wort-title" lang="de">{{ topic.title }}</h1>
+      <p class="wort-caption">{{ topic.level }}{% if progress %} · {{ _('{right} / {total} correct', right=progress[0], total=progress[1]) }}{% endif %}</p>
+    </div>
+    <div class="wort-btn-row">
+      <form class="wort-inline" method="post" action="/ueben/grammatik/{{ topic_id }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {{ btn(_('Practise ({n} tasks)', n=topic.exercises | length), 'primary', submit=true) }}
+      </form>
+      {{ btn(_('All topics'), 'secondary', href='/ueben?neu=1&modus=grammatik') }}
+    </div>
+  </header>
+  <p class="wort-lead" lang="de">{{ topic.summary }}</p>
 
-{# The explanation: one block per section — German, the Ukrainian note, and a table where the rule is a table. #}
-{% for s in topic.sections %}
-<section class="wort-section wort-grammar" aria-label="{{ s.title }}">
-  {% with type='title-info', title=s.title, info='' %}{% include "components/table-header/template.html" %}{% endwith %}
-  <p>{{ s.text }}</p>
-  {% if s.uk %}<p class="wort-grammar__uk">{{ s.uk }}</p>{% endif %}
-  {% if s.table %}
-  <div class="wort-table wort-cols-{{ s.table.headers | length }}" role="table" aria-label="{{ s.title }}">
-    {% for h in s.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
-    {% for row in s.table.rows %}
-    {% set cells = [] %}
-    {% for c in row %}{% set _x = cells.append({'type': 'text-passive-cell' if loop.first else 'text-active-cell', 'content': c, 'wrap': true}) %}{% endfor %}
-    {% with selected=false, cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
-    {% endfor %}
-  </div>
-  {% endif %}
-</section>
-{% endfor %}
+  {% for s in topic.sections %}
+  <section class="wort-section wort-grammar" aria-labelledby="sec-{{ loop.index }}">
+    <h2 class="wort-section-title" id="sec-{{ loop.index }}" lang="de">{{ s.title }}</h2>
+    <p lang="de">{{ s.text }}</p>
+    {% if s.uk %}<p class="wort-grammar__uk" lang="uk">{{ s.uk }}</p>{% endif %}
+    {% if s.table %}
+    <div class="wort-table wort-cols-{{ s.table.headers | length }}" role="table" aria-label="{{ s.title }}" lang="de">
+      {% for h in s.table.headers %}{% with label=h %}{% include "components/table-header-cell/template.html" %}{% endwith %}{% endfor %}
+      {% for row in s.table.rows %}
+      {% set cells = [] %}
+      {% for c in row %}{% set _x = cells.append({'type': 'text-passive-cell' if loop.first else 'text-active-cell', 'content': c, 'wrap': true}) %}{% endfor %}
+      {% with selected=false, cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+  {% endfor %}
 
-<section class="wort-section">
-  <form class="wort-row" method="post" action="/ueben/grammatik/{{ topic_id }}">
+  <form class="wort-btn-row" method="post" action="/ueben/grammatik/{{ topic_id }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% with priority='primary', underline='dotted', label=_('Practise now'), submit=true %}{% include "components/text-button/template.html" %}{% endwith %}
+    {{ btn(_('Practise now'), 'primary', submit=true) }}
   </form>
-</section>
+</div>
 {% endblock %}

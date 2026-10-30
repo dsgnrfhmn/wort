@@ -322,6 +322,11 @@ def register(app, ctx) -> None:
             raise HTTPException(404, "no such session")
         return sess
 
+    def weakest_words(user: User) -> list[UserWord]:
+        """The five words with the lowest score (words not practised yet follow the scored ones)."""
+        from app.words import order
+        return order([w for w in store.words(user.id) if not w.is_phrase], "score", False)[:5]
+
     @app.get("/ueben", response_class=HTMLResponse)
     def start(request: Request, modus: str = "", thema: str = questions.ALL, neu: str = "",
               user: User = Depends(current_user)):
@@ -337,7 +342,7 @@ def register(app, ctx) -> None:
                           tabs=TABS, count=sum(1 for w in store.words(user.id) if not w.is_phrase), thema=questions.topic_or_all(thema),
                           themen=questions.LABELS, batch=batch_of(user, store.latest_practice(user.id, WORD_KINDS)),
                           resume=store.latest_practice(user.id, MODES[modus], open_only=True),
-                          ueben_tabs=mode_tabs(user, modus),
+                          ueben_tabs=mode_tabs(user, modus), weakest=[w.lemma for w in weakest_words(user)],
                           topics=[{"id": k, **t, "progress": progress.get(k)} for k, t in grammar.TOPICS.items()])
 
     @app.get("/grammatik/{topic}", response_class=HTMLResponse)
@@ -398,8 +403,7 @@ def register(app, ctx) -> None:
         if art == "erklaere" and not ai.uses("answer"):  # the page offers it disabled; a forged post lands here
             return ctx.redirect("/ueben?neu=1&modus=abfrage", t("“Explain in German” needs the AI; it is off."))
         if preset == "weakest":
-            from app.words import order
-            chosen = order([w for w in store.words(user.id) if not w.is_phrase], "score", False)[:5]
+            chosen = weakest_words(user)
         else:
             if not ids or len(ids) > 200:
                 raise HTTPException(400, "select between 1 and 200 words")
@@ -463,7 +467,8 @@ def register(app, ctx) -> None:
         shown = current if view == pos else turn(user, dic, tr, view, items[view], opened)
         if shown is None:
             raise HTTPException(404, "word is gone")
-        tabs = [{"index": i, "attempts": 1 + len(items[i].get("retries") or []) if "result" in items[i] else 0}
+        tabs = [{"index": i, "attempts": 1 + len(items[i].get("retries") or []) if "result" in items[i] else 0,
+                 "v": step_verdict(items[i])}
                 for i in (reachable[w] if w else range(pos + 1))]
         # ?nochmal=1: the composer answers the shown, already answered sentence task again (a retry).
         retry = bool(nochmal) and can_retry(items[view])
@@ -501,7 +506,8 @@ def register(app, ctx) -> None:
             mode=abfrage_mode(items), modes=ABFRAGE_MODES, erklaere_ok=ai.uses("answer"),
             pos_label=POS_LABEL.get(entry.pos, entry.pos.capitalize())
             + (f" · {GENDER_LABEL[entry.gender]}" if entry.pos == "noun" and entry.gender in GENDER_LABEL else ""),
-            article=ARTICLES[entry.gender]["nominative"] if entry.pos == "noun" and entry.gender in ARTICLES else "",
+            # Not `article`: text-button reads a context variable of that name and would colour every button on the page.
+            word_article=ARTICLES[entry.gender]["nominative"] if entry.pos == "noun" and entry.gender in ARTICLES else "",
             lemma=entry.lemma, translations=" · ".join(x for x in (tr_uk, tr_en) if x),
             example=entry.examples[0][0] if entry.examples else "",
             can_downgrade=res.get("verdict") in ("correct", "almost") and bool(res.get("attempt_id"))
@@ -893,6 +899,17 @@ def register(app, ctx) -> None:
         if pos < len(items) and "result" in items[pos]:
             store.save_practice(user.id, sid, items, pos + 1)
         return RedirectResponse(f"/ueben/s/{sid}#jetzt", status_code=303)
+
+    def step_verdict(item: dict) -> str:
+        """How a task went, for its step in the session header: correct | almost | wrong | tip | skipped | none."""
+        res = item.get("result")
+        if not res:
+            return "none"
+        if res.get("skipped"):
+            return "skipped"
+        if res.get("verdict") in ("correct", "almost", "wrong"):
+            return res["verdict"]
+        return "tip" if res.get("tip") else "none"
 
     def summary(user: User, items: list[dict]) -> list[dict]:
         rows = []

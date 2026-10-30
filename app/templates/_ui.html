@@ -1,0 +1,29 @@
+{# Building blocks of the GUI refresh (garv, 2026-10-30; styles in static/ui.css). Import with
+   {% from "_ui.html" import bubble, badge, btn with context %}. #}
+
+{# One turn of the exchange. Same markup and classes as dis-system's message (its CSS draws it), plus `lang`: the
+   words of a task and of an answer are German even when the interface is English or Ukrainian. #}
+{% macro bubble(variant, label, text, segments=none, note=none, note_tone=none, tail=none, lang='de') %}
+<div class="ds-message" data-variant="{{ variant }}"{% if tail in ['start', 'end'] %} data-tail="{{ tail }}"{% endif %}>
+  {% if label %}<div class="ds-message__label">{{ label }}</div>{% endif %}
+  <div class="ds-message__text" lang="{{ lang }}">
+  {%- if segments -%}
+    {%- for seg in segments -%}
+      {%- if seg.kind in ['remove', 'add'] -%}
+        {%- with kind=seg.kind, text=seg.text, tooltip=seg.tooltip, href=seg.href, current=seg.current -%}{%- include "components/inline-mark/template.html" -%}{%- endwith -%}
+      {%- else -%}{{ seg.text }}{%- endif -%}
+    {%- endfor -%}
+  {%- else -%}{{ text }}{%- endif -%}
+  </div>
+  {% if note %}<div class="ds-message__note" lang="{{ lang }}"{% if note_tone == 'success' %} data-tone="success"{% endif %}>{{ note }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{# A verdict by glyph, word and colour. `v`: correct | almost | wrong | tip | none | skipped. #}
+{% macro badge(v, label) %}<span class="wort-badge" data-v="{{ v }}"><span class="wort-badge__glyph" aria-hidden="true">{{ {'correct': '✓', 'almost': '~', 'wrong': '✗', 'tip': 'i', 'skipped': '→'}.get(v, '–') }}</span><span>{{ label }}</span></span>{% endmacro %}
+
+{# A button or link that looks like one. kind: primary | secondary | ghost | danger. `submit`: a form button; `href`: a link. #}
+{% macro btn(label, kind='secondary', href=none, submit=false, attrs='') %}
+{%- if href -%}<a class="wort-btn wort-btn--{{ kind }}" href="{{ href | safe_url }}"{% if attrs %} {{ attrs | safe }}{% endif %}>{{ label }}</a>
+{%- else -%}<button class="wort-btn wort-btn--{{ kind }}" type="{{ 'submit' if submit else 'button' }}"{% if attrs %} {{ attrs | safe }}{% endif %}>{{ label }}</button>{%- endif -%}
+{% endmacro %}
