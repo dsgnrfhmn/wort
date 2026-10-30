@@ -62,21 +62,32 @@
      is held invisible (dis-system fade-in's data-fade-hold) until its turn. #}
   <div class="wort-reply"{% if t.attempt %} data-attempt="{{ t.attempt }}"{% endif %}{% if anim %} aria-live="polite"{% endif %}>
     {# Messenger-like: the answer and its correction on the right, as one bubble; the feedback below, full width. #}
-    <div class="wort-reply__mine">
-    {# The learner's replies are dark like the task (message `inverted`, garv 2026-10-29). Once checked, one bubble only
-       (garv, 2026-10-29): with corrections it is the corrected version (the answer with the
-       wrong runs struck through and the right ones beside them), else the answer as written. #}
+    <div class="wort-reply__mine"{% if t.segments %} data-shown="corrected"{% endif %}>
+    {# The learner's replies are white, the outlined `answer` message (garv, 2026-10-30; dark until then). Once checked,
+       one bubble only (garv, 2026-10-29): with corrections it is the corrected version (the answer with the wrong
+       runs struck through and the right ones beside them), else the answer as written. With corrections, "Show
+       original" under the bubble swaps in the answer as written and back (app.js sets .wort-reply__mine[data-shown]).
+       The two bubbles lie in one grid cell and so do the two button labels (layout.css): the unused one is invisible,
+       not removed, so nothing changes size when they swap. #}
     {% if t.segments %}
-    <div{% if anim and not erklaert %} data-fade-hold data-result-step="0"{% endif %}>{% with variant='prompt', label=attempt ~ _('Corrected'), segments=t.segments, note_tooltip=none, note_tone='success', tail='end', inverted=true,
-       note=result.corrected if result.corrected and result.corrected != t.answer else none %}{% include "components/message/template.html" %}{% endwith %}</div>
+    <div class="wort-answer-views"{% if anim and not erklaert %} data-fade-hold data-result-step="0"{% endif %}>
+      <div data-answer-view="corrected">{% with variant='answer', label=attempt ~ _('Corrected'), segments=t.segments, note_tooltip=none, note_tone='success', tail='end',
+         note=result.corrected if result.corrected and result.corrected != t.answer else none %}{% include "components/message/template.html" %}{% endwith %}</div>
+      <div data-answer-view="original">{% with variant='answer', label=attempt ~ _('Your answer'), text=t.answer, segments=none, note=none, tail='end' %}{% include "components/message/template.html" %}{% endwith %}</div>
+    </div>
     {% else %}
-    <div{% if anim and not erklaert %} data-fade-hold data-result-step="0"{% endif %}>{% with variant='answer', label=attempt ~ _('Your answer'), text=t.answer, segments=none, note=none, tail='end', inverted=true %}{% include "components/message/template.html" %}{% endwith %}</div>
+    <div{% if anim and not erklaert %} data-fade-hold data-result-step="0"{% endif %}>{% with variant='answer', label=attempt ~ _('Your answer'), text=t.answer, segments=none, note=none, tail='end' %}{% include "components/message/template.html" %}{% endwith %}</div>
     {% endif %}
     {# The corrected sentence stands in green under the marked answer (above); the feedback with each mistake explained
        lies hidden under the answer, and "Explain more" under the bubble shows and hides it (app.js). Always hidden at
        first (garv, 2026-10-29). #}
     {% set fb_id = 'fb-' ~ t.index ~ '-' ~ (t.attempt or 1) %}
-    <div class="wort-reply__toggle"{% if anim and not erklaert %} data-fade-hold data-result-step="1"{% endif %}>{% with priority='secondary', underline='dotted', label=_('Explain more'), extra_attrs='data-feedback-toggle aria-controls="' ~ fb_id ~ '" aria-expanded="false"' %}{% include "components/text-button/template.html" %}{% endwith %}</div>
+    <div class="wort-reply__toggle"{% if anim and not erklaert %} data-fade-hold data-result-step="1"{% endif %}>
+      {% if t.segments %}<span class="wort-answer-toggle">
+        {% with priority='secondary', underline='dotted', label=_('Show original'), extra_attrs='data-answer-toggle="original"' %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% with priority='secondary', underline='dotted', label=_('Show corrected'), extra_attrs='data-answer-toggle="corrected"' %}{% include "components/text-button/template.html" %}{% endwith %}
+      </span>{% endif %}
+      {% with priority='secondary', underline='dotted', label=_('Explain more'), extra_attrs='data-feedback-toggle aria-controls="' ~ fb_id ~ '" aria-expanded="false"' %}{% include "components/text-button/template.html" %}{% endwith %}</div>
     </div>
     {# The review: the feedback and the word's facts, framed as one block (dis-system pane), under the answer. The
        actions about it sit first in its body. #}
@@ -220,7 +231,7 @@
    dis-system's message and progress-bar; the next page then brings the result in steps. #}
 <template id="wort-pending">
   <div class="wort-pending" aria-live="polite">
-    <div class="wort-reply__mine" data-pending-answer>{% with variant='answer', label=_('Your answer'), text=' ', segments=none, note=none, tail='end', inverted=true %}{% include "components/message/template.html" %}{% endwith %}</div>
+    <div class="wort-reply__mine" data-pending-answer>{% with variant='answer', label=_('Your answer'), text=' ', segments=none, note=none, tail='end' %}{% include "components/message/template.html" %}{% endwith %}</div>
     {% with value=none, label=_('Checking …') %}{% include "components/progress-bar/template.html" %}{% endwith %}
   </div>
 </template>

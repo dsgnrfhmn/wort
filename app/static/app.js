@@ -61,28 +61,8 @@ window.addEventListener('DOMContentLoaded', () => {
       if (b.tagName === 'BUTTON') b.disabled = !on;
     });
   };
-  // The chosen words survive moving between the pages (localStorage; ids only). A preset from the server
-  // ("10 schwächste", "Letzte 20") replaces them. Ids of rows not loaded on this page are kept untouched.
-  const KEY = 'wort-selected';
-  const readStored = () => {
-    try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch (e) { return []; }
-  };
-  const saveSelection = () => {
-    try {
-      const visible = new Set(Array.from(table.querySelectorAll('.ds-table-row[data-word-id]')).map((r) => r.dataset.wordId));
-      const kept = readStored().filter((id) => !visible.has(id));
-      localStorage.setItem(KEY, JSON.stringify([...kept, ...selectedRows().map((r) => r.dataset.wordId)]));
-    } catch (e) { /* not persisted */ }
-  };
-  document.addEventListener('ds-table-row-select', () => { syncButtons(); saveSelection(); });
-  if (selectedRows().length) {
-    saveSelection();
-  } else {
-    const stored = new Set(readStored());
-    const rows = Array.from(table.querySelectorAll('.ds-table-row[data-word-id]')).filter((r) => stored.has(r.dataset.wordId));
-    rows.forEach((r) => r.setAttribute('data-selected', 'true'));
-    if (rows.length) table.dispatchEvent(new CustomEvent('ds-table-row-select', { bubbles: true, detail: { selected: true, restored: true } }));
-  }
+  // Nothing is selected on load; only a preset from the server ("10 schwächste", "Letzte 20") pre-selects rows.
+  document.addEventListener('ds-table-row-select', syncButtons);
   syncButtons();
 
   document.querySelector('[data-clear-selection]')?.addEventListener('click', () => {
@@ -809,5 +789,14 @@ document.addEventListener('click', (e) => {
       box.classList.add('ds-fade-in');
       box.addEventListener('animationend', () => box.classList.remove('ds-fade-in'), { once: true });
     }
+  });
+  // "Show original" / "Show corrected" under a corrected answer: the bubble shows the marked version or the answer as written.
+  // Both stay in the layout and layout.css hides the one not showing, so no size changes; the focus follows to the other button.
+  document.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-answer-toggle]');
+    const mine = button && button.closest('.wort-reply__mine[data-shown]');
+    if (!mine) return;
+    mine.dataset.shown = button.dataset.answerToggle;
+    mine.querySelector(`[data-answer-toggle]:not([data-answer-toggle="${mine.dataset.shown}"])`)?.focus({ preventScroll: true });
   });
 })();

@@ -75,7 +75,8 @@ body[data-layout="wide"] .wort-main { max-width: none; }
    window. */
 body[data-view="session"] .wort-main { padding: 0; }
 .wort-practice, .wort-practice__main { display: grid; gap: var(--ds-spacing-7); min-width: 0; }
-.wort-practice__main { padding: var(--ds-spacing-7) var(--ds-spacing-5); min-height: calc(100vh - var(--wort-head-h)); box-sizing: border-box; align-content: start; }
+/* A flex column, no bottom padding: the composer (margin-top: auto) sits at the bottom of the window even when the task is short. */
+.wort-practice__main { display: flex; flex-direction: column; padding: var(--ds-spacing-7) var(--ds-spacing-5) 0; min-height: calc(100vh - var(--wort-head-h)); box-sizing: border-box; }
 .wort-pending { display: grid; gap: var(--ds-spacing-4); }
 .wort-pending > .wort-reply__mine { justify-self: end; }
 .wort-practice--words { grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 0; }
@@ -92,7 +93,7 @@ body[data-view="session"] .wort-main { padding: 0; }
 .wort-mistake { display: grid; gap: var(--ds-spacing-3); padding: var(--ds-spacing-5) var(--ds-spacing-cell) 0; }
 .wort-mistake p { margin: 0; }
 .wort-review[hidden] { display: none; }
-.wort-reply__toggle { justify-self: end; }  /* "Show feedback" under the answer bubble */
+.wort-reply__toggle { justify-self: end; display: flex; gap: var(--ds-spacing-5); }  /* "Show original" and "Explain more" under the answer bubble */
 .wort-turn { display: grid; gap: var(--ds-spacing-4); scroll-margin-top: var(--wort-head-h); }
 .wort-reply { display: grid; gap: var(--ds-spacing-4); }
 .wort-feedback-fix { display: grid; padding: var(--ds-spacing-5) var(--ds-spacing-cell); }  /* "So wäre es richtig" under the tables */
@@ -100,6 +101,17 @@ body[data-view="session"] .wort-main { padding: 0; }
 /* Messenger-like sides: the task on the left, the answer with its correction on the right, each at most 75% wide. */
 .wort-turn > .ds-message { justify-self: start; max-width: 75%; }
 .wort-reply__mine { justify-self: end; max-width: 75%; display: grid; }  /* as wide as its widest bubble */
+/* The corrected and the original answer share one cell (as large as the larger), each bubble fills it; likewise the two
+   button labels ("Show original" / "Show corrected"). The one not in use is invisible, not removed, so swapping them
+   moves nothing and changes no size. .wort-reply__mine[data-shown] says which answer is showing. */
+.wort-answer-views, .wort-answer-toggle { display: grid; }
+.wort-answer-views > [data-answer-view] { grid-area: 1 / 1; display: grid; }
+.wort-answer-views > [data-answer-view] > .ds-message { align-self: stretch; }
+.wort-answer-toggle > * { grid-area: 1 / 1; }
+.wort-reply__mine[data-shown="corrected"] [data-answer-view="original"],
+.wort-reply__mine[data-shown="original"] [data-answer-view="corrected"],
+.wort-reply__mine[data-shown="corrected"] [data-answer-toggle="corrected"],
+.wort-reply__mine[data-shown="original"] [data-answer-toggle="original"] { visibility: hidden; }
 /* Feedback table: Bewertung | Ergebnis | Kommentar, the comment 60% of the width; the details under it: label | text. */
 .wort-feedback-table { grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 6fr); }
 .wort-details-table { grid-template-columns: minmax(0, 2fr) minmax(0, 8fr); }
@@ -112,7 +124,10 @@ body[data-view="session"] .wort-main { padding: 0; }
 .wort-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .wort-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .wort-grammar p, .wort-grammar__lead { margin: 0; max-width: calc(var(--ds-spacing-9) * 18); }
-.wort-composer { position: sticky; bottom: 0; padding: var(--ds-spacing-4) 0; background-color: var(--ds-color-bg-surface); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+/* The composer is a bar across the task column (the column's side padding is taken back), 20px inside on every side;
+   the answer box and "Senden" sit on one line, the button at the right. */
+.wort-composer { position: sticky; bottom: 0; z-index: 1; margin: auto calc(-1 * var(--ds-spacing-5)) 0; padding: var(--ds-spacing-6); background-color: var(--ds-color-bg-surface); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-composer .wort-answer { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
 
 /* Full-bleed pages (Wörter list): regions run edge to edge like the design canvas. */
 body[data-layout="full"] .wort-main { max-width: none; padding: 0; gap: 0; }

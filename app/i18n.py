@@ -191,6 +191,8 @@ DE: dict[str, str] = {
     'See the result': 'Ergebnis ansehen',
     'Send': 'Senden',
     'Show another example': 'Weiteres Beispiel zeigen',
+    'Show corrected': 'Korrigiert anzeigen',
+    'Show original': 'Original anzeigen',
     'Sign in': 'Anmelden',
     'Sign out ({name})': 'Abmelden ({name})',
     'Skip': 'Überspringen',

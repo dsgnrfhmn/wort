@@ -255,9 +255,14 @@ def test_tip_answer_changes_no_score_and_shows_tipp(tmp_path, dict_path):
     assert 'data-tone="success">Ich sehe den Garten dort<' in html
     assert ">Fehler 1<" in html and "«der» → den" in html and "<p>Falscher Artikel" in html
     assert 'class="wort-review" id="fb-0-1" hidden' in html and ">Mehr erklären<" in html
-    # once checked, one bubble: the corrected version carries the marks, no separate "Deine Antwort" beside it
+    # once checked, one bubble shows: the corrected version carries the marks; the answer as written lies in the
+    # same cell, invisible, behind "Original anzeigen" (app.js swaps them, data-shown), both the white outlined `answer` message
+    shown = html.split('<template id="wort-pending">')[0]
     assert html.count('data-kind="remove">der<') == 1
-    assert "Korrigiert</div>" in html and "Deine Antwort</div>" not in html.split('<template id="wort-pending">')[0]
+    assert 'data-answer-view="corrected">' in shown and "Korrigiert</div>" in shown
+    assert 'class="wort-reply__mine" data-shown="corrected"' in shown and 'data-answer-view="original">' in shown
+    assert 'data-answer-toggle="original"' in shown and ">Original anzeigen<" in shown and ">Korrigiert anzeigen<" in shown
+    assert 'data-inverted="true"' not in html
     assert store.words(uid)[0].score == before
 
 
