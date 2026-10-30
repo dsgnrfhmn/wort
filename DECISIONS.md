@@ -258,7 +258,13 @@ Confirmed by maintainer (date)*.
   (`--ds-color-accent-1` and its hover/pressed) and the input focus border (`--ds-color-input-border-focus`) are set to
   `--ds-color-text-active` (white) in `app/static/layout.css`,
   an exception to "no colors in this repo". Move it into dis-system or drop it once decided.
-- **dis-system commit in use (2026-10-29):** `8f1d0b4` on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
+- **dis-system commit in use (2026-10-30):** `bc62167` on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
+  top of `8f1d0b4`. Commits the draft props that had been in the working tree since 2026-10-29/30: message `tail` /
+  `note_tone` / `inverted`, nav-bar `workspace_items` / `workspace_name`, page-head `title_href` / `current`, popup
+  `body_html` and link/form actions, context-menu `note` rows, sidebar-list `caption` / `muted`. The pages built on
+  them rendered from the uncommitted tree until now. `python -m pytest tests` there: 74 passed. Same rule as below:
+  the branch has to be pushed and a dis-system PR opened (maintainer's OK) before this pointer is pushed.
+  Previous: `8f1d0b4` (2026-10-29) on branch `dsgnrfhmn/message-note` (local, **not pushed**), on
   top of `b2ed6ea`. Draft props (D00h): nav-bar `brand` / `brand_href` / `brand_html` and an empty `workspace_label`
   leaving the dropdown out, table-header-actions `outlined`, disclosure `body_html`, radio `disabled`. Waits for the
   maintainer's OK before it is pushed (to `dsgnrfhmn/isolated`) and a PR is opened.

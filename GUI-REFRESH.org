@@ -249,7 +249,7 @@ Before (2026-10-30 morning, 10 pages × 2 themes, 1440 px): light 119 failing te
 Fixed on the way: muted captions, column heads and labels (2.8–3.2 → ≥ 5.4:1), the correction marks (3.6 → ≥ 4.5), the green corrected line (4.3 → 5.7), verdict badges (own colours, ≥ 5.7:1). Words, word detail, lookup, History, Texts and Login were *not* re-audited after the global token change.
 
 * Open decisions
-- *17 uncommitted files in =vendor/dis-system=* (branch =dsgnrfhmn/message-note=, =8f1d0b4=): the current UI needs them (message =tail= and =note_tone=, nav-bar =workspace_items=, page-head =title_href= are in the working tree only; =git show HEAD:= has none of them). They have to be committed in dis-system before =gui-improvements= is merged anywhere, otherwise another checkout renders a different UI. garv decides where and when. :garv:decision:
+- *dis-system draft props:* the 17 files that only the working tree had (message =tail= and =note_tone=, nav-bar =workspace_items=, page-head =title_href= …) are committed on =dsgnrfhmn/message-note= as =bc62167= (2026-10-30, local only, 74 dis-system tests pass) and =gui-improvements= points at it. Still open: push that branch and open a dis-system PR before =gui-improvements= is pushed or merged, or the pointer leads nowhere for everyone else. :garv:decision:
 - dis-system pin: =main= or a tag (temporary exception since 2026-10-18). :garv:decision:
 - Keep the screenshot, measuring and contrast scripts (session scratchpad: =serve_demo.py=, =run_shots.sh=, =shoot*.py=) in the repo, e.g. under =spikes/gui-review/=, or leave them out? :garv:decision:
 - One explanation surface in a session: the inline "Explain more" block or the side pane "Mistake explained". :garv:decision:
@@ -258,11 +258,11 @@ Fixed on the way: muted captions, column heads and labels (2.8–3.2 → ≥ 5.4
 - Figma canvas ("Üben 1–6", =open-projects 391:23146=) for Practice: not looked at; the refresh follows current practice and the running app, not the canvas. :garv:decision:
 - =CLAUDE.md= "Design-system rules (hard)" and its Modules list: now out of date for Practice (own CSS, =_ui.html=, =ui.css=). Update it, or fold =ui.css= back into dis-system component by component. :garv:decision:
 - The global colour overrides in =ui.css= (DS-1) change every page. Keep them global, or scope them to Practice until each page is reviewed. :garv:decision:
-- Not committed: the refresh sits in the working tree of =gui-improvements= (14 changed files, =ui.css=, =_ui.html= and this file new). :garv:
 
 * Out of scope
 - New features (AI feedback, the real Texte pipeline, OCR), backend logic beyond renaming a template variable, the CLI/TUI look, the Mono style, a native mobile app.
 
 * Log
 - 2026-10-30: branch created, review of all pages done with demo data (Setup, findings above). No UI code changed.
+- 2026-10-30 (night): committed locally on =gui-improvements= (nothing pushed): the Practice refresh, the LanguageTool start-up (=dev.sh=, =compose.yaml=) and the dis-system pointer =bc62167=.
 - 2026-10-30 (evening): Practice refreshed (start, session, Quiz, result, grammar, mode bar). =PYTHONPATH=.:src uv run pytest=: 503 passed, 1 skipped. 3 new tests guard the verdict, the article leak (mutation-checked) and the page structure; existing assertions in 4 test files updated to the new markup (82 lines added, 26 removed in =tests/=). 24 German entries added. UX-20 … UX-29 added to =UX-Decisions.md=.
