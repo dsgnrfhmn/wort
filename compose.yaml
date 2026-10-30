@@ -27,6 +27,7 @@ services:
     command: ["uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "8000"]
     environment:
       WORT_HOME: /data                  # web.db goes here (the wort-data volume)
+      WORT_LT_URL: http://127.0.0.1:8010   # wort-lt below, same network namespace; loopback, so the client accepts it
       PYTHONPATH: /app/src:/app
       PYTHONDONTWRITEBYTECODE: "1"
     volumes:
@@ -37,6 +38,29 @@ services:
     tmpfs:
       - /tmp
     read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # LanguageTool, the grammar check, comes up and goes down with the stack. Shares wort-tls's network namespace like
+  # wort-web, so wort-web reaches it at 127.0.0.1:8010 and nothing else can: no `ports:` here and nginx does not proxy
+  # it, so a browser on the LAN gets the grammar results through the app only. Started without the image's `--public`,
+  # so the server listens on loopback inside that namespace (checked 2026-10-30 with this command: the namespace's own
+  # LAN address refuses, 127.0.0.1 answers). Same image, digest and heap as scripts/languagetool.sh (DECISIONS D4); bump
+  # both together. About 1 GB of RAM: do not run that script's container
+  # (wort-languagetool, host port 8081) at the same time on this host. wort-web does not depend on it: while it is
+  # down or still starting, a sentence is "not checked" and changes no score.
+  wort-lt:
+    image: docker.io/erikvl87/languagetool:6.5@sha256:9bc387f54513615648898ad60dd91bad7ba3c3b018cb2abe9f0ba61ec70681c4
+    container_name: wort-lt
+    network_mode: "service:wort-tls"
+    depends_on:
+      - wort-tls
+    command: ["java", "-Xms256m", "-Xmx1g", "-cp", "languagetool-server.jar", "org.languagetool.server.HTTPServer",
+              "--port", "8010", "--config", "config.properties"]
+    mem_limit: 1500m
     cap_drop:
       - ALL
     security_opt:

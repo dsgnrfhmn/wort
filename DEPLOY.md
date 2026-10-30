@@ -56,6 +56,21 @@ it, and create `~/.config/wort/sync.json`:
 The url must use the IP address and an explicit port. Then `wort sync`. The token can only add words and
 history to that one user; it cannot read data or sign in.
 
+## 3c. LanguageTool (the grammar check) starts with the stack
+
+`podman-compose up -d --build` also starts `wort-lt` (LanguageTool 6.5, image pinned by digest in `compose.yaml`). It shares
+the network namespace of `wort-tls` like `wort-web` does, listens on loopback inside it (`127.0.0.1:8010`, no `--public`)
+and has no `ports:`: only `wort-web` reaches it, so a browser on the LAN gets the grammar results through the app and the
+firewall needs no new rule. It takes about 1 GB of RAM (limit 1.5 GB) and the first `up` pulls a ~580 MB image. `wort-web`
+does not wait for it: until it answers (a few seconds) a sentence is "not checked" and changes no score.
+
+    podman exec wort-web python -c "from wort.exercises import grammar_check as g; print(g.check('Ich sehe den Haus.'))"
+    # a list with one DE_AGREEMENT issue; None means LanguageTool is not reachable (podman logs wort-lt)
+
+Do not run `scripts/languagetool.sh` (the dev machine's container `wort-languagetool`, host port 8081) on the same host at
+the same time: two JVMs of this size do not fit next to the other services. Not yet run through `podman-compose up` on the
+server: the command above is the first check to make (DECISIONS D4).
+
 ## 4. Firewall (ufw): allow the LAN to reach this socket only
 
     sudo ufw allow from <LAN-SUBNET> to <LAN-IP> port 8455 proto tcp comment 'wort https'

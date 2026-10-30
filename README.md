@@ -122,8 +122,9 @@ WORT_INSECURE_COOKIES=1 PYTHONPATH=.:src uv run uvicorn app.main:create_app --fa
 ```
 
 Open <http://127.0.0.1:8000> and sign in. In this plain-http mode the app answers only `127.0.0.1` / `::1`.
-For other devices on the LAN use `scripts/dev.sh` (https, see its header); for the server use `DEPLOY.md`
-(podman compose, nginx with TLS on the LAN address).
+For other devices on the LAN use `scripts/dev.sh` (https, see its header); it also starts the LanguageTool container for
+the grammar check and stops it again (needs rootless podman; `WORT_DEV_LT=0` skips it). For the server use `DEPLOY.md`
+(podman compose, nginx with TLS on the LAN address; LanguageTool is part of the stack).
 
 ## Roadmap
 

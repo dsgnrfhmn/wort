@@ -337,6 +337,13 @@ Confirmed by maintainer (date)*.
   Haus`), verb agreement (`Er gehen`) and haben/sein (`habe … gegangen`); misses a wrong case of an object
   (`Ich sehe der Hund`, `Ich gebe der Mann`). Server numbers below are still open.
 
+- **Starts with the service (2026-10-30):** `scripts/dev.sh` runs `scripts/languagetool.sh ensure` when the LAN dev server
+  starts (a LanguageTool that already answers is used and left alone; one it started is stopped with the server;
+  `WORT_DEV_LT=0` opts out). `compose.yaml` has the service `wort-lt` for the deployed stack: same pinned image and heap,
+  shared network namespace of `wort-tls`, no `ports:`, started without `--public` so it listens on loopback inside that
+  namespace (checked with a throwaway container: 127.0.0.1 answers, the namespace's LAN address refuses; heap 384 MB
+  there). Not yet run through `podman-compose up`; the server numbers below stay open.
+
 - Server model / total RAM: _
 - Setup tried (Java / Docker), unix user: _
 - RAM idle / under 10 checks: _

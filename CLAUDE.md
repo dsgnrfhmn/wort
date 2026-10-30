@@ -202,6 +202,6 @@ Keep README and this file in sync after each session.
   dictionary
 - `app/ocr.py` — image validation + Tesseract **[post-MVP]**, not written yet
 - `scripts/adduser.py`, `scripts/synctoken.py` — admin user and sync-token creation; `scripts/fetch_data.py` —
-  downloads (the CLI never downloads); `scripts/dev.sh` — https dev server on the LAN
+  downloads (the CLI never downloads); `scripts/dev.sh` — https dev server on the LAN (starts LanguageTool with it, stops it with it); `scripts/languagetool.sh` — the LanguageTool container (compose.yaml has its own service `wort-lt`)
 - `spikes/` — Step 0 measurement scripts (run on the server by the maintainer)
 - `vendor/dis-system/` — submodule
