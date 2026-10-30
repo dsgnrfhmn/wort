@@ -186,8 +186,20 @@ Keep README and this file in sync after each session.
   `users.ui_lang`; words and exercises stay German, the EN/UK label tooltips show with German only (DECISIONS D00j)
 - `app/importer.py`, `app/sync_app.py` — CLI export import, `POST /sync` (own process); `app/ui_terms.py` — EN/UK
   tooltips for the German button labels
-- `app/db.py` — web.db schema v5 + migrations (v5: an attempt keeps its asked form, expected answer, correction
-  and rule, for the word detail's marked forms table and "Deine Fehler")
+- `app/db.py` — web.db schema v7 + migrations (v5: an attempt keeps its asked form, expected answer, correction
+  and rule, for the word detail's marked forms table and "Deine Fehler"; v7: `user_words.added_from` may be `text`,
+  a word or **phrase** added while reading a text; a phrase is a row with `pos = 'phrase'` and the text as its lemma,
+  no dictionary entry, not practised in Üben yet, no checkbox in Wörter)
+- `app/texts.py` + `app/templates/texts.html` — Texte (design boards "Texte 1-5"): the UI stage with **mock texts** (fixed texts, notes
+  and recognition result; no photo is read: the dropzone's file input has no name); buttons that need the real
+  pipeline carry `data-demo` and say so; the popups (`popup` with the draft props `body_html` and link/submit actions) are opened
+  by app.js from the URL (`/texte/neu`, `/texte/{id}/bearbeiten`). **Real** (maintainer, 2026-10-30): every word of a text is a
+  word-token (a span, so its text can be selected; its lemma comes from the dictionary, never from the browser); a click on it, "Add
+  to list" on a note, or "Add to word list" in the **selection menu** (opens when text is selected: dis-system `context-menu` with
+  the draft row type `note` for the translation) writes into the user's Wörter with `added_from = 'text'`; one selected word is
+  added as a word, anything longer as a phrase (it must occur in the open text). A phrase is translated locally (`app/mt.py`, Argos:
+  needs the optional `mt` install and its models, German → English only so far; without them the menu says so), a word from the
+  dictionary
 - `app/ocr.py` — image validation + Tesseract **[post-MVP]**, not written yet
 - `scripts/adduser.py`, `scripts/synctoken.py` — admin user and sync-token creation; `scripts/fetch_data.py` —
   downloads (the CLI never downloads); `scripts/dev.sh` — https dev server on the LAN

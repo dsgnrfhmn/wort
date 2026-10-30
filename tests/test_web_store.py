@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytest
 from wort.transfer import FORMAT_VERSION
 
-from app.db import WebStore
+from app.db import SCHEMA, SCHEMA_VERSION, WebStore
 from app.importer import import_export
 
 NOW = datetime(2026, 10, 21, 12, 0)
@@ -105,7 +105,7 @@ def test_legacy_v0_db_is_migrated_and_adopted_by_first_user(tmp_path):
     """)
     old.commit(); old.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     u = web.create_user("anna", "h")
     assert [r.query for r in web.history(u.id)] == ["Haus"]
     assert [f.lemma for f in web.favorites(u.id)] == ["Haus"]
@@ -176,7 +176,7 @@ def test_v1_database_is_migrated_to_current(tmp_path):
     """)
     con.commit(); con.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     assert web.practice(1, 1)["kind"] == "saetze"
     assert web.create_practice(1, "regel", []) > 0  # new kind accepted
     assert {"state_before", "task", "expected", "corrected", "rule"} <= {
@@ -219,7 +219,7 @@ def test_v4_database_gets_the_attempt_details(tmp_path):
     """)
     con.commit(); con.close()
     web = WebStore(path)
-    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == 6
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     old = web.attempts(1, 1)[0]
     assert (old.answer, old.task, old.expected, old.corrected, old.rule) == ("der", "", "", "", "")
     assert web.conn.execute("SELECT ui_lang FROM users WHERE id = 1").fetchone()[0] == "en"  # v5 -> v6
@@ -229,3 +229,34 @@ def test_v4_database_gets_the_attempt_details(tmp_path):
     new = web.attempts(1, 1)[0]
     assert (new.task, new.expected, new.corrected, len(new.rule)) == ("Akkusativ Singular", "das … Haus",
                                                                       "Ich sehe das Haus.", 300)
+
+
+def test_v6_database_may_hold_words_from_texts_and_keeps_every_answer(tmp_path):
+    """v6 -> v7: user_words.added_from gets 'text'; the table is rebuilt, so the answers must still point at their words."""
+    path = tmp_path / "v6.db"
+    con = sqlite3.connect(path)
+    con.executescript(SCHEMA.replace(", 'practice', 'text')", ", 'practice')") + """
+        INSERT INTO users (id, name, password_hash, created_at) VALUES (1, 'anna', 'h', '2026-10-01T00:00:00');
+        INSERT INTO user_words (id, user_id, lemma, pos, added_at, own_translation) VALUES (7, 1, 'Haus', 'noun', '2026-10-01T00:00:00', 'house');
+        INSERT INTO attempts (user_id, word_id, skill, kind, prompt, answer, verdict, delta, created_at)
+            VALUES (1, 7, 'form', 'sentence', 'p', 'a', 'correct', 5, '2026-10-02T00:00:00');
+        PRAGMA user_version = 6;
+    """)
+    assert "'text'" not in con.execute("SELECT sql FROM sqlite_master WHERE name = 'user_words'").fetchone()[0]
+    with pytest.raises(sqlite3.IntegrityError):  # the old table really refuses it
+        con.execute("INSERT INTO user_words (user_id, lemma, pos, added_from, added_at) VALUES (1, 'x', '', 'text', '2026-10-01T00:00:00')")
+    con.commit(); con.close()
+
+    web = WebStore(path)
+    assert web.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    word = web.words(1)[0]
+    assert (word.id, word.lemma, word.own_translation) == (7, "Haus", "house")
+    assert len(web.attempts(1, 7)) == 1  # the answer still belongs to its word (the query joins on word_id)
+    assert web.conn.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert web.conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    assert web.add_word(1, "Das ist ein Satz", "phrase", added_from="text") is True
+    assert web.add_word(1, "Das ist ein Satz", "phrase", added_from="text") is False  # the same phrase once
+    with pytest.raises(sqlite3.IntegrityError):  # the CHECK still guards the other values
+        web.conn.execute("INSERT INTO user_words (user_id, lemma, added_from, added_at) VALUES (1, 'y', 'bogus', '2026-10-01T00:00:00')")
+    web.conn.rollback()  # the refused INSERT left a transaction open
+    WebStore(path)  # opening it again changes nothing

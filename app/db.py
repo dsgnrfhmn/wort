@@ -7,6 +7,7 @@ Every per-user query takes a user_id and filters on it.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -15,8 +16,9 @@ from pathlib import Path
 from app import scoring
 from wort import sanitize
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 ATTEMPT_DETAILS = ("task", "expected", "corrected", "rule")
+PHRASE = "phrase"  # user_words.pos of a phrase or sentence added from a text: no dictionary entry, not practised (yet)
 MAX_DETAIL = 300
 
 SCHEMA = """
@@ -66,7 +68,7 @@ CREATE TABLE IF NOT EXISTS user_words (
     status TEXT NOT NULL DEFAULT 'learning' CHECK (status IN ('learning', 'known')),
     translation INTEGER, form INTEGER, usage INTEGER,
     streak INTEGER NOT NULL DEFAULT 0,
-    added_from TEXT NOT NULL DEFAULT 'lookup' CHECK (added_from IN ('lookup', 'cli', 'practice')),
+    added_from TEXT NOT NULL DEFAULT 'lookup' CHECK (added_from IN ('lookup', 'cli', 'practice', 'text')),
     own_translation TEXT NOT NULL DEFAULT '',
     added_at TEXT NOT NULL,
     last_seen TEXT,
@@ -183,6 +185,10 @@ class UserWord:
     def score(self) -> int | None:
         return scoring.word_score(self.state)
 
+    @property
+    def is_phrase(self) -> bool:
+        return self.pos == PHRASE
+
 
 def _ts(value: datetime) -> str:
     return value.isoformat(timespec="seconds")
@@ -230,6 +236,32 @@ class WebStore:
         if "ui_lang" not in cols:
             self.conn.execute("ALTER TABLE users ADD COLUMN ui_lang TEXT NOT NULL DEFAULT 'en'")
 
+    def _migrate_v6(self) -> None:
+        """v6 -> v7: user_words.added_from may be 'text' (a word or a phrase added while reading a text).
+
+        SQLite cannot change a CHECK, so the table is rebuilt the documented way (new table, copy, drop, rename) with
+        foreign keys off meanwhile, so the attempts of every word survive. The new DDL is the one in SCHEMA."""
+        row = self.conn.execute("SELECT sql FROM sqlite_master WHERE name = 'user_words'").fetchone()
+        if not row or "'text'" in row["sql"]:
+            return
+        ddl = re.search(r"CREATE TABLE IF NOT EXISTS user_words \(.*?\n\);", SCHEMA, re.S).group(0)
+        ddl = ddl.replace("IF NOT EXISTS user_words", "user_words_v7", 1)
+        cols = ", ".join(r["name"] for r in self.conn.execute("PRAGMA table_info(user_words)"))
+        self.conn.commit()
+        self.conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            self.conn.executescript(
+                f"BEGIN; {ddl} INSERT INTO user_words_v7 ({cols}) SELECT {cols} FROM user_words; "
+                "DROP TABLE user_words; ALTER TABLE user_words_v7 RENAME TO user_words; COMMIT;"
+            )
+        except sqlite3.Error:
+            self.conn.rollback()
+            raise
+        finally:
+            self.conn.execute("PRAGMA foreign_keys = ON")
+        if self.conn.execute("PRAGMA foreign_key_check").fetchall():
+            raise sqlite3.IntegrityError("user_words rebuild left dangling references")
+
     def _migrate(self) -> None:
         version = self.conn.execute("PRAGMA user_version").fetchone()[0]
         legacy = version == 0 and self.conn.execute(
@@ -246,6 +278,8 @@ class WebStore:
             self._migrate_v4()
         if 0 < version < 6:
             self._migrate_v5()
+        if 0 < version < 7:
+            self._migrate_v6()
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 

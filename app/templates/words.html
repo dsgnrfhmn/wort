@@ -141,14 +141,15 @@
     {% with label=_('Score'), sortable=true, sort_dir=(dir if sort == 'score' else 'none') %}{% include "components/table-header-cell/template.html" %}{% endwith %}
     {% for r in rows %}
     {% set href = '/words/' ~ r.id ~ '?' ~ list_params ~ '#detail' %}
+    {# A phrase (added from a text) has no checkbox: Üben has no exercise for it yet. #}
     {% set cells = [
-      {'type': 'checkbox-cell'},
+      {'type': 'checkbox-cell'} if not r.word.is_phrase else {'type': 'text-passive-cell', 'content': ''},
       {'type': 'link', 'content': r.label, 'href': href, 'article': r.article, 'plain': true},
       {'type': 'text-active-cell', 'content': r.translation}
     ] %}
     {% set _x = cells.append({'type': 'date', 'content': german_date(r.word.added_at)}) %}
     {% set _x = cells.append({'type': 'tag', 'content': (r.word.score | string) if r.word.score is not none else '–', 'tag_type': r.score_type, 'tag_subtype': 'passive'}) %}
-    {% with selected=(r.id in selected), href=href, extra_attrs='data-word-id="' ~ r.id ~ '" data-context-menu="wort-word-menu"' ~ (' aria-current="true"' if detail and detail.v.id == r.id else ''), cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
+    {% with selected=(r.id in selected), href=href, extra_attrs='data-word-id="' ~ r.id ~ '" data-context-menu="wort-word-menu"' ~ (' data-phrase' if r.word.is_phrase else '') ~ (' aria-current="true"' if detail and detail.v.id == r.id else ''), cells=cells %}{% include "components/table-row/template.html" %}{% endwith %}
     {% endfor %}
   </div>
   {% if total > rows | length %}

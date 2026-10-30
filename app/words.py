@@ -16,7 +16,7 @@ from wort.dictionary.ukrainian import Ukrainian
 
 from wort import sanitize
 
-from app.db import User, UserWord, WebStore
+from app.db import PHRASE, User, UserWord, WebStore
 from app import i18n
 from app.i18n import t
 from app.scoring import level
@@ -25,7 +25,7 @@ PAGE = 20
 MAX_LIMIT = 1000
 MAX_OWN = 200
 SORTS = ("added", "word", "score")
-POS_LABEL = {"noun": "Nomen", "verb": "Verb", "adj": "Adjektiv", "adv": "Adverb"}
+POS_LABEL = {"noun": "Nomen", "verb": "Verb", "adj": "Adjektiv", "adv": "Adverb", PHRASE: "Phrase"}
 SCORE_TAG = {"new": "neutral", "weak": "danger", "medium": "warning", "strong": "success"}
 GENDER_LABEL = {"m": "maskulin", "f": "feminin", "n": "neutral"}
 MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
@@ -190,6 +190,7 @@ def order(words: list[UserWord], sort: str, desc: bool) -> list[UserWord]:
 
 
 def preset_ids(words: list[UserWord], preset: str) -> set[int]:
+    words = [w for w in words if not w.is_phrase]  # a phrase cannot be practised yet
     if preset == "weakest":
         return {w.id for w in order(words, "score", False)[:10]}
     if preset == "latest":

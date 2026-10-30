@@ -11,6 +11,18 @@ body { margin: 0; background-color: var(--ds-color-bg-surface); }
   --ds-color-input-border-focus: var(--ds-color-text-active);
 }
 
+/* TEMPORARY local exception to "no colors in this repo" (maintainer request 2026-10-30, as in job-agent's dashboard):
+   scrollbars show only while something scrolls, in the theme's own tone. The thumb is transparent at rest; app.js puts
+   .is-scrolling on whatever is being scrolled (the page, a table, a pane, a text field) for a moment. color-scheme makes the
+   browser's own scrollbar parts follow the theme; the thumb is an existing token. The space stays reserved, so
+   nothing shifts when the thumb appears. dis-system's pane hides its scrollbar and leaves "the page-level scroll
+   indicator style" to the host, so panes and the sidebar get the same thin one. Move into dis-system (or drop) once decided. */
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+* { scrollbar-color: transparent transparent; }
+.ds-pane__scroll, .ds-sidebar-list { scrollbar-width: thin; }
+.is-scrolling { scrollbar-color: var(--ds-color-object-dark-passive) transparent; }
+
 /* Header: the nav bar and the toolbar row under it stay at the top together. --wort-head-h is their height (app.js
    measures it; the fallback is one nav row plus the toolbar); sticky panes and jump targets stop below it. */
 :root { --wort-head-h: calc(var(--ds-spacing-9) * 3); }
@@ -128,6 +140,40 @@ body[data-view="session"] .wort-main { padding: 0; }
    the answer box and "Senden" sit on one line, the button at the right. */
 .wort-composer { position: sticky; bottom: 0; z-index: 1; margin: auto calc(-1 * var(--ds-spacing-5)) 0; padding: var(--ds-spacing-6); background-color: var(--ds-color-bg-surface); border-top: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
 .wort-composer .wort-answer { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+
+/* Texte: dis-system's split row (sidebar | text | notes) as high as the window below the header, each pane scrolling by
+   itself; the notes column is 420px. Stacked on a narrow window. */
+body[data-view="texts"] .wort-main { padding: 0; }
+.wort-texts { height: calc(100vh - var(--wort-head-h)); }
+.wort-texts__side { display: flex; position: relative; z-index: 2; border-right: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-texts__side > .ds-sidebar-list { height: 100%; }
+.wort-texts__reader, .wort-texts__notes { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.wort-texts__reader { flex: 1 1 0; }
+.wort-texts__notes { flex: 0 0 calc(var(--ds-spacing-9) * 10.5); border-left: var(--ds-border-width-thin) solid var(--ds-color-object-dark-passive); }
+.wort-texts__reader > .ds-pane, .wort-texts__notes > .ds-pane { flex: 1 1 0; }
+.wort-texts__empty { flex: 1 1 auto; display: grid; place-content: center; justify-items: center; gap: var(--ds-spacing-5); text-align: center; padding: var(--ds-spacing-7) var(--ds-spacing-6); }
+.wort-texts__empty .ds-empty-state { max-width: calc(var(--ds-spacing-9) * 10.5); }
+.wort-texts__empty .wort-row { justify-content: center; }
+.wort-text { display: grid; align-content: start; gap: var(--ds-spacing-6); padding: var(--ds-spacing-7) var(--ds-spacing-6) var(--ds-spacing-9); }
+.wort-text__photo { display: grid; justify-items: start; gap: var(--ds-spacing-3); }
+.wort-text__original { width: calc(var(--ds-spacing-9) * 8.5); max-width: 100%; }
+.wort-text__original[hidden] { display: none; }
+.wort-text__body { display: grid; gap: var(--ds-spacing-5); max-width: calc(var(--ds-spacing-9) * 19); }
+.wort-text__body p { margin: 0; }
+.wort-note[tabindex] { outline-offset: calc(-1 * var(--ds-spacing-1)); }
+/* The upload and check popups: a stack of rows; the check step has the photo at the left, the text at the right. */
+.wort-upload, .wort-check { display: grid; gap: var(--ds-spacing-5); }
+.wort-upload { gap: var(--ds-spacing-6); }
+.wort-check__status { justify-content: space-between; }
+.wort-check__cols { display: grid; grid-template-columns: minmax(0, calc(var(--ds-spacing-9) * 8.5)) minmax(0, 1fr); gap: var(--ds-spacing-7); align-items: start; }
+.wort-check__photo, .wort-check__text { display: grid; gap: var(--ds-spacing-3); min-width: 0; }
+.wort-check__text p, .wort-upload p { margin: 0; }
+@media (max-width: 720px) {
+  .wort-texts { flex-direction: column; height: auto; }
+  .wort-texts__side { border-right: 0; }
+  .wort-texts__notes { flex: none; border-left: 0; }
+  .wort-check__cols { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* Full-bleed pages (Wörter list): regions run edge to edge like the design canvas. */
 body[data-layout="full"] .wort-main { max-width: none; padding: 0; gap: 0; }

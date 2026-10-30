@@ -1,9 +1,148 @@
 {% extends "base.html" %}
-{% block title %}{{ _('Texts') }} · wort{% endblock %}
+{% block title %}{{ current.title if current else _('Texts') }} · wort{% endblock %}
+{% block body_attrs %} data-layout="wide" data-view="texts"{% endblock %}
+
+{# Texte (design canvas wort/design, boards "Texte 1-5"), UI stage with mock data (app/texts.py). Three columns: the saved
+   texts (dis-system sidebar-list), the open text with words the reader can look up (word-token), and the notes made
+   while reading (note-item). "Foto hochladen" and "Text prüfen" are popups over the page: the page behind them is the
+   same page, opened by app.js on load (the [data-autoopen] button) when the URL asks for it. Buttons that need the
+   real pipeline carry [data-demo]: app.js answers them with a message instead of doing nothing. A click on a word,
+   "Add to list" on a note and a selection put things into the user's word list (app/texts.py, app.js). #}
+
+{# The upload popup (board "Texte 2"). The dropzone's file input has no name on purpose: in this stage no photo is sent. #}
+{% macro upload_popup(popup) %}
+  {% set body_html %}
+  <form class="wort-upload" id="wort-upload-form" method="post" action="/texte/neu">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% with steps=[_('Photo'), _('Check text'), _('Done')], current=1, label=_('Steps') %}{% include "components/stepper/template.html" %}{% endwith %}
+    {% with id='wort-upload-file', name='', accept='image/jpeg,image/png,image/heic', prompt=_('Drop a photo here or'), choose_label=_('choose a file'), hint=_('JPG, PNG or HEIC · up to 20 MB · one photo per text'), remove_label=_('Remove') %}{% include "components/dropzone/template.html" %}{% endwith %}
+    {% with type='text', name='title', label=_('Title'), fill='filled', placeholder=_('Title, e.g. Letter from the Jobcenter'), autocomplete='off' %}{% include "components/input/template.html" %}{% endwith %}
+    <p>{{ _('The photo stays on your server. Text recognition runs locally.') }}</p>
+  </form>
+  {% endset %}
+  {% set cancel = {'label': _('Cancel'), 'href': '/texte'} if popup == 'upload' else {'label': _('Cancel')} %}
+  {% with popup_id='wort-texts-upload', size='medium', title=_('Upload photo'), closable=true, body_html=body_html,
+          bottom_actions=[cancel, {'label': _('Recognize text'), 'priority': 'primary', 'form': 'wort-upload-form', 'confirm': true}] %}{% include "components/popup/template.html" %}{% endwith %}
+{% endmacro %}
+
+{# The check popup (board "Texte 3"): the photo with the places recognition was unsure of, the text to correct, and one row
+   per uncertain place. Also what "Text bearbeiten" opens, with the open text and no photo marks. #}
+{% macro check_popup() %}
+  {% set body_html %}
+  <form class="wort-check" id="wort-check-form" method="post" action="/texte/neu/speichern">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if not editing %}
+    <div class="wort-row wort-check__status">
+      {% with steps=[_('Photo'), _('Check text'), _('Done')], current=2, label=_('Steps') %}{% include "components/stepper/template.html" %}{% endwith %}
+      <span class="wort-row">
+        {% with type='neutral', subtype='passive', label=_('Recognized · {p} % · {n} words', p=recognized, n=word_count) %}{% include "components/tag/template.html" %}{% endwith %}
+        {% if doubts %}{% with type='warning', subtype='passive', label=_('1 uncertain spot') if doubts | length == 1 else _('{n} uncertain spots', n=doubts | length) %}{% include "components/tag/template.html" %}{% endwith %}{% endif %}
+      </span>
+    </div>
+    {% with value=100, label=_('Text recognition') %}{% include "components/progress-bar/template.html" %}{% endwith %}
+    {% endif %}
+    <div class="wort-check__cols">
+      <div class="wort-check__photo">
+        {% with label=_('Photo of the text'), regions=regions %}{% include "components/image-regions/template.html" %}{% endwith %}
+        <div class="wort-row">
+          {% for name in (_('Select area'), _('Rotate'), _('Recognize again')) %}
+          {% with priority='secondary', underline='dotted', label=name, extra_attrs='data-demo' %}{% include "components/text-button/template.html" %}{% endwith %}
+          {% endfor %}
+        </div>
+      </div>
+      <div class="wort-check__text">
+        {% with type='textarea', name='text', label=_('Recognized text, editable'), rows=12, fill='filled', required=true, value=recognized_text %}{% include "components/input/template.html" %}{% endwith %}
+        <p>{{ _('Fix mistakes, delete needless lines such as the address or footer, or add what is missing.') }}</p>
+        {% if doubts %}
+        <section class="wort-check__doubts" aria-label="{{ _('Uncertain spots') }}">
+          {% with type='title-info', title=_('Uncertain spots'), info='' %}{% include "components/table-header/template.html" %}{% endwith %}
+          {% for d in doubts %}
+          {% with found=d.found, proposal=d.proposal, state=d.state, meta=_('Line {n} · {p} % sure', n=d.line, p=d.sure) if d.sure else _('Line {n}', n=d.line),
+                  ignore_label=_('Ignore'), accept_label=_('Accept'), accepted_label=_('accepted'), ignored_label=_('ignored'),
+                  extra_attrs='data-demo', ignore_extra_attrs='data-demo' %}{% include "components/correction-row/template.html" %}{% endwith %}
+          {% endfor %}
+        </section>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+  {% endset %}
+  {% set back = {'label': _('Cancel'), 'href': '/texte/' ~ current.id} if editing else {'label': _('Back'), 'href': '/texte/neu'} %}
+  {% with popup_id='wort-texts-check', size='large', backdrop='static', title=(_('Edit text — {title}', title=new_title) if editing else _('Check text — {title}', title=new_title)),
+          closable=true, body_html=body_html,
+          bottom_actions=[back, {'label': _('Save text'), 'priority': 'primary', 'form': 'wort-check-form', 'confirm': true}] %}{% include "components/popup/template.html" %}{% endwith %}
+{% endmacro %}
+
 {% block content %}
-<section class="wort-section">
-  {% with type='title-info', title=_('Texts'), info=_('not available yet') %}{% include "components/table-header/template.html" %}{% endwith %}
-  {% with message=_('Text from a photo (OCR) and word tooltips come later. Photos are never sent to an API for this.') %}{% include "components/empty-state/template.html" %}{% endwith %}
-  {% with priority='secondary', underline='solid', label=_('To the words'), href='/' %}{% include "components/text-button/template.html" %}{% endwith %}
-</section>
+<div class="ds-split wort-texts"{% if current %} data-text-id="{{ current.id }}"{% endif %}>
+  <div class="wort-texts__side">
+    {% with title=_('Texts'), label=_('Saved texts'), items=side_items, create=_('Upload photo') %}{% include "components/sidebar-list/template.html" %}{% endwith %}
+  </div>
+
+  <div class="wort-texts__reader">
+  {% if current %}
+    {% set body_html %}
+    <div class="wort-text">
+      {# The photo behind the text, closed until "Show original": the page placeholder of image-regions is a 440px portrait page, not a thumbnail. #}
+      <div class="wort-text__photo" data-original>
+        {% with priority='secondary', underline='dotted', label=_('Show original'), extra_attrs='data-original-toggle' %}{% include "components/text-button/template.html" %}{% endwith %}
+        <div class="wort-text__original" data-original-view hidden>
+          {% with label=_('Photo of the text'), regions=[] %}{% include "components/image-regions/template.html" %}{% endwith %}
+        </div>
+      </div>
+      <div class="wort-text__body">
+        {# Every word of the text is a word-token (app/texts.py: expand, reading), as a span (interactive=false): the text of a
+           <button> cannot be selected with the mouse, and selecting is how a phrase is added. app.js handles the click and the
+           Enter key. trim: the component ends with a line break, which would show as a space before the punctuation. #}
+        {% for paragraph in paragraphs %}
+        <p>{% for seg in paragraph %}{% if not seg.word %}{{ seg.text }}{% else %}{% filter trim %}{% with id='w-' ~ seg.ref, text=seg.text, state=seg.state, interactive=false,
+              card=({'kicker': seg.card.kicker, 'title': seg.card.title, 'gloss': seg.card.gloss, 'note': seg.card.note, 'hint': _('Click: add to word list')} if seg.card else none),
+              extra_attrs='role="button" data-ref="' ~ seg.ref ~ '"' %}{% include "components/word-token/template.html" %}{% endwith %}{% endfilter %}{% endif %}{% endfor %}</p>
+        {% endfor %}
+      </div>
+      {% with mode='legend', legend=[{'state': 'noted', 'sample': _('Word'), 'label': _('in notes')}, {'state': 'known', 'sample': _('Word'), 'label': _('already in the word list')}], legend_hint=_('Hover: translation · Click: add word · Select text: translation, add to list') %}{% include "components/word-token/template.html" %}{% endwith %}
+    </div>
+    {% endset %}
+    {% with id='wort-text', title=current.title, emphasis=true, caption=_('{date} · recognized {p} %', date=long_date(current.day), p=current.recognized),
+            action=_('Edit text'), action_href='/texte/' ~ current.id ~ '/bearbeiten' %}{% include "components/pane/template.html" %}{% endwith %}
+  {% else %}
+    {% set body_html %}
+    <div class="wort-texts__empty">
+      {% with icon='add', message=_('Choose a saved text on the left or upload a photo of a letter, a page or a sign. The text is recognized, every word can be looked up.') %}{% include "components/empty-state/template.html" %}{% endwith %}
+      <div class="wort-row">
+        {% with priority='secondary', underline='dotted', label=_('Paste text'), extra_attrs='data-demo' %}{% include "components/text-button/template.html" %}{% endwith %}
+        {% with priority='primary', underline='dotted', label=_('Upload photo'), extra_attrs='data-popup-open="wort-texts-upload"' %}{% include "components/text-button/template.html" %}{% endwith %}
+      </div>
+    </div>
+    {% endset %}
+    {% with id='wort-text', title=_('No text selected'), caption='', no_action=true %}{% include "components/pane/template.html" %}{% endwith %}
+  {% endif %}
+  </div>
+
+  {% if current %}
+  <div class="wort-texts__notes">
+    {% set body_html %}
+    {% for n in current.notes %}
+    <div class="wort-note" data-note-index="{{ loop.index0 }}" tabindex="-1">
+      {% with label=n.label, article=n.article, translation=n.translation, form=n.form, in_list=(loop.index0 in known_notes), in_list_label=_('in list'), add_label=_('Add to list'), extra_attrs='data-add-note="' ~ loop.index0 ~ '"' %}{% include "components/note-item/template.html" %}{% endwith %}
+    </div>
+    {% endfor %}
+    <div class="ds-table-footer">
+      {% with priority='secondary', underline='dotted', label=_('All to the word list'), extra_attrs='data-add-all' %}{% include "components/text-button/template.html" %}{% endwith %}
+    </div>
+    {% endset %}
+    {% with id='wort-notes', title=_('Notes'), caption=_('{n} total', n=current.notes | length), action=_('Practice'), action_href='/ueben' %}{% include "components/pane/template.html" %}{% endwith %}
+  </div>
+  {% endif %}
+</div>
+
+{% if current %}
+{# Selecting text in the open text opens this menu at the pointer (app.js): the translation of the selection (the first row,
+   filled by app.js) and "Add to word list". The token is read by app.js for its posts; the form is never submitted. #}
+{% with id='wort-selection-menu', label=_('Selected text'), items=[{'note': _('Translating …'), 'id': 'wort-selection-translation'}, {'divider': true}, {'value': 'add-selection', 'label': _('Add to word list')}] %}{% include "components/context-menu/template.html" %}{% endwith %}
+<form id="wort-text-form" hidden><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+{% endif %}
+{{ upload_popup(popup) }}
+{% if popup == 'check' %}{{ check_popup() }}{% endif %}
+{% if popup %}<button type="button" hidden data-popup-open="wort-texts-{{ popup }}" data-autoopen data-close-href="{{ ('/texte/' ~ current.id) if current else '/texte' }}"></button>{% endif %}
 {% endblock %}

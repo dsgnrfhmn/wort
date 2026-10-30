@@ -334,7 +334,7 @@ def register(app, ctx) -> None:
         modus = modus if modus in TABS else "saetze"
         progress = store.grammar_progress(user.id)
         return ctx.render(request, "practice_start.html", user=user, page="practice", modus=modus, kinds=KINDS,
-                          tabs=TABS, count=len(store.words(user.id)), thema=questions.topic_or_all(thema),
+                          tabs=TABS, count=sum(1 for w in store.words(user.id) if not w.is_phrase), thema=questions.topic_or_all(thema),
                           themen=questions.LABELS, batch=batch_of(user, store.latest_practice(user.id, WORD_KINDS)),
                           resume=store.latest_practice(user.id, MODES[modus], open_only=True),
                           ueben_tabs=mode_tabs(user, modus),
@@ -399,11 +399,15 @@ def register(app, ctx) -> None:
             return ctx.redirect("/ueben?neu=1&modus=abfrage", t("“Explain in German” needs the AI; it is off."))
         if preset == "weakest":
             from app.words import order
-            chosen = order(store.words(user.id), "score", False)[:5]
+            chosen = order([w for w in store.words(user.id) if not w.is_phrase], "score", False)[:5]
         else:
             if not ids or len(ids) > 200:
                 raise HTTPException(400, "select between 1 and 200 words")
             chosen = store.words_by_ids(user.id, ids)  # other users' ids are dropped here
+        phrases = [w for w in chosen if w.is_phrase]  # added from a text: there is no exercise for them yet
+        chosen = [w for w in chosen if not w.is_phrase]
+        if phrases and not chosen:
+            return ctx.redirect("/", t("Phrases cannot be practised yet."))
         dic = dictionary()
         pairs = [(w, e) for w in chosen if (e := dic.find_lemma(w.lemma, w.pos or None))]
         items = build_items(kind, pairs, random.Random(), ai_answers=ai.uses("answer"),
@@ -417,7 +421,10 @@ def register(app, ctx) -> None:
         if not items:
             return ctx.redirect("/", t("There are no exercises for these words."))
         close_open(user, MODES[kind])
-        return RedirectResponse(f"/ueben/s/{store.create_practice(user.id, kind, items)}", status_code=303)
+        url = f"/ueben/s/{store.create_practice(user.id, kind, items)}"
+        if phrases:
+            return ctx.redirect(url, t("Phrases are skipped: there is no exercise for them yet."))
+        return RedirectResponse(url, status_code=303)
 
     @app.get("/ueben/s/{sid}", response_class=HTMLResponse)
     def show(request: Request, sid: int, fehler: str = "", nochmal: str = "", a: int = -1, w: int = 0,

@@ -16,6 +16,20 @@ document.addEventListener('ds-dropdown-select', (e) => {
   form.submit();
 });
 
+/* Scrollbars show only while something scrolls (layout.css keeps the thumbs transparent): whatever is being scrolled,
+   the page or any inner scroll container, gets .is-scrolling until it has been still for 800 ms. One capturing listener:
+   scroll events do not bubble, but every one passes the document in the capture phase. */
+(() => {
+  const timers = new WeakMap();
+  document.addEventListener('scroll', (e) => {
+    const el = e.target === document ? document.documentElement : e.target;
+    if (!(el instanceof Element)) return;
+    el.classList.add('is-scrolling');
+    clearTimeout(timers.get(el));
+    timers.set(el, setTimeout(() => el.classList.remove('is-scrolling'), 800));
+  }, { capture: true, passive: true });
+})();
+
 /* Theme switch glue for dis-system's nav-bar: remembers the theme (same key as dis-system's site). The stored
    theme is already applied by theme-init.js in <head>, before the first paint. */
 (() => {
@@ -51,7 +65,7 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('DOMContentLoaded', () => {
   const table = document.querySelector('[data-word-table]');
   if (!table) return;
-  const selectedRows = () => Array.from(table.querySelectorAll('.ds-table-row[data-selected="true"][data-word-id]'));
+  const selectedRows = () => Array.from(table.querySelectorAll('.ds-table-row[data-selected="true"][data-word-id]:not([data-phrase])'));
   const gated = () => Array.from(document.querySelectorAll('[data-needs-selection]'));
 
   const syncButtons = () => {
@@ -62,7 +76,19 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   };
   // Nothing is selected on load; only a preset from the server ("10 schwächste", "Letzte 20") pre-selects rows.
-  document.addEventListener('ds-table-row-select', syncButtons);
+  // A phrase row has no checkbox and is never selected (Üben has no exercise for it); "select all" skips it, and the
+  // header checkbox counts only the rows that can be selected, so a second click still clears them.
+  const header = table.querySelector('.ds-table-cell[data-checkbox-role="select-all"]');
+  const afterSelect = () => {
+    table.querySelectorAll('.ds-table-row[data-phrase][data-selected="true"]').forEach((r) => r.setAttribute('data-selected', 'false'));
+    if (header && table.querySelector('.ds-table-row[data-phrase]')) {
+      const rows = Array.from(table.querySelectorAll('.ds-table-row[data-word-id]:not([data-phrase])'));
+      const on = rows.filter((r) => r.getAttribute('data-selected') === 'true').length;
+      header.setAttribute('data-state', rows.length && on === rows.length ? 'checked' : on ? 'indeterminate' : 'unchecked');
+    }
+    syncButtons();
+  };
+  document.addEventListener('ds-table-row-select', afterSelect);
   syncButtons();
 
   document.querySelector('[data-clear-selection]')?.addEventListener('click', () => {
@@ -798,5 +824,132 @@ document.addEventListener('click', (e) => {
     if (!mine) return;
     mine.dataset.shown = button.dataset.answerToggle;
     mine.querySelector(`[data-answer-toggle]:not([data-answer-toggle="${mine.dataset.shown}"])`)?.focus({ preventScroll: true });
+  });
+})();
+
+/* Texte (UI stage, mock texts): a popup the URL asks for opens on load and closing it goes back to the page behind; the
+   sidebar's "Upload photo" opens the upload popup; "Show original" opens the photo; buttons that need the real pipeline
+   ([data-demo]) say so instead of doing nothing. What is real is the way into the word list: a click on any word and
+   "Add to list" / "All to the word list" on the notes post a place in the text; selecting text opens dis-system's
+   context menu at the pointer with its translation and "Add to word list" (a single word is added as a word, longer
+   text as a phrase) and posts the selected text. The server decides what is added and answers with a message and what
+   is in the list now. */
+(() => {
+  const root = document.querySelector('.wort-texts');
+  if (!root) return;
+  const toast = (message, status = 'default') => { if (window.dsToast) window.dsToast.show({ message, status }); };
+
+  const auto = document.querySelector('[data-autoopen]');
+  if (auto) {
+    const back = auto.dataset.closeHref;
+    document.getElementById(auto.dataset.popupOpen)?.addEventListener('ds-popup-before-close', () => {
+      if (back && back.startsWith('/texte')) window.location.assign(back);
+    });
+    auto.click();
+  }
+  document.querySelector('.wort-texts__side .ds-sidebar-item[data-role="create"] button')?.setAttribute('data-popup-open', 'wort-texts-upload');
+
+  const textId = root.dataset.textId;
+  const csrf = document.querySelector('#wort-text-form input[name="csrf"]')?.value;
+  async function post(path, fields, quiet = false) {
+    if (!textId || !csrf) return null;
+    try {
+      const res = await fetch(`/texte/${textId}/${path}`, { method: 'POST', credentials: 'same-origin',
+        headers: { Accept: 'application/json' }, body: new URLSearchParams({ csrf, ...fields }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return data;
+      if (!quiet) toast(res.status === 400 && typeof data.detail === 'string' ? data.detail : wortText('add_failed'), 'error');
+    } catch (err) { if (!quiet) toast(wortText('add_failed'), 'error'); }
+    return null;
+  }
+  // What the server says is in the word list now: its words get the dotted underline, its notes the "in list" tag.
+  function showKnown(data) {
+    (data.refs || []).forEach((ref) => root.querySelector(`.ds-word-token[data-ref="${CSS.escape(ref)}"]`)?.setAttribute('data-state', 'known'));
+    (data.notes || []).forEach((i) => {
+      const add = root.querySelector(`.wort-note[data-note-index="${CSS.escape(String(i))}"] [data-add-note]`);
+      if (!add) return;
+      const tag = document.createElement('span');
+      tag.className = 'ds-tag';
+      tag.dataset.type = 'neutral';
+      tag.dataset.subtype = 'passive';
+      tag.textContent = wortText('in_list');
+      add.replaceWith(tag);
+    });
+  }
+  async function add(path, fields) {
+    const data = await post(path, fields);
+    if (!data) return;
+    toast(data.message);
+    showKnown(data);
+  }
+
+  const body = root.querySelector('.wort-text__body');
+  const menu = document.getElementById('wort-selection-menu');
+  const translation = document.getElementById('wort-selection-translation');
+  // The text the browser has selected inside the text (the hover cards inside it are not part of the text), as one line.
+  const selectedText = () => {
+    const sel = window.getSelection();
+    if (!body || !sel || sel.isCollapsed || !sel.rangeCount || !body.contains(sel.getRangeAt(0).commonAncestorContainer)) return '';
+    const copy = document.createElement('div');
+    copy.appendChild(sel.getRangeAt(0).cloneContents());
+    copy.querySelectorAll('.ds-word-token__card').forEach((card) => card.remove());
+    return copy.textContent.replace(/\s+/g, ' ').trim();
+  };
+
+  // A click on a word adds it, a moment later: a double click (which selects the word) or a drag that ends inside the
+  // same word is a selection, not a click, and the selection menu takes over. The words are spans (their text can be
+  // selected), so the click and the Enter / Space key are handled here, not by the component.
+  let clickTimer = 0;
+  body?.addEventListener('dblclick', () => clearTimeout(clickTimer));
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.ds-word-token[data-ref]')) {
+      e.preventDefault();
+      add('wort', { ref: e.target.dataset.ref });
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    const word = e.target.closest('.ds-word-token[data-ref]');
+    if (word) {
+      clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => { if (!selectedText()) add('wort', { ref: word.dataset.ref }); }, 250);
+      return;
+    }
+    const noteAdd = e.target.closest('[data-add-note]');
+    if (noteAdd) { add('wort', { note: noteAdd.dataset.addNote }); return; }
+    if (e.target.closest('[data-add-all]')) { add('wort', { note: 'all' }); return; }
+    if (e.target.closest('[data-demo]')) { e.preventDefault(); toast(wortText('demo_stub')); return; }
+    const toggle = e.target.closest('[data-original-toggle]');
+    const view = toggle && toggle.closest('[data-original]')?.querySelector('[data-original-view]');
+    if (view) { view.hidden = !view.hidden; toggle.textContent = wortText(view.hidden ? 'original_show' : 'original_hide'); }
+  });
+
+  // The selection menu: attached to the text for as long as something is selected in it (so everywhere else the
+  // browser's own menu stays), opened by the end of a mouse selection and by a right click on a selection. Its first row
+  // is the translation, asked for from the server; a late answer for an earlier selection is dropped.
+  let selection = '';
+  let asked = 0;
+  async function translate(text) {
+    const mine = ++asked;
+    translation.textContent = wortText('translating');
+    const data = await post('uebersetzung', { text }, true);
+    if (mine !== asked || menu.hidden) return;
+    translation.textContent = !data ? wortText('translate_failed') : data.lines.length ? data.lines.join('\n') : data.message;
+  }
+  body?.addEventListener('contextmenu', () => {
+    selection = selectedText();
+    if (!selection || !menu || !translation) { body.removeAttribute('data-context-menu'); return; }
+    body.setAttribute('data-context-menu', 'wort-selection-menu');
+    translate(selection);
+  });
+  body?.addEventListener('mouseup', (e) => {
+    if (e.button !== 0) return;
+    const { clientX, clientY } = e;
+    setTimeout(() => {
+      if (selectedText()) body.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX, clientY }));
+    }, 0);
+  });
+  document.addEventListener('ds-context-menu-select', (e) => {
+    if (e.detail && e.detail.host === body && e.detail.value === 'add-selection' && selection) add('auswahl', { text: selection });
   });
 })();

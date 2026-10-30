@@ -19,7 +19,7 @@ from wort.dictionary.lookup import Dictionary
 from wort.exercises import grammar_check
 from wort.exercises.sentence import targets
 
-from app import auth, ds, i18n, lexicon, practice, ui_terms, words
+from app import auth, ds, i18n, lexicon, practice, texts, ui_terms, words
 from app.ai import config as ai_config
 from app.ai import service as ai_service
 from types import SimpleNamespace
@@ -194,12 +194,9 @@ def create_app(
         redirect=redirect, facts=lexicon.summary, checker=check,
         ai=ai or ai_service.build(ai_config.load(), store),
     )
-    @app.get("/texte", response_class=HTMLResponse)
-    def texts(request: Request, user: User = Depends(current_user)):
-        return render(request, "texts.html", user=user, page="texts")
-
     words.register(app, shared)
     practice.register(app, shared)
+    texts.register(app, shared)
 
     @app.get("/history", response_class=HTMLResponse)
     def history(request: Request, limit: int = 100, user: User = Depends(current_user)):

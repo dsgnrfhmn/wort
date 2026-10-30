@@ -86,7 +86,7 @@
   {% endfor %}
   {# English / Ukrainian tooltips for the German labels: only with the German interface. #}
   {% if lang == 'de' %}<script type="application/json" id="wort-glossary">{{ ui_glossary | tojson }}</script>{% endif %}
-  <script type="application/json" id="wort-i18n">{{ {'lookup_failed': _('Lookup failed. Please try again.'), 'delete_named': _('“{word}” will be removed with its score and your answers. This cannot be undone.'), 'explain_more': _('Explain more'), 'hide_feedback': _('Hide explanation'), 'send_stalled': _('No answer from the server. Please send again.')} | tojson }}</script>
+  <script type="application/json" id="wort-i18n">{{ {'lookup_failed': _('Lookup failed. Please try again.'), 'delete_named': _('“{word}” will be removed with its score and your answers. This cannot be undone.'), 'explain_more': _('Explain more'), 'hide_feedback': _('Hide explanation'), 'send_stalled': _('No answer from the server. Please send again.'), 'demo_stub': _('Demo data: this is not connected yet.'), 'original_show': _('Show original'), 'original_hide': _('Hide original'), 'in_list': _('in list'), 'add_failed': _('Could not add it. Please try again.'), 'translating': _('Translating …'), 'translate_failed': _('The translation failed. Please try again.')} | tojson }}</script>
   <script src="/static/app.js"></script>
 </body>
 </html>
