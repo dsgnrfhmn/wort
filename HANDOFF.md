@@ -16,14 +16,16 @@ installed**. The CLI is offline except `wort sync`. The code is committed and pu
 compose (including `wort-lt`), and OCR has only seen generated pages, not real photos.**
 
 - Branch `wip/development` (new 2026-10-31): `wip/cli-development` + `wip/web-view` (incl. the 2026-10-23 state that was
-  PR #5) + `gui-improvements`, fast-forwarded; no merge conflicts. Local `wip/dev-testing` and `gui-improvements` sit at
-  `c2de5ae`, one commit before it, and are not pushed.
+  PR #5) + `gui-improvements`, fast-forwarded; no merge conflicts. PR #6 (`wip/development` → `wip/dev-testing`) was
+  merged on GitHub on 2026-10-31 at `0ef26c6`: `origin/wip/dev-testing` is `385c2f6`, with `.gitmodules` and the pin
+  `bc62167` (on GitHub). It lacks only `b9fcdc9` (re-pin to `c0ce165`, docs). Local `wip/dev-testing` (`c2de5ae`) is
+  2 commits behind it, `gui-improvements` is at `c2de5ae`.
 - Tests: `PYTHONPATH=.:src uv run pytest` → **577 passed, 1 skipped** (2026-10-31, dev venv; web deps `--group web`,
   photo tests `--group ocr`, AI tests `--group ai`, they skip otherwise). dis-system `python -m pytest tests`: 74 passed.
 - DB: schema v9 (`app/db.py`; was v3 on 2026-10-23).
 - dis-system: the submodule is `c0ce165` on **`dsgnrfhmn/uiux-dev`** (pushed 2026-10-31). A fresh
-  `git clone --recurse-submodules -b wip/development` fetched the earlier pin `bc62167`; repeat it once the commit with
-  the new pin is pushed. That branch is deliberately **not** merged into dis-system `main` (`2db2701`): it changes 52
+  `git clone --recurse-submodules -b wip/development` was run again after the push of `b9fcdc9` and fetched `c0ce165`
+  (2026-10-31). That branch is deliberately **not** merged into dis-system `main` (`2db2701`): it changes 52
   existing files and adds 3 (D00b). Its exception to dis-system's branch rules is in dis-system's own `CLAUDE.md`.
 - Rollback tags (pushed 2026-10-31): `gui/before-words-texts` (`f806b7c`), `gui/words-texts-refresh` (`985691d`).
 
@@ -81,8 +83,8 @@ compose (including `wort-lt`), and OCR has only seen generated pages, not real p
 6. UI: Practice, Words, Texte, History and Login were checked in a browser with demo data (1440 and 390 px, both themes,
    `GUI-REFRESH.org`). Left: keyboard and phone walkthroughs by a person, real photos (T-5), a screen-reader pass.
    `/favorites` and `/exercise/{lemma}` are untouched.
-7. GitHub state of `wip/web-view` and of wort PR #5: not checked from here (no network); `origin/wip/web-view` was
-   `f8d2fd4` when last fetched.
+7. wort PR #5 (`wip/web-view` into `wip/dev-testing`): not seen merged in `origin/wip/dev-testing`'s history; its
+   content reached `wip/dev-testing` through PR #6. `origin/wip/web-view` is still `f8d2fd4` (fetched 2026-10-31).
 
 ## Next steps (suggested order)
 
@@ -90,9 +92,9 @@ compose (including `wort-lt`), and OCR has only seen generated pages, not real p
 1. **Design-system rule.** Either update `CLAUDE.md` (own kit allowed, `ui.css` / `_ui.html` in the module list) or fold the
    kit back into dis-system component by component. The same section of `GUI-REFRESH.org` lists three smaller decisions
    (one explanation surface, `/favorites` + `/exercise` delete or restyle, global colour overrides in `ui.css`).
-2. **`origin/wip/dev-testing` (`19fc3da`).** It pins `6d58745`, which is on no dis-system branch, and has no `.gitmodules`
-   file at all, so a recursive clone fails. It is an ancestor of `wip/development`: fast-forward it there, or delete it.
-   `PLAN.md` still says "PRs into `wip/dev-testing`".
+2. **`wip/dev-testing` gets `b9fcdc9`.** The branch was broken until PR #6 (before it: pin `6d58745` on no dis-system
+   branch, no `.gitmodules`). It is fixed now (`385c2f6`), but it lacks the re-pin to `c0ce165` and the docs. Open a PR
+   `wip/development` → `wip/dev-testing` (as `PLAN.md` says: PRs into `wip/dev-testing`). Do not force-push it.
 3. **dis-system.** Keep working on `dsgnrfhmn/uiux-dev`. Before any PR into `main`: tests, existing demos with default props,
    both themes; merge commit, not squash; then re-pin wort and move the other services (D00b).
 4. On the server: key in `~/.config/wort/ai.env`, egress to `api.anthropic.com:443` only (DEPLOY §6), smoke test, then
@@ -125,9 +127,12 @@ Same as `README.md` ("Run it locally"):
 - dis-system rules: work on `dsgnrfhmn/<topic>` from `main`, PR only, `python -m pytest tests` before pushing;
   in a single-branch clone create the remote-tracking ref with `git fetch origin +refs/heads/<b>:refs/remotes/origin/<b>` or the stop hook complains.
 - **A submodule pin must be on GitHub before the wort commit that uses it is pushed**; otherwise `git submodule update`
-  fails for everyone else (happened to `origin/wip/dev-testing`, pin `6d58745`).
+  fails for everyone else (happened to `origin/wip/dev-testing` with pin `6d58745`; fixed by PR #6).
 - From the Claude sandbox `github.com` is unreachable: pushes are run by garv in the session with `!`. On 2026-10-31 the
   first push to each of dis-system and wort returned 403 and went through on retry; the cause was not found.
+- Without network a Claude session only knows the refs of the last fetch. Run `! git fetch origin` before saying anything
+  about GitHub state or planning a push: on 2026-10-31 a push to `wip/dev-testing` was rejected (`fetch first`) because PR #6
+  had moved it, and a plan built on the old `19fc3da` was wrong. Never force-push to fix that.
 - SDK facts checked, not assumed: Haiku 5.5 rejects `temperature`/`top_p`/prefill; SDK 2.x sends the key in the `Authorization` header.
 - A leftover implicit SQLite transaction once locked the DB for the admin script; `tests/test_web_store.py` guards it.
 - `cli.main()` installs the network guard process-wide; `tests/conftest.py` uninstalls it after each test.
