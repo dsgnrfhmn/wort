@@ -51,7 +51,10 @@ def _tokens(sentence: str) -> list[str]:
 
 
 def make(entry: Entry, rng: random.Random, checker: Checker = grammar_check.check) -> Exercise:
-    task, required = rng.choice(targets(entry))
+    options = targets(entry)
+    if not options:
+        raise ValueError(f"No sentence targets for {entry.lemma}")
+    task, required = rng.choice(options)
     expected = " … ".join(required)
 
     def check(answer: str) -> Result:
@@ -78,4 +81,4 @@ def make(entry: Entry, rng: random.Random, checker: Checker = grammar_check.chec
     return Exercise("sentence", entry, prompt, check, hint=gloss, slow=True)
 
 
-TYPE = ExerciseType("sentence", "Sentence", available=lambda e: bool(e.glosses), make=make, weight=0.7)
+TYPE = ExerciseType("sentence", "Sentence", available=lambda e: bool(e.glosses) and bool(targets(e)), make=make, weight=0.7)

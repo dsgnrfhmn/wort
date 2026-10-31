@@ -57,7 +57,10 @@ class PracticePane(Vertical):
         self.index = 0
         self.results = []
         if not self.session:
-            self._set_idle("No words to practice. Add words in the «Translate» tab.")
+            if kind == "sentence" and self.app.store.words():
+                self._set_idle("No sentence exercises available: these words have no suitable dictionary forms. Try another exercise type.")
+            else:
+                self._set_idle("No words to practice. Add words in the «Translate» tab.")
             return
         self._show_current()
 
