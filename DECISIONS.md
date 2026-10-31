@@ -268,12 +268,19 @@ Confirmed by maintainer (date)*.
   redesign finished; no force-push, rebase or delete while a wort pin is on it; `main` is merged into it (not
   rebased) at each bump; into `main` only by PR with a merge commit, not a squash (a squash orphans the pinned
   commits), then wort re-pins to `main`; the other services move to `main` only after that merge, each checked in
-  both themes. dis-system forbids names of consuming applications in anything pushed (checked for the four
-  commits: none; authors are noreply addresses). **Not verified yet:** that the changed components keep their old
-  output with default props. Run dis-system `tests` and the existing demos before any PR into `main`.
-- **dis-system commit in use (2026-10-30):** `bc62167` on branch `dsgnrfhmn/uiux-dev` (renamed 2026-10-31 from
-  `dsgnrfhmn/message-note`; **pushed 2026-10-31**, `origin/dsgnrfhmn/uiux-dev` = `bc62167`, together with the three
-  commits below it), on top of `8f1d0b4`. Commits the draft props that had been in the working tree since 2026-10-29/30: message `tail` /
+  both themes. The same rules are written into dis-system's own `CLAUDE.md` ("Exception: `dsgnrfhmn/uiux-dev`",
+  `6190a03`), which is the canonical copy. dis-system forbids names of consuming applications and of real people in
+  anything pushed. Checked for the four commits: no consumer names; authors are noreply addresses; the maintainer's
+  handle stood in six attributions (and once in a commit message), the six were replaced in `c0ce165`, the history
+  keeps the handle. **Not verified yet:** that the changed components keep their old output with default props. Run
+  dis-system `tests` and the existing demos before any PR into `main`.
+- **dis-system commit in use (2026-10-31):** `c0ce165` on `dsgnrfhmn/uiux-dev`, **pushed 2026-10-31**
+  (`origin/dsgnrfhmn/uiux-dev` = `c0ce165`), on top of `6190a03` and `bc62167`. Wording only, no component or token
+  change: `6190a03` records the long-lived exception in dis-system's `CLAUDE.md`; `c0ce165` replaces the handle in six
+  attributions with "the maintainer". `python -m pytest tests` there: 74 passed; against `main` (`2db2701`) still
+  52 changed and 3 added files.
+  Previous: `bc62167` (2026-10-30) on `dsgnrfhmn/uiux-dev` (renamed 2026-10-31 from `dsgnrfhmn/message-note`; pushed
+  2026-10-31 together with the three commits below it), on top of `8f1d0b4`. Commits the draft props that had been in the working tree since 2026-10-29/30: message `tail` /
   `note_tone` / `inverted`, nav-bar `workspace_items` / `workspace_name`, page-head `title_href` / `current`, popup
   `body_html` and link/form actions, context-menu `note` rows, sidebar-list `caption` / `muted`. The pages built on
   them rendered from the uncommitted tree until now. `python -m pytest tests` there: 74 passed. Same rule as below:

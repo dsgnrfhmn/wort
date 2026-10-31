@@ -82,8 +82,10 @@ explanations.
   `DECISIONS.md` D00b); record the commit hash in `DECISIONS.md` at every bump.
 - `dsgnrfhmn/uiux-dev` is never force-pushed, rebased or deleted while a pin
   of wort is on it; `main` is merged *into* it, never the reverse, until the
-  maintainer calls the redesign finished. Nothing pushed there may name a
-  consuming application (dis-system rule).
+  maintainer calls the redesign finished. The full rules are dis-system's own
+  ("Exception: `dsgnrfhmn/uiux-dev`" in its `CLAUDE.md`, the canonical copy).
+  Nothing pushed there may name a consuming application or a real person.
+  A pin must be on GitHub before the wort commit that uses it is pushed.
 - App-local CSS may contain **layout only** (grid, page regions, spacing via
   dis-system tokens). No new colors, type styles, or component styles in
   this repo.

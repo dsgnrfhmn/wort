@@ -1,31 +1,46 @@
-# Handoff — where we stopped (2026-10-23)
+# Handoff — where we stopped (2026-10-31)
 
 Read this first next time. It says what exists, what is verified, what is not, and what to do next.
-Standing rules are in `CLAUDE.md`, decisions in `DECISIONS.md`, the ordered plan in `PLAN.md`.
+Standing rules are in `CLAUDE.md`, decisions in `DECISIONS.md`, the ordered plan in `PLAN.md`, the page-by-page UI
+review in `GUI-REFRESH.org`.
 
 ## State in one paragraph
 
-The web app (`app/`) works locally: login, per-user word list with scores, word detail, lookup on the Wörter page,
-practice (Sätze bilden, Abfrage, Regel üben), history, hover translations for any German word, Texte placeholder.
-The AI layer is complete and **off by default**. The CLI is offline except `wort sync`. Everything is committed on
-`wip/web-view` (2026-10-23). **Nothing has run against the live Anthropic API, the OS-level CLI network rule, nginx or
-compose.**
+The web app (`app/`) works locally: login, per-user word list with scores, word detail with marked mistakes, lookup,
+hover translations for any German word, practice in three tabs (Sätze bilden, Abfrage, Grammatik; one task at a time,
+retries, topic questions), history/import, **Texte** (reading texts with word and selection menus; photo → Tesseract →
+offline translation preview → saved texts with notes), and an English interface with a German switch. LanguageTool
+starts with the dev server and is a service in the compose stack. The AI layer is complete and **off until a key is
+installed**. The CLI is offline except `wort sync`. The code is committed and pushed on `wip/development`
+(`0ef26c6`, 2026-10-31); this handoff is a later edit. **Nothing has run against the live Anthropic API, the OS-level CLI network rule, nginx or
+compose (including `wort-lt`), and OCR has only seen generated pages, not real photos.**
 
-- Branch `wip/web-view`, PR **#5** into `wip/dev-testing`.
-- 419 tests pass: `PYTHONPATH=.:src uv run pytest` (web deps: `uv sync --group web`; AI tests need `--group ai`, they skip otherwise).
-- dis-system: the submodule points at `cb13772` on branch `dsgnrfhmn/reading-upload-components` (pushed, PR to its
-  `main` pending). Bump it to the merge commit after the merge, and do not delete that branch before (D00b).
+- Branch `wip/development` (new 2026-10-31): `wip/cli-development` + `wip/web-view` (incl. the 2026-10-23 state that was
+  PR #5) + `gui-improvements`, fast-forwarded; no merge conflicts. PR #6 (`wip/development` → `wip/dev-testing`) was
+  merged on GitHub on 2026-10-31 at `0ef26c6`: `origin/wip/dev-testing` is `385c2f6`, with `.gitmodules` and the pin
+  `bc62167` (on GitHub). It lacks only `b9fcdc9` (re-pin to `c0ce165`, docs). Local `wip/dev-testing` (`c2de5ae`) is
+  2 commits behind it, `gui-improvements` is at `c2de5ae`.
+- Tests: `PYTHONPATH=.:src uv run pytest` → **577 passed, 1 skipped** (2026-10-31, dev venv; web deps `--group web`,
+  photo tests `--group ocr`, AI tests `--group ai`, they skip otherwise). dis-system `python -m pytest tests`: 74 passed.
+- DB: schema v9 (`app/db.py`; was v3 on 2026-10-23).
+- dis-system: the submodule is `c0ce165` on **`dsgnrfhmn/uiux-dev`** (pushed 2026-10-31). A fresh
+  `git clone --recurse-submodules -b wip/development` was run again after the push of `b9fcdc9` and fetched `c0ce165`
+  (2026-10-31). That branch is deliberately **not** merged into dis-system `main` (`2db2701`): it changes 52
+  existing files and adds 3 (D00b). Its exception to dis-system's branch rules is in dis-system's own `CLAUDE.md`.
+- Rollback tags (pushed 2026-10-31): `gui/before-words-texts` (`f806b7c`), `gui/words-texts-refresh` (`985691d`).
 
-## Done 2026-10-22/23
+## Done since 2026-10-23
 
-- dis-system (`cb13772`): new word-token, dropzone, stepper, progress-bar, correction-row, image-regions, note-item;
-  table-cell `plain`/`mark`/`highlight`, table-row `href` (cancelable `ds-table-row-open`) and keyboard selection,
-  nav-bar `right_actions` and centred links, wrapping bars, tooltip layer mode + `window.dsTooltip`, pane `body_html` and
-  `data-motion`, inline-mark `uncertain`, hero-block `data-fit`.
-- wort: `overrides.css` and `_nav.html` deleted (D00e closed); theme applied in `<head>` (no light flash); the word pane
-  opens and closes in place without reloads, scroll kept, 0 dropped frames (measured); `GET /api/gloss` + hover
-  translations for any German word; plain-http mode answers loopback clients only; README (two parts, roadmap),
-  PLAN.md brought up to date.
+- 10-28 `ebc7f23` Üben as a chat: topic questions, local feedback, explanations, Grammatik tab.
+- 10-28/29 `f2c83cf` word detail marks, Abfrage page, access-log redaction fix, local look trial (`trial.css`, D00h),
+  dev-only "Gesuchte laden" from the CLI's `user.db` (D00g).
+- 10-29 `81c1c18` English interface with a German switch (D00j), practice as one task at a time with retries (D00i),
+  `scripts/languagetool.sh`.
+- 10-30 pinned composer and original/corrected toggle (`5989c2a`); Texte reading texts (`a389a01`); Practice GUI
+  refresh (`c6e3df7`); LanguageTool starts with `scripts/dev.sh`, `compose.yaml` service `wort-lt` (`00cc087`); dis-system
+  draft props committed (`de28078`); Texte photo → text → preview, saved texts, notes, delete (`f806b7c`); Words and
+  Texte refresh (`985691d`).
+- 10-31 History, Login and one tooltip on texts (`c2de5ae`); `.gitmodules` follows `dsgnrfhmn/uiux-dev` (`0ef26c6`).
 
 ## What is built
 
@@ -33,79 +48,93 @@ compose.**
 |---|---|---|
 | Accounts | `app/auth.py`, `scripts/adduser.py` | argon2, hashed session tokens, CSRF, login throttle; no signup |
 | Word list + detail + lookup | `app/words.py`, `app/lookup.py`, `app/templates/words.html`, `_word_detail.html` | sort, search, presets, selection, own translation, word opens beside the table, `/api/gloss` |
-| Practice | `app/practice.py`, `app/scoring.py` | sessions stored per user; local grading; sentence without grammar check = no score |
-| DB | `app/db.py` | schema v3 (users, sessions, user_words, attempts, practice_sessions, sync_tokens, ai_usage); WAL; migrations from v0/v1/v2 |
+| Practice | `app/practice.py`, `app/scoring.py`, `app/questions.py`, `app/grammar.py`, `app/checking.py`, `app/hints.py` | three tabs, one open session per tab, only the first answer counts; Grammatik B1/B2 graded locally; sentence check = required form + LanguageTool |
+| Texte | `app/texts.py`, `app/uploads.py`, `app/ocr.py`, `app/mt.py`, `app/templates/texts.html` | Pillow decode, then Tesseract (`deu`), offline translation; install `--group ocr` and `tesseract-ocr-deu` |
+| Interface language | `app/i18n.py`, `app/ui_terms.py` | English source text → German; stored in the profile (`users.ui_lang`) |
+| UI | `app/static/ui.css`, `app/templates/_ui.html`, `layout.css`, `trial.css`, dis-system tokens | wort's own small kit on `--ds-*` tokens (GUI-REFRESH decision) next to dis-system components via `app/ds.py` |
+| DB | `app/db.py` | schema v9, WAL, migrations from older versions |
 | AI layer | `app/ai/` | six blocks (check, explain, tasks, recheck, rule, answer), `WORT_AI_FEATURES`, daily cap, fake + Anthropic provider (Haiku 5.5, SDK `messages.parse`) |
 | Sanitizing | `src/wort/sanitize.py` | applied at every input/output boundary; `tests/test_boundaries.py` (mutation-checked) |
 | CLI sync | `src/wort/syncing.py`, `app/sync_app.py`, `scripts/synctoken.py` | `wort sync` -> `POST :8456/sync`, write-only token, pinned cert |
 | CLI offline | `src/wort/netguard.py`, `scripts/wort-offline`, `scripts/fetch_data.py` | CLI never downloads; fetching is a separate script |
-| Deploy | `compose.yaml`, `nginx.conf`, `DEPLOY.md` | `wort-web`, `wort-sync`, TLS front; AI is DEPLOY §6, CLI network §7 |
+| LanguageTool | `scripts/languagetool.sh`, `scripts/dev.sh`, `compose.yaml` (`wort-lt`) | loopback only; image `erikvl87/languagetool:6.5` pinned by digest (6.6 does not start) |
+| Deploy | `compose.yaml`, `nginx.conf`, `DEPLOY.md`, `deploy/` | `wort-web`, `wort-sync`, `wort-lt`, TLS front; AI is DEPLOY §6, CLI network §7 |
+| Tracking | `GUI-REFRESH.org`, `UX-Decisions.md`, `BACKLOG.md` | page-by-page review; UI rules without wort context; feature ideas |
 
-## Decisions made this session (all in `DECISIONS.md`)
+## Decisions since 2026-10-23 (all in `DECISIONS.md` unless noted)
 
-- **D0r confirmed (2026-10-21):** the web backend may call the Anthropic API (Haiku). Still open under it:
-  host egress rule, separate spend-limited key, Haiku-vs-Sonnet test.
-- **D00d:** CLI has no network except loopback and one write-only sync port; web is the only side with outbound.
-- Language: English primary, Ukrainian as the learner's own translation / AI task translations (design shows DE→UK).
-- Design gaps are **not** patched locally (rule in `CLAUDE.md`); the temporary D00e overrides are gone (2026-10-23).
+- **D00g** dev-only import from the CLI's `user.db` (needs `WORT_CLI_DB`; the server never sets it).
+- **D00h** trial look in `app/static/trial.css`; whether any of it goes into dis-system is open.
+- **D00i** one task at a time, "Nochmal antworten" (first answer counts), one open session per Üben tab.
+- **D00j** interface English by default, switchable to German; German content stays German.
+- **dis-system integration branch (2026-10-31):** wort follows `dsgnrfhmn/uiux-dev` until the redesign is finished (D00b).
+- **GUI refresh (garv, 2026-10-30, `GUI-REFRESH.org`):** dis-system is a visual reference, not a guideline; the refreshed
+  pages use wort's own kit. **`CLAUDE.md` "Design-system rules (hard)" still says the opposite** and has not been changed.
 
 ## Not verified (do not assume these work)
 
 1. Any real Anthropic call. Run `PYTHONPATH=.:src python scripts/ai_smoke.py` on the server (needs key); expect `ALL PASS`.
 2. `scripts/wort-offline --check` on the real CLI machine (Linux user systemd / macOS sandbox).
-3. `nginx.conf` (8456 listener) and `compose.yaml` (`wort-sync`): never started.
+3. `nginx.conf` (8456 listener) and `compose.yaml` (`wort-sync`, `wort-lt`): never started through `podman-compose up`.
+   The Containerfile with Tesseract was not rebuilt (as of 2026-10-30, `GUI-REFRESH.org`).
 4. Quality of AI verdicts on real mistakes: `spikes/ai_eval.md` is a spec, not run.
-5. Both-theme check (2026-10-23): Wörter, word detail, Üben start and Verlauf at 1440 and 390 px; not every practice state.
-6. ~~The access log~~ fixed 2026-10-28: `sanitize.install_log_redaction` keeps tuple args (each redacted) so
-   uvicorn's access formatter works; a record whose joined message still matches a secret pattern is collapsed as before
-   (`tests/test_sanitize.py`, mutation-checked).
-
-## Design audit (2026-10-22): what changed
-
-Done with the new dis-system components (PR #3 and the follow-up): Wörter has `page-head` with the stats text, word colors by
-article and a score chip (tag cell by `scoring.level`); Üben start has tabs as links (`?modus=`); the task and the
-answer are `message` blocks and a corrected sentence shows `inline-mark` runs (built from the checker's remarks by
-`practice.correction_segments`, plain text when the fragments are ambiguous); "falsch/richtig" are tags; Beispiele and
-Deine Fehler are `disclosure` sections.
-Still different from the canvas: no word tooltips with translations in the feedback, no "saved" icon column, row checkboxes
-are hover-only (dis-system design), Texte is a placeholder (post-MVP). The dark theme greys row links until hover in
-dis-system; article links are exempt from that rule.
-Update 2026-10-23: hover translations now exist for every German word (not the canvas's click-to-note token yet), and
-row checkboxes are keyboard-operable in the dis-system branch.
+5. OCR (D3): generated pages only; the table for book page, sign, screenshot, menu and low light is empty; threshold and
+   deskew are open. LanguageTool server numbers (D4) are empty too (dev machine only).
+6. UI: Practice, Words, Texte, History and Login were checked in a browser with demo data (1440 and 390 px, both themes,
+   `GUI-REFRESH.org`). Left: keyboard and phone walkthroughs by a person, real photos (T-5), a screen-reader pass.
+   `/favorites` and `/exercise/{lemma}` are untouched.
+7. wort PR #5 (`wip/web-view` into `wip/dev-testing`): not seen merged in `origin/wip/dev-testing`'s history; its
+   content reached `wip/dev-testing` through PR #6. `origin/wip/web-view` is still `f8d2fd4` (fetched 2026-10-31).
 
 ## Next steps (suggested order)
 
-**Yours (blockers for merging / enabling):**
-1. Open and merge the dis-system PR `dsgnrfhmn/reading-upload-components` → `main`; then the submodule pointer is bumped
-   to the merge commit.
-2. Merge PR #5 (`wip/web-view` into `wip/dev-testing`).
-3. On the server: key in `~/.config/wort/ai.env`, egress to `api.anthropic.com:443` only (DEPLOY §6), smoke test, then `spikes/ai_eval.md`.
-4. Step 0 spikes (dictionary coverage, lemmatizer) on the server; numbers into `DECISIONS.md` D1/D2.
+**Yours:**
+1. **Design-system rule.** Either update `CLAUDE.md` (own kit allowed, `ui.css` / `_ui.html` in the module list) or fold the
+   kit back into dis-system component by component. The same section of `GUI-REFRESH.org` lists three smaller decisions
+   (one explanation surface, `/favorites` + `/exercise` delete or restyle, global colour overrides in `ui.css`).
+2. **`wip/dev-testing` gets `b9fcdc9`.** The branch was broken until PR #6 (before it: pin `6d58745` on no dis-system
+   branch, no `.gitmodules`). It is fixed now (`385c2f6`), but it lacks the re-pin to `c0ce165` and the docs. Open a PR
+   `wip/development` → `wip/dev-testing` (as `PLAN.md` says: PRs into `wip/dev-testing`). Do not force-push it.
+3. **dis-system.** Keep working on `dsgnrfhmn/uiux-dev`. Before any PR into `main`: tests, existing demos with default props,
+   both themes; merge commit, not squash; then re-pin wort and move the other services (D00b).
+4. On the server: key in `~/.config/wort/ai.env`, egress to `api.anthropic.com:443` only (DEPLOY §6), smoke test, then
+   `spikes/ai_eval.md`; start the compose stack including `wort-lt`.
+5. Step 0 spikes on the server (dictionary coverage, lemmatizer) → D1/D2; OCR on real photos → D3; LanguageTool numbers → D4.
 
 **Mine, one piece at a time:**
-1. Bump the dis-system submodule after the merge, record the hash (D00b).
-2. Fix the access-log redaction (item 6 above).
-3. Word detail from the canvas: mistakes marked in the declension table (table-cell `mark`), "Fehler erklärt" as a side
-   pane with the rule table.
-4. **Step 1 evidence:** sandbox proofs (D6) for the podman compose deploy (D00f, decided 2026-10-23).
-5. **Step 7:** nightly `.backup` of the SQLite DB, structured logs, admin usage view (AI calls per user per day).
-6. **Texte (post-MVP):** Tesseract spike (D3) first, then uploads with the CLAUDE.md rules, built from the new components.
-7. Mobile layouts on the design canvas, then touch for word tooltips.
+1. What is left in `GUI-REFRESH.org` (Global shell, Practice, Texte 4/9, cross-cutting contrast).
+2. Sentence mistakes do not count toward a topic's progress yet (D00i, open).
+3. **Step 1 evidence:** sandbox proofs (D6) for the podman compose deploy (D00f).
+4. **Step 7:** nightly `.backup` of the SQLite DB, structured logs, admin usage view (AI calls per user per day).
+5. Mobile layouts on the design canvas, then touch for word tooltips.
 
 ## How to run locally
 
-    uv sync --group web
-    uv run wort import --file <kaikki.jsonl>          # from: python scripts/fetch_data.py dictionary downloads/
+Same as `README.md` ("Run it locally"):
+
+    git clone --recurse-submodules <repo> && cd wort
+    uv sync --group web --group ocr                     # + `sudo apt install tesseract-ocr tesseract-ocr-deu` for Texte
+    uv run wort import --file tests/fixtures/german_sample.jsonl   # or the full dictionary: python scripts/fetch_data.py dictionary downloads/
     PYTHONPATH=.:src uv run python scripts/adduser.py anna
-    WORT_INSECURE_COOKIES=1 PYTHONPATH=.:src uv run uvicorn app.main:create_app --factory --port 8000   # 127.0.0.1 only (the app refuses non-loopback clients in this mode)
+    WORT_INSECURE_COOKIES=1 PYTHONPATH=.:src uv run uvicorn app.main:create_app --factory --port 8000   # 127.0.0.1 only
+    scripts/dev.sh                                      # LAN https + LanguageTool container (WORT_DEV_LT=0 skips it)
 
 ## Gotchas learned
 
-- Git identity: this environment sets `GIT_AUTHOR_*`/`GIT_COMMITTER_*`, which override `git config`. The stop hook wants
-  `noreply@anthropic.com` in wort commits; set the env vars for the commit. dis-system wants the GitHub noreply address
-  (`255602589+dsgnrfhmn@users.noreply.github.com`) and no mention of consuming apps.
+- Git identity (written in a cloud session, not re-checked): `GIT_AUTHOR_*`/`GIT_COMMITTER_*` override `git config`, and
+  the stop hook wanted `noreply@anthropic.com` in wort commits. On the dev machine on 2026-10-31 `0ef26c6`
+  carries `dsgnrfhmn`'s GitHub noreply address. dis-system wants that address and no mention of consuming apps or of real people (a personal handle counts) in anything pushed.
 - dis-system rules: work on `dsgnrfhmn/<topic>` from `main`, PR only, `python -m pytest tests` before pushing;
   in a single-branch clone create the remote-tracking ref with `git fetch origin +refs/heads/<b>:refs/remotes/origin/<b>` or the stop hook complains.
+- **A submodule pin must be on GitHub before the wort commit that uses it is pushed**; otherwise `git submodule update`
+  fails for everyone else (happened to `origin/wip/dev-testing` with pin `6d58745`; fixed by PR #6).
+- From the Claude sandbox `github.com` is unreachable: pushes are run by garv in the session with `!`. On 2026-10-31 the
+  first push to each of dis-system and wort returned 403 and went through on retry; the cause was not found.
+- Without network a Claude session only knows the refs of the last fetch. Run `! git fetch origin` before saying anything
+  about GitHub state or planning a push: on 2026-10-31 a push to `wip/dev-testing` was rejected (`fetch first`) because PR #6
+  had moved it, and a plan built on the old `19fc3da` was wrong. Never force-push to fix that.
 - SDK facts checked, not assumed: Haiku 5.5 rejects `temperature`/`top_p`/prefill; SDK 2.x sends the key in the `Authorization` header.
 - A leftover implicit SQLite transaction once locked the DB for the admin script; `tests/test_web_store.py` guards it.
 - `cli.main()` installs the network guard process-wide; `tests/conftest.py` uninstalls it after each test.
+- A macro imported at the top of a template is visible to every included component (a macro named `mark` printed as
+  `<Macro 'mark'>` in the history table); a test guards every page (`GUI-REFRESH.org`, log).

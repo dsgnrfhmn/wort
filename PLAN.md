@@ -63,11 +63,11 @@ Post-MVP (details at the end of the file):
   `DECISIONS.md`.
 - **kaikki.org is not reachable** from cloud sessions; the dictionary spike
   runs on the dev machine or the server.
-- **dis-system components for Texte and the remaining design gaps** (word token, dropzone, stepper,
-  correction row, image regions, note item, progress bar; row link, nav-bar right actions, tooltip layer, pane
-  block slot) are on the dis-system branch `dsgnrfhmn/reading-upload-components` (`cb13772`, pushed 2026-10-23), not
-  merged into its `main` yet. The web app already uses them (submodule at `cb13772`) and `overrides.css` / `_nav.html`
-  (D00e) are deleted; after the merge the submodule pointer is bumped to the merge commit (D00b).
+- **dis-system is followed on an integration branch, not on its `main`.** The Texte components and the earlier design
+  gaps are merged into dis-system `main` (PRs #5–#7, `2db2701`; `overrides.css` / `_nav.html` (D00e) are deleted).
+  Since 2026-10-31 wort pins `dsgnrfhmn/uiux-dev` (`c0ce165`): the alternative UX/UI, kept out of `main` until the
+  maintainer calls it finished (rules: D00b and dis-system's own `CLAUDE.md`). Until then the app depends on a branch
+  that is not in dis-system `main`; its pin must be on GitHub before a wort commit using it is pushed.
 
 ---
 
@@ -146,7 +146,7 @@ LanguageTool and cap rules from `CLAUDE.md` apply when those features ship.
       dictionary lookup and grammar code (`src/wort/dictionary/`). Scoring is separate:
       CLI `srs.py`, web `app/scoring.py`.
 - [x] **dis-system first:** the submodule follows `main` (@ `a2404a4`, recorded in `DECISIONS.md` D00b).
-      Pinned tag vs `main` is still open.
+      Pinned tag vs `main` is still open. *(Superseded 2026-10-31: wort follows `dsgnrfhmn/uiux-dev`, see D00b.)*
 - [x] FastAPI + Jinja2 base layout from dis-system components; theme switch (applied in `<head>`, no light flash).
 - [x] SQLite schema (now v3) + migrations from v0/v1/v2: `users`, `sessions`, `user_words`, `attempts`,
       `practice_sessions`, `sync_tokens`, `ai_usage`.
@@ -269,14 +269,17 @@ when the item ships.
       image on the server and whether basic preprocessing (grayscale,
       threshold, deskew) helps → `DECISIONS.md` D3.
 - [ ] Upload page: dis-system dropzone; validation per `CLAUDE.md`; image
-      deleted after OCR; per-user daily upload cap. *(the dropzone, stepper, progress bar, correction row
-      and image regions components exist on the unmerged dis-system branch; the page itself is a placeholder)*
+      deleted after OCR; per-user daily upload cap. *(Texte exists since 2026-10-30, `f806b7c`: photo → recognised
+      text → translation preview → saved texts with notes; uploads are decoded with Pillow and capped in size and
+      pixels in `app/uploads.py`. The boxes are not re-verified against the definition of done below: image
+      deletion, daily cap, real photos, mobile.)*
 - [ ] Result: editable text block (OCR errors can be fixed by hand), then
       "done" → tokenized read-only view.
 - [ ] Each word token is clickable → tooltip: lemma, translation, one-line
       grammar note, "learn this word". Lookups go through `lexicon.py`
       (same rules as Step 2, including user translations). *(hover translations for any German word already
-      work site-wide via `/api/gloss`; the clickable token with notes is the dis-system `word-token`, unmerged)*
+      work site-wide via `/api/gloss`; the dis-system `word-token` is in dis-system `main` (PR #5); Texte's word and
+      selection menus are built (`a389a01`) but not re-verified against this item)*
 - [ ] Texts saved per user (`texts` table) and reopenable.
 
 **Definition of done:** 5 real photos → text → tooltips work on mobile and
