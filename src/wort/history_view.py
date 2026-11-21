@@ -6,7 +6,7 @@ selected row starts with `>`, the others with a space. `l`/Enter opens a row: a 
 as compact cards, a sentence shows its translation block, and a card opens into the full word
 card (a card taller than its place opens on a screen of its own, with scrolling). In a narrow window the results
 open in place, below the row. From `SPLIT_MIN_WIDTH` columns on, `l` opens a side pane instead: the list narrows to the
-left and the results of the row appear on the right, under the row's word, and the `>` moves into them (`j`/`k`, digits,
+left half and the results of the row appear on the right, under the row's word, and the `>` moves into them (`j`/`k`, digits,
 `l`, `s` work there as everywhere); the row stays marked in the list by a grey `>` and bold text. One `h` (or `q`) closes
 the pane and puts the cursor back on the row. Without an open row the list has the whole width. `x` deletes the selected
 row after a `y/n` question in the bottom line. `s` saves the selected result of an open word row instead of the
@@ -32,7 +32,6 @@ from wort.render.card import MUTED, render_card, render_compact
 INDENT = 4
 GUTTER = 2  # the width of the `> ` in front of a result in the right-hand pane
 SPLIT_MIN_WIDTH = 120  # columns: from here on the results are shown beside the list, not below the row
-LIST_WIDTH = (36, 56)  # the least and the most columns of the list in the split view
 HINT = "j k move · l open · 1-9 pick · s save · x delete · Tab {other} · q close"
 PANE_HINT = "j k move · l open · 1-9 pick · s save · h back · q close"  # while the cursor is in the side pane
 MARK = ">"  # in front of the selected row (and of the selected result of an open row)
@@ -109,7 +108,7 @@ def _panes(width: int) -> tuple[int, int] | None:
     else None. One more column in between holds the separating line."""
     if width < SPLIT_MIN_WIDTH:
         return None
-    left = min(max(width // 3, LIST_WIDTH[0]), LIST_WIDTH[1])
+    left = (width - 1) // 2  # half and half (the separator column is taken off first)
     return left, width - left - 1
 
 
