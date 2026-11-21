@@ -9,3 +9,4 @@ build/
 *.jsonl
 !tests/fixtures/*.jsonl
 .DS_Store
+.env.dev
