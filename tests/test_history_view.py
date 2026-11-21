@@ -207,14 +207,14 @@ def _entries(dictionary):
     return [dictionary.find_lemma("Haus"), dictionary.find_lemma("gehen")]
 
 
-COLUMN = hv._panes(140)[0]  # 46: where the separator is in a 140-column window
+COLUMN = hv._panes(140)[0]  # 69: where the separator is in a 140-column window
 
 
 def test_the_window_is_split_from_120_columns_on():
     assert hv._panes(119) is None and hv._panes(80) is None
-    assert hv._panes(120) == (40, 79)  # a third for the list, the rest for the results
-    assert hv._panes(150) == (50, 99)
-    assert hv._panes(300) == (56, 243)  # the list stops growing
+    assert hv._panes(120) == (59, 60)  # half for the list, half for the results
+    assert hv._panes(150) == (74, 75)
+    assert hv._panes(300) == (149, 150)  # no upper limit: always half
     assert hv._panes(120)[0] + 1 + hv._panes(120)[1] == 120  # the separator is the one column left
 
 

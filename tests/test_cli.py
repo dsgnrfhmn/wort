@@ -1446,7 +1446,7 @@ def test_history_in_a_wide_window_opens_a_side_pane_on_l(home, monkeypatch, caps
     cli.main([])
     assert left == []
     frames = [[l.replace("\x1b[2K", "") for l in _plain(f).split("\r\n")] for f in _history_screen(capsys.readouterr().out).split("\x1b[H")[1:]]
-    column = 46  # a third of 140
+    column = 69  # half of 140
     first, opened, back = frames[0], frames[1], frames[2]
     assert not any(len(l) > column and l[column] == "│" for l in first)  # nothing is open: the list has the whole window
     body = [l for l in opened if len(l) > column]

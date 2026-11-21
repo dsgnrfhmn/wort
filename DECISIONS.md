@@ -116,7 +116,7 @@ Confirmed by maintainer (date)*.
   changes every try of the row's text. The history is shown newest first. In the suggestion list `s` no longer
   starts a word (it did before: any printable key did); in other result lists it still does.
 - **A side pane in a wide window (2026-11-21, maintainer request, reworked the same day):** from 120 columns on, `l` on a
-  row opens a side pane on the right (the list narrows to a third of the width, 36 to 56 columns; without an open row it has
+  row opens a side pane on the right (the list narrows to half of the width; without an open row it has
   the whole window). The `>` moves into the pane (first result, or the word when there is nothing to pick) and the usual keys
   work there (`j`/`k`, `g`/`G`, digits, `l`, `s`); `x` and `Tab`-less list keys are for the list. The opened row stays
   marked in the list (grey `>`, bold word) and its word is fixed at the top of the pane while the results scroll under it.
