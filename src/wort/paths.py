@@ -1,4 +1,4 @@
-"""Where wort keeps its data (XDG data dir, overridable with WORT_HOME)."""
+"""Where wort keeps its data: databases in the XDG data dir (WORT_HOME), history in the data repository (WORT_DATA_REPO)."""
 
 import os
 from pathlib import Path
@@ -12,13 +12,6 @@ def data_dir() -> Path:
         path = Path(base) / "wort"
     path.mkdir(parents=True, exist_ok=True)
     return path
-
-
-def config_dir() -> Path:
-    """Settings (sync endpoint) and, by convention, the token file; never inside the data dir's database."""
-    if override := os.environ.get("WORT_CONFIG_HOME"):
-        return Path(override)
-    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "wort"
 
 
 def dictionary_db() -> Path:
@@ -42,3 +35,10 @@ def dictionary_en_uk_db() -> Path:
 
 def user_db() -> Path:
     return data_dir() / "user.db"
+
+
+def data_repo() -> Path:
+    """The git checkout that holds `words.jsonl` and `sentences.jsonl` (the query history); `wort sync` pushes it."""
+    if override := os.environ.get("WORT_DATA_REPO"):
+        return Path(override).expanduser()
+    return Path.home() / "wort-data"

@@ -1,0 +1,61 @@
+#+TITLE: wort — plan (CLI only)
+#+TODO: TODO WIP BLOCKED | DONE DROPPED
+
+Checked against the real state on 2026-11-21: code, tests (388 pass, =.venv/bin/python -m pytest=), git
+(branch =wip/cli-development=), a live tmux session. The web version was removed the same day (DECISIONS D00k);
+its former steps are not listed here, they are in the git history.
+
+* Status at a glance
+
+| Step | Title                                   | State   | What is left                                              |
+|------+-----------------------------------------+---------+-----------------------------------------------------------|
+| C    | CLI: lookup, session, cards             | DONE    | -                                                         |
+| H    | History in two validated files + sync   | WIP     | real GitHub push; create =wort-data=; run migrate + sync |
+| S    | Sentence translation block              | DONE    | quality check with the real Argos models                  |
+| U    | Ukrainian / German dictionaries         | DONE    | -                                                         |
+| P    | Practice (prototype: tui, add, list)    | TODO    | reliable sessions, graded answers, SM-2 verified          |
+| E    | More examples (Tatoeba)                 | TODO    | decide whether to add a corpus                            |
+
+* DONE Step C — CLI
+- [X] =wort=, =wort WORD=, cards with forms, translations, IPA, tables, examples (README "What it does")
+- [X] pinned banner and footer, result picker, typo suggestions, short phrases word by word
+- [X] =/history= and =/clear-history= (checked in the test suite and a live tmux run 2026-11-21)
+*Definition of done:* all CLI tests pass and the session behaves as documented in the README.
+
+* WIP Step H — History and sync
+- [X] two files =words.jsonl= / =sentences.jsonl= in the data repository (=src/wort/history.py=, =dataschema.py=)
+- [X] =/history=: two tabs (=Tab=), =>= marks the row, =x= then =y/n= deletes, hints in the bottom line
+- [X] allowlist validator, shipped as =validate.py=; 129 rule tests (=tests/test_dataschema.py=)
+- [X] =wort migrate-history= (old =queries= table, explicit, merges by time, safe to repeat); run on the real =user.db= 2026-11-21: 103 words, 14 sentences, 6 skipped
+- [X] =wort init-data= and =wort sync= tested against a local bare repository: foreign files, symlinks, executables,
+  bad lines on the remote are refused before merging; hooks never run; GIT_* variables ignored (=tests/test_datarepo.py=)
+- [ ] create the private GitHub repository =dsgnrfhmn/wort-data= (empty), then =wort init-data --remote URL=
+- [ ] the first real =wort sync= (not run: the sandbox blocks github.com)
+- [ ] branch protection / required check =validate= on =main= of =wort-data= (maintainer, on GitHub)
+- [ ] a second machine: =git clone= of =wort-data=, =wort sync= there
+*Definition of done:* the first =wort sync= has pushed real history to GitHub and a second machine got it back.
+
+* DONE Step S — Sentences
+- [X] a sentence or phrase (2+ words, not a dictionary entry, one known word) is translated as one two-line block, no word cards
+- [X] =Translating…= shown while the model works (live run with a stand-in model)
+- [ ] translation quality with the real Argos models is not measured
+*Definition of done:* the block shows for a real sentence with the installed models.
+
+* DONE Step U — Dictionaries
+- [X] =import=, =import-uk=, =import-de=, =import-en-uk=; downloads only in =scripts/fetch_data.py=
+
+* TODO Step P — Practice (prototype)
+- [ ] graded sessions you can rely on, mastery and SM-2 checked on real use
+- [ ] decide what the supported feature set is before it is advertised in the README
+*Definition of done:* a practice session over real words runs end to end and the scores match the rules in =src/wort/srs.py=.
+
+* TODO Step E — Examples
+- [ ] more example sentences only via an extra corpus (Tatoeba): decide
+
+* Open decisions
+- =;= is not allowed in stored text (a command separator): sentences containing it are translated but not saved. Allow it?
+- Whether the history deletion (=x=) should also leave a marker so another machine cannot bring a deleted row back.
+- Whether sentence translations should be stored (now: only what was typed).
+
+* Out of scope
+- the web version (removed 2026-11-21), accounts, uploads, OCR, any LLM API

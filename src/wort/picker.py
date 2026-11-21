@@ -5,6 +5,8 @@ selection, a digit, `l` or Enter opens the full card, `h` (or `q`/Esc) goes back
 `q`/Esc in the list closes it. In the full card `j`/`k` scroll (space / `b` page down / up, `g`/`G` top / bottom) and a digit
 switches to another result. A card or list taller than the screen shows one page at a time.
 In the list, any other printable key closes the picker and is handed back, so it can start the next word.
+With `on_save` (the `Did you mean` list) `s` saves the selected entry instead, in the list and in an open card, and the
+picker stays open; `s` then no longer starts a word.
 """
 
 from __future__ import annotations
@@ -113,6 +115,15 @@ def wait_for_key() -> None:
         termios.tcsetattr(fd, termios.TCSADRAIN, saved)
 
 
+def key_waiting() -> bool:
+    """True when another key is already waiting in the input: typed ahead, or a held key whose repeats arrive
+    faster than the screen is redrawn. Never blocks; False when stdin is not a terminal."""
+    try:
+        return bool(select.select([sys.stdin.fileno()], [], [], 0)[0])
+    except (OSError, ValueError):  # no usable file descriptor (redirected or replaced stdin)
+        return False
+
+
 def read_key() -> str:
     """One key: 'enter', 'esc', 'up', 'down', 'resize' (terminal size changed), or the typed character.
 
@@ -183,6 +194,7 @@ def run(
     listed: bool = False,
     banner: Callable[[], list[str]] | None = None,
     active_card: bool = False,
+    on_save: Callable[[Entry], str] | None = None,
 ) -> str | None:
     """Run the picker (on whatever screen is current) until it is closed. Returns the key that closed it, if it was a character.
 
@@ -193,11 +205,15 @@ def run(
 
     `heading` is a muted line above the list (not above an open card). A single entry opens as a card
     (for scrolling) unless `listed` asks for the list anyway (suggestions).
+
+    `on_save(entry)` is called when `s` is pressed; it returns a message that is shown in the bottom line
+    until the next key.
     """
     keys = keys or read_key
     single = len(entries) == 1 and not listed  # one tall card: shown open from the start, closing it leaves the picker
     selected, opened = 0, single
     list_top = card_top = 0  # first visible line of the list / of the open card
+    message = ""  # the answer of `on_save`, shown in the bottom line until the next key
     while True:
         rows = max(screen_rows(), 4)
         fixed = banner() if banner else []
@@ -224,12 +240,16 @@ def run(
                 list_top = end - room
             list_top = max(0, min(list_top, len(lines) - room))
             hint = HINT_LIST
+        if on_save and not single:
+            hint = hint + " · s save"
         top = card_top if opened else list_top
-        paint(console, fixed, lines[top : top + room], hint, rows)
+        paint(console, fixed, lines[top : top + room], f"{message}  ·  {hint}" if message else hint, rows)
         try:
             key = keys()
         except KeyboardInterrupt:
             key = "esc"
+        if key != "resize":
+            message = ""
 
         if opened and key in ("j", "down"):
             card_top += 1
@@ -247,6 +267,8 @@ def run(
             selected = (selected + 1) % len(entries)
         elif not opened and key in ("k", "up"):
             selected = (selected - 1) % len(entries)
+        elif key == "s" and on_save:
+            message = on_save(entries[selected])
         elif key.isdigit() and 1 <= int(key) <= len(entries):
             selected, opened, card_top = int(key) - 1, True, 0
         elif key in ("l", "enter") and not opened:
@@ -272,7 +294,8 @@ def pick(
     heading: str = "",
     listed: bool = False,
     banner: Callable[[], list[str]] | None = None,
+    on_save: Callable[[Entry], str] | None = None,
 ) -> str | None:
     """`run` on the alternate screen: the picker takes the whole terminal and gives it back untouched."""
     with fullscreen():
-        return run(entries, console, screen_rows, keys, heading, listed, banner)
+        return run(entries, console, screen_rows, keys, heading, listed, banner, on_save=on_save)

@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
-# Local LanguageTool server for the web app's grammar check, as a rootless podman container.
+# Local LanguageTool server for the optional grammar check of the practice prototype, as a rootless podman container.
 #
 #   scripts/languagetool.sh start | ensure | ready | stop | status | check
 #
 #   start   (re)creates the container and waits until it answers
-#   ensure  leaves a running one alone, starts a stopped one, creates a missing one (what scripts/dev.sh uses)
+#   ensure  leaves a running one alone, starts a stopped one, creates a missing one
 #   ready   exit 0 when it answers, 1 when not; prints nothing
 #
-# It listens on 127.0.0.1 only (CLAUDE.md: LanguageTool on loopback; the app's client refuses other hosts). The web
-# app on the same machine reaches it at its default WORT_LT_URL (http://127.0.0.1:8081), so anyone who opens the app
-# from the LAN (scripts/dev.sh) sees the grammar results; the LanguageTool port itself is never on the LAN.
-# scripts/dev.sh calls `ensure` when it starts and `stop` when it ends; compose.yaml has its own service (wort-lt) for
-# the deployed stack. Never run both on one host: each takes about 1 GB of RAM.
-# The image is pinned by digest; bump both together (compose.yaml too) and record it in DECISIONS.md (D4).
+# It listens on 127.0.0.1 only (CLAUDE.md: LanguageTool on loopback; wort's client refuses other hosts). wort reaches it at
+# its default WORT_LT_URL (http://127.0.0.1:8081). It takes about 1 GB of RAM.
+# The image is pinned by digest; record a bump in DECISIONS.md.
 set -euo pipefail
 
 IMAGE="docker.io/erikvl87/languagetool:6.5@sha256:9bc387f54513615648898ad60dd91bad7ba3c3b018cb2abe9f0ba61ec70681c4"  # 6.6 ships Java 11 for a Java 17 build (does not start)
