@@ -10,10 +10,8 @@ from textual.widgets import Button, Input, Label, Static
 from wort import sentence
 from wort.dictionary.lookup import Entry
 from wort.render.card import render_card
-
-
-MAX_PHRASE_WORDS = 30  # same limits as the CLI session
-MIN_SENTENCE_WORDS = 3
+from wort.search import MAX_PHRASE_WORDS
+from wort.sentence import MIN_SENTENCE_WORDS
 
 
 class WordAdded(Message):

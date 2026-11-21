@@ -11,11 +11,13 @@ from rich.text import Text
 
 from wort.dictionary import grammar as g
 from wort.dictionary.lookup import Entry
+from wort.sentence import Translation
 
 # Monochrome: bold/italic plus one mid grey for secondary text.
 # Underline is used only for the changing parts of verb forms (conjugation endings).
 # Colors: the nominative singular article (der blue, die red, das green) and the main line of a card,
-# which takes the word class color (noun: its article's color, verb: terminal text color (black on light), adj/adv: dark purple).
+# which takes the word class color (noun: its article's color, verb: terminal text color (black on light); adjectives,
+# adverbs and the other classes have none).
 ENDING = "bold"  # inflection endings stand out in bold against the plain stem
 VERB_ENDING = "bold underline"  # verb conjugation endings: bold and underlined
 STEM = ""
@@ -23,14 +25,19 @@ MUTED = "grey42"  # secondary text; darker than the terminal's "dim" attribute
 HEAD = "bold"
 # Fixed 256-color indices, not the terminal theme's ANSI palette (a theme can turn that grey).
 ARTICLE_COLORS = {"der": "color(33)", "die": "color(160)", "das": "color(34)"}  # blue, red, green
-POS_COLORS = {"verb": "default", "adj": "color(54)", "adv": "color(54)"}  # verb: the terminal's own text color (black on a light theme), not grey; dark purple
+POS_COLORS = {"verb": "default"}  # verb: the terminal's own text color (black on a light theme), not grey; no other class has a color
+
+
+def noun_color(entry: Entry) -> str:
+    """The article's color for a noun (der blue, die red, das green), nothing for any other class."""
+    if entry.pos == "noun":
+        return ARTICLE_COLORS.get(g.GENDER_ARTICLE.get(entry.gender, ""), "")
+    return ""
 
 
 def pos_color(entry: Entry) -> str:
     """Color of the card's main line: a noun takes its article's color, other classes their own."""
-    if entry.pos == "noun":
-        return ARTICLE_COLORS.get(g.GENDER_ARTICLE.get(entry.gender, ""), "")
-    return POS_COLORS.get(entry.pos, "")
+    return noun_color(entry) or POS_COLORS.get(entry.pos, "")
 
 POS_LABELS = {
     "noun": "Substantiv", "verb": "Verb", "adj": "Adjektiv", "adv": "Adverb", "prep": "Präposition",
@@ -238,5 +245,22 @@ def render_card(entry: Entry, *, max_glosses: int = 4, footer: str | None = None
         subtitle_align="right",
         box=box.HEAVY if selected else box.SQUARE,
         border_style="bold" if selected else MUTED,
+        padding=(0, 1),
+    )
+
+
+def render_translation(typed: str, translation: Translation) -> RenderableType:
+    """A typed sentence and its translation as one block, like a word card: two lines, the sentence and then
+    its translation (or why there is none)."""
+    if translation.error:
+        second = Text(f"No sentence translation: {translation.error}", style=MUTED)
+    else:
+        second = Text(translation.text, style="bold")
+    return Panel(
+        Group(Text(typed), second),
+        title=Text(f" {translation.source}→{translation.target} ", style=MUTED),
+        title_align="left",
+        box=box.SQUARE,
+        border_style=MUTED,
         padding=(0, 1),
     )

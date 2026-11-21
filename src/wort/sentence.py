@@ -7,12 +7,15 @@ The direction follows the words: mostly German words → de→en, otherwise en�
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from wort.dictionary.lookup import PUNCTUATION, Dictionary
 
 DIRECTIONS = (("de", "en"), ("en", "de"))
 MAX_CHARS = 500  # user text is data: length-capped before it reaches the model
+MIN_SENTENCE_WORDS = 2  # two or more words that are not in the dictionary as a whole are translated like a sentence
 
 MISSING_PACKAGE = "Sentence translation needs the 'mt' group: uv sync --group mt"
 MISSING_MODEL = "Sentence translation model {src}→{dst} not installed: fetch the model files with scripts/fetch_data.py, then run `wort install-translation FILE...`"
@@ -22,11 +25,20 @@ class TranslationUnavailable(RuntimeError):
     """The package or the model is missing; the message says which and how to fix it."""
 
 
+def _quiet_stanza() -> None:
+    """Argos splits sentences with `stanza`, which prints a warning on stderr when it first loads a language
+    ("Language de package default expects mwt, which has been added"). Right in the middle of the pinned screen it
+    only gets in the way; errors are still shown."""
+    for handler in logging.getLogger("stanza").handlers:
+        handler.setLevel(logging.ERROR)
+
+
 def _argos():
     try:
         from argostranslate import package, translate
     except ImportError as exc:
         raise TranslationUnavailable(MISSING_PACKAGE) from exc
+    _quiet_stanza()
     return package, translate
 
 
@@ -59,13 +71,30 @@ def translate(text: str, source: str = "de", target: str = "en") -> str:
     return result
 
 
-def describe(dictionary: Dictionary, text: str) -> str:
-    """One line for the UI: the translation, or why there is none (fail loud, never silent)."""
+@dataclass(frozen=True)
+class Translation:
+    """The outcome of translating one sentence: the text, or why there is none (fail loud, never silent)."""
+
+    source: str
+    target: str
+    text: str = ""
+    error: str = ""
+
+
+def run(dictionary: Dictionary, text: str) -> Translation:
     source, target = detect(dictionary, text)
     try:
-        return f"Translation ({source}→{target}): {translate(text, source, target)}"
+        return Translation(source, target, translate(text, source, target))
     except (TranslationUnavailable, ValueError, RuntimeError) as exc:
-        return f"No sentence translation: {exc}"
+        return Translation(source, target, error=str(exc))
+
+
+def describe(dictionary: Dictionary, text: str) -> str:
+    """One line for the UI: the translation, or why there is none."""
+    result = run(dictionary, text)
+    if result.error:
+        return f"No sentence translation: {result.error}"
+    return f"Translation ({result.source}→{result.target}): {result.text}"
 
 
 def install(files: list[Path]) -> int:

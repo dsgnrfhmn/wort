@@ -1,511 +1,176 @@
 """Command line entry point.
 
 `wort`            interactive session: type words, `quit` to leave
-`wort WORD`       look a word up once (every lookup is logged in user.db)
-`wort tui|import|add|list|history|export|sync|t WORD`   other commands (`sync` is the only one that uses the network)
+`wort WORD`       look a word or sentence up once (saved in the history files)
+`wort tui|import|add|list|history|sync|t WORD`   other commands (`sync` is the only one that uses the network)
 """
 
 from __future__ import annotations
 
 import argparse
-import json
-import shutil
 import sys
 from pathlib import Path
 
-from rich import box
-from rich.console import Console
-from rich.table import Table
-from rich.text import Text
-
-from wort import netguard, paths, picker, sanitize, syncing
-from wort import history_view, sentence
-from wort.header import Header
-from wort.dictionary.grammar import GENDER_ARTICLE
-from wort.dictionary.lookup import Dictionary, Entry
-from wort.render.card import MUTED
+from wort import dataschema, datarepo, history, paths, sentence
+from wort.history import HistoryStore
+from wort.output import console, print_text, table, working
+from wort.dictionary.lookup import Dictionary
+from wort.search import did_you_mean, find, is_sentence, open_dictionary, show_result
+from wort.sentence import MIN_SENTENCE_WORDS
+from wort.session import cmd_session
 from wort.store import Store
-from wort.transfer import export_words
 
-def _make_console(**kwargs) -> Console:
-    """Monochrome output (plus the article colors): no automatic number/string highlighting.
-
-    Under tmux or TERM=screen rich detects only 8 colors and would map the fixed 256-color
-    article colors onto the terminal theme's ANSI palette; those terminals do support 256.
-    """
-    console = Console(highlight=False, **kwargs)
-    if console.color_system == "standard":
-        console = Console(highlight=False, color_system="256", **kwargs)
-    return console
+COMMANDS = {"tui", "import", "import-uk", "import-de", "import-en-uk", "t", "add", "list", "history", "migrate-history", "init-data", "sync", "install-translation"}
 
 
-console = _make_console()
-
-BANNER = """
-█   █  ███  █ ██   █
-█   █ █   █ ██  █ █████
-█ █ █ █   █ █      █
-██ ██ █   █ █      █
-█   █  ███  █      ██
-""".strip("\n")  # solid block letters
-
-COMMANDS = {"tui", "import", "import-uk", "import-de", "import-en-uk", "t", "add", "list", "history", "export", "install-translation", "sync"}
-FOOTER = "/history . /clear-history . clear . quit"
-PROMPT = "translate> "
-QUIT_WORDS = {"quit"}
-CLEAR_WORDS = {"clear"}
-HISTORY_COMMAND = "/history"
-CLEAR_HISTORY_COMMAND = "/clear-history"
-
-
-def _print(text: str) -> None:
-    """Print text as is (no markup parsing: it may come from the user)."""
-    console.print(text, markup=False)
-
-
-def _open_dictionary() -> Dictionary:
-    try:
-        return Dictionary(paths.dictionary_db())
-    except FileNotFoundError:
-        _print(
-            "The dictionary has not been imported yet.\n"
-            "Fetch the dump once with scripts/fetch_data.py (the CLI never downloads),\n"
-            "then `wort import --file kaikki.org-dictionary-German.jsonl`."
-        )
+def _require_file(path: str, hint: str) -> Path:
+    source = Path(path)
+    if not source.is_file():
+        print_text(f"No such file: {source}. {hint}")
         sys.exit(1)
+    return source
+
+
+def _import(source: Path, run, target: Path, done: str) -> None:
+    """Run an importer under a progress line and report `done` with the entry count and target."""
+    with console.status("Importing…", spinner_style="none") as status:
+        count = run(source, target, progress=lambda n: status.update(f"Importing… {n} entries read"))
+    print_text(done.format(count=count, target=target))
 
 
 def cmd_import(args: argparse.Namespace) -> None:
     from wort.dictionary import importer
 
-    source = Path(args.file)
-    if not source.is_file():
-        _print(f"No such file: {source}. Fetch the dump with scripts/fetch_data.py first.")
-        sys.exit(1)
-    with console.status("Importing…", spinner_style="none") as status:
-        count = importer.import_file(source, paths.dictionary_db(), progress=lambda n: status.update(f"Importing… {n} entries"))
-    _print(f"Done: {count} entries → {paths.dictionary_db()}")
+    source = _require_file(args.file, "Fetch the dump with scripts/fetch_data.py first.")
+    _import(source, importer.import_file, paths.dictionary_db(), "Done: {count} entries → {target}")
 
 
 def cmd_import_uk(args: argparse.Namespace) -> None:
     from wort.dictionary import ukrainian
 
-    source = Path(args.file)
-    if not source.is_file():
-        _print(f"No such file: {source}. Fetch the dump with scripts/fetch_data.py uk first.")
-        sys.exit(1)
-    with console.status("Importing…", spinner_style="none") as status:
-        count = ukrainian.import_file(source, paths.dictionary_uk_db(), progress=lambda n: status.update(f"Importing… {n} entries read"))
-    _print(f"Done: {count} words with Ukrainian translations → {paths.dictionary_uk_db()}")
+    source = _require_file(args.file, "Fetch the dump with scripts/fetch_data.py uk first.")
+    _import(source, ukrainian.import_file, paths.dictionary_uk_db(), "Done: {count} words with Ukrainian translations → {target}")
 
 
 def cmd_import_de(args: argparse.Namespace) -> None:
     from wort.dictionary import german
 
-    source = Path(args.file)
-    if not source.is_file():
-        _print(f"No such file: {source}. Fetch the dump with scripts/fetch_data.py uk first (the same German dump).")
-        sys.exit(1)
-    with console.status("Importing…", spinner_style="none") as status:
-        count = german.import_file(source, paths.dictionary_de_db(), progress=lambda n: status.update(f"Importing… {n} entries read"))
-    _print(f"Done: {count} words with German definitions → {paths.dictionary_de_db()}")
+    source = _require_file(args.file, "Fetch the dump with scripts/fetch_data.py uk first (the same German dump).")
+    _import(source, german.import_file, paths.dictionary_de_db(), "Done: {count} words with German definitions → {target}")
 
 
 def cmd_import_en_uk(args: argparse.Namespace) -> None:
     from wort.dictionary import ukrainian
 
-    source = Path(args.file)
-    if not source.is_file():
-        _print(f"No such file: {source}. Fetch it with scripts/fetch_data.py en-uk first.")
-        sys.exit(1)
-    with console.status("Importing…", spinner_style="none") as status:
-        count = ukrainian.import_english(source, paths.dictionary_en_uk_db(), progress=lambda n: status.update(f"Importing… {n} entries read"))
-    _print(f"Done: {count} English words with Ukrainian translations → {paths.dictionary_en_uk_db()}")
-
-
-MAX_PHRASE_WORDS = 30  # a sentence fits; each word is one picker entry
-MIN_SENTENCE_WORDS = 3  # shorter phrases are only looked up word by word
-
-
-def resolve(dictionary: Dictionary, query: str) -> tuple[list[Entry], str, str]:
-    """Look `query` up without logging: (entries, short translation, note).
-
-    A phrase that is not in the dictionary as a whole is looked up word by word (best entry per word);
-    `note` then says so and lists typo corrections. It is empty for an ordinary lookup.
-    """
-    german, english = dictionary.lookup(query)
-    if not (german or english) and " " in query:
-        entries, fixes = dictionary.lookup_words(query, MAX_PHRASE_WORDS)
-        if entries:
-            note = "One result per word" + "".join(f" · corrected {a} → {b}" for a, b in fixes)
-            return entries, " / ".join(e.glosses[0] for e in entries if e.glosses), note
-    return german + english, _translation(german, english), ""
-
-
-def find(dictionary: Dictionary, store: Store, query: str) -> tuple[list[Entry], Text, str]:
-    """Look `query` up, log it as typed, and return (entries, one-line summary '• query — translation', note)."""
-    query = sanitize.text(query, 200)
-    entries, meaning, note = resolve(dictionary, query)
-    if note and len(query.split()) >= MIN_SENTENCE_WORDS:
-        note = f"{sentence.describe(dictionary, query)}\n{note}"
-    store.log_query(query, bool(entries))
-    line = Text("• ")  # the query as typed in the normal foreground, the translation in muted grey
-    line.append(query)
-    line.append(f" — {meaning}", style=MUTED)
-    return entries, line, note
-
-
-def _translation(german: list[Entry], english: list[Entry]) -> str:
-    if not (german or english):
-        return "nothing found"
-    if german:  # a German word: show its English meaning(s), ignore weaker English-side matches
-        parts = ["; ".join(e.glosses[:2]) for e in german]
-    else:  # an English word: show the German equivalents
-        parts = [f"{GENDER_ARTICLE[e.gender]} {e.lemma}" if e.pos == "noun" and e.gender in GENDER_ARTICLE else e.lemma for e in english]
-    unique = list(dict.fromkeys(p for p in parts if p))
-    return " / ".join(unique[:3])
-
-
-def show(entries: list[Entry]) -> int:
-    """Print the cards (or a not-found line); returns how many terminal lines that took."""
-    from wort.render.card import render_card
-
-    with console.capture() as captured:
-        if not entries:
-            _print("Nothing found.")
-        for entry in entries:
-            console.print(render_card(entry))
-    out = captured.get()
-    sys.stdout.write(out)
-    sys.stdout.flush()
-    return out.count("\n")
+    source = _require_file(args.file, "Fetch it with scripts/fetch_data.py en-uk first.")
+    _import(source, ukrainian.import_english, paths.dictionary_en_uk_db(), "Done: {count} English words with Ukrainian translations → {target}")
 
 
 def cmd_lookup(args: argparse.Namespace) -> None:
     query = " ".join(args.word).strip()
     if not query:
         sys.exit(1)
-    dictionary = _open_dictionary()
-    entries, _, note = find(dictionary, Store(paths.user_db()), query)
-    if note:
-        _print(note)
-    show(entries)
-    if not entries:
+    dictionary = open_dictionary()
+    result = find(dictionary, HistoryStore(paths.data_repo()), query, working=working if sys.stdout.isatty() else None)
+    if result.note:
+        print_text(result.note)
+    show_result(result)
+    if result.warning:
+        print_text(result.warning)
+    if result.kind == "word" and not result.entries:
         if similar := dictionary.suggest(query):
-            _print(_did_you_mean(similar))
+            print_text(did_you_mean(similar))
         sys.exit(1)
 
 
-def _interactive() -> bool:
-    return sys.stdin.isatty() and sys.stdout.isatty()
-
-
-def _screen_lines(text: str) -> int:
-    """Terminal lines a typed line occupies (long input wraps)."""
-    return sum(max(1, -(-len(part) // max(console.width, 1))) for part in text.split("\n"))
-
-
-def _fit(text: Text) -> Text:
-    text.truncate(max(console.width - 1, 10), overflow="ellipsis")
-    return text
-
-
-def _banner() -> None:
-    console.print(Text(BANNER, style="bold"), markup=False)
-
-
-def _clear_screen() -> None:
-    """Clear the screen (not the scrollback) and bring the banner back."""
-    sys.stdout.write("\x1b[H\x1b[2J")
-    sys.stdout.flush()
-    _banner()
-
-
-def _bind_ctrl_l() -> None:
-    """Ctrl-L behaves like typing `clear`, so the banner survives it (GNU readline only)."""
-    try:
-        import readline
-    except ImportError:
-        return
-    if getattr(readline, "backend", "readline") == "readline":
-        # kill whatever is typed so far, type `clear`, accept the line
-        readline.parse_and_bind(r'"\C-l": "\C-a\C-kclear\C-m"')
-
-
-def _print_unique_queries(dictionary: Dictionary, store: Store) -> None:
-    rows = store.unique_queries()
-    if not rows:
-        _print("No queries yet.")
-        return
-    table = _table("#", "Query", "Meaning", "Found", "Times")
-    for number, (query, found, count, _) in enumerate(rows, 1):
-        meaning = resolve(dictionary, query)[1] if found else "—"  # lookup only, not logged
-        table.add_row(str(number), query, Text(meaning, style=MUTED), "yes" if found else "no", str(count))
-    console.print(table)
-
-
-def _browse(header: Header, entries: list[Entry], heading: str = "", listed: bool = False) -> str:
-    """Let the user pick among several entries; returns a key that should start the next word, or ''."""
-    with picker.cbreak(), header.suspended():
-        return picker.pick(entries, console, lambda: shutil.get_terminal_size().lines, heading=heading, listed=listed, banner=header.pinned_lines) or ""
-
-
-def _recent(store: Store, dictionary: Dictionary, since: int = 0) -> list[tuple[str, str]]:
-    """The last five different words asked in this session with their translation, newest first."""
-    asked = list(reversed(store.unique_queries(since)))[:5]
-    return [(q, resolve(dictionary, q)[1] if found else "nothing found") for q, found, *_ in asked]
-
-
-def _browse_history(header: Header, dictionary: Dictionary, store: Store) -> None:
-    """The `/history` accordion: everything ever asked; nothing in it is logged or added."""
-    items = [
-        history_view.Item(query, found, count, ts, resolve(dictionary, query)[1] if found else "nothing found")
-        for query, found, count, ts in store.unique_queries()
-    ]
-
-    def load(item: history_view.Item) -> tuple[list[Entry], str]:
-        if item.found:
-            entries, _, note = resolve(dictionary, item.query)
-            return entries, note
-        similar = dictionary.suggest(item.query)
-        return similar, "Nothing found. Did you mean:" if similar else ""
-
-    # order matters: the pinned banner is repainted by `suspended` on the way out, which must be after the
-    # alternate screen was left
-    with picker.cbreak(), header.suspended(), header.recent_hidden(), picker.fullscreen():
-        history_view.browse(items, load, console, lambda: shutil.get_terminal_size().lines, banner=header.pinned_lines)
-
-
-def _clear_history(store: Store) -> bool:
-    """Ask, then delete the whole stored query history. True if it was deleted."""
-    entries = len(store.unique_queries())
-    if not entries:
-        _print("The history is already empty.")
-        return False
-    answer = input(f"Delete the whole history ({entries} words, it cannot be undone)? [y/N] ").strip().lower()
-    if answer not in ("y", "yes"):
-        _print("Kept.")
-        return False
-    store.clear_queries()
-    _print("History cleared.")
-    return True
-
-
-def _did_you_mean(similar: list[Entry]) -> str:
-    return "Did you mean: " + ", ".join(dict.fromkeys(e.lemma for e in similar)) + "?"
-
-
-def _print_lines(text: str) -> int:
-    _print(text)
-    return _screen_lines(text)
-
-
-def _input(prompt: str, prefill: str = "") -> str:
-    """`input()`, optionally with text already typed (needs GNU readline; otherwise the text is dropped)."""
-    try:
-        import readline
-    except ImportError:
-        return input(prompt)
-    if prefill:
-        readline.set_startup_hook(lambda: readline.insert_text(prefill))
-    try:
-        return input(prompt)
-    finally:
-        readline.set_startup_hook()
-
-
-def cmd_session(args: argparse.Namespace | None = None) -> None:
-    header = Header(console, BANNER, FOOTER)
-    try:
-        _session(header)
-    finally:
-        header.stop()  # give the terminal its scroll region back
-
-
-def _session(header: Header) -> None:
-    """Interactive session: every line is a word to look up; `quit` leaves.
-
-    On a terminal, the previous word's card collapses into one `• query — translation`
-    line as soon as the next word is typed.
-    """
-    try:
-        import readline  # noqa: F401  (line editing and history for input())
-    except ImportError:
-        pass
-    dictionary, store = _open_dictionary(), Store(paths.user_db())
-    since = store.last_query_id()  # the recent words under the banner show only what is asked from now on
-    interactive = _interactive()
-    prompt = PROMPT if interactive else ""
-    if interactive:
-        _bind_ctrl_l()
-        header.recent = _recent(store, dictionary, since)
-        if not header.start():  # window too small to pin the banner: print it once, as plain output
-            _banner()
-            _print(FOOTER)
-    last: tuple[int, Text] | None = None  # (screen lines used by the last query+cards, its summary)
-    below = 0  # screen lines added after it (blank inputs)
-
-    def collapse(typed_lines: int) -> None:
-        nonlocal last, below
-        if last is None:
-            return
-        rows, summary = last
-        # Up to the old query line, then clear to the end. A card taller than the
-        # screen can only be erased as far as the cursor can reach (its top has scrolled off).
-        erase = min(rows + below + typed_lines, header.usable_rows() - 1)
-        sys.stdout.write(f"\x1b[{erase}A\x1b[J")
-        console.print(_fit(summary), markup=False)
-        last, below = None, 0
-
-    pending = ""  # a key that closed the picker: it is the first letter of the next word
-    while True:
-        try:
-            if interactive and last is not None and picker.has_terminal():
-                # the previous result collapses into its bullet line as soon as typing starts, not at Enter
-                if not pending:
-                    sys.stdout.write(prompt)
-                    sys.stdout.flush()
-                    picker.wait_for_key()
-                collapse(0)  # the cursor is on a fresh line below the result: no typed line to count
-            line = _input(prompt, pending)
-        except (EOFError, KeyboardInterrupt):
-            if interactive:
-                print()
-            return
-        pending = ""
-        query = " ".join(line.split())
-        typed = _screen_lines(prompt + line)
-        if not query:
-            if last is not None:
-                below += typed
-            continue
-        if query.lower() in QUIT_WORDS:
-            if interactive:
-                collapse(typed)
-            return
-        if query.startswith("/"):  # session commands are never looked up or logged
-            if interactive:
-                collapse(typed)
-            if query.lower() == HISTORY_COMMAND:
-                if interactive and picker.usable() and store.unique_queries():
-                    _browse_history(header, dictionary, store)
-                else:
-                    _print_unique_queries(dictionary, store)
-            elif query.lower() == CLEAR_HISTORY_COMMAND:
-                if _clear_history(store):
-                    since = 0  # the ids start over: everything logged from now on belongs to this session
-                    header.recent = []
-            else:
-                _print(f"Unknown command: {query}. Available: {HISTORY_COMMAND}, {CLEAR_HISTORY_COMMAND}")
-            continue
-        if query.lower() in CLEAR_WORDS:
-            if interactive:
-                header.recent_visible = True  # nothing is being searched any more
-                header.clear() if header.active else _clear_screen()
-                last, below = None, 0  # nothing of the old screen is left to collapse
-            continue
-        header.hide_recent()  # a search is on screen from here on
-        entries, summary, note = find(dictionary, store, query)
-        header.recent = _recent(store, dictionary, since)
-        if not interactive:
-            if note:
-                _print(note)
-            show(entries)
-            if not entries and (similar := dictionary.suggest(query)):
-                _print(_did_you_mean(similar))
-            continue
-        collapse(typed)
-        echo = prompt + query
-        console.print(Text(echo), markup=False)
-        if not entries:  # a typo? offer close matches in the same numbered list
-            rows = show(entries)  # "Nothing found."
-            if len(query.split()) > MAX_PHRASE_WORDS:
-                rows += _print_lines(f"Too many words: a phrase is looked up word by word up to {MAX_PHRASE_WORDS}.")
-            similar = dictionary.suggest(query)
-            if similar and picker.usable():
-                pending = _browse(header, similar, "Did you mean:", listed=True)
-            elif similar:
-                rows += _print_lines(_did_you_mean(similar))
-            last = (_screen_lines(echo) + rows, summary)
-            continue
-        rows_on_screen = header.usable_rows()
-        if picker.usable() and (len(entries) > 1 or (entries and picker.too_tall(entries[0], console, rows_on_screen))):
-            pending = _browse(header, entries, note)
-            last = (_screen_lines(echo), summary)  # the picker erased its own output
-            continue
-        rows = _print_lines(note) if note else 0
-        last = (_screen_lines(echo) + rows + show(entries), summary)
-
-
 def cmd_add(args: argparse.Namespace) -> None:
-    dictionary = _open_dictionary()
+    dictionary = open_dictionary()
     query = " ".join(args.word)
     german, english = dictionary.lookup(query)
     candidates = [e for e in german + english if args.pos is None or e.pos == args.pos]
     if not candidates:
-        _print("Nothing found.")
+        print_text("Nothing found.")
         sys.exit(1)
     entry = candidates[0]
     Store(paths.user_db()).add_word(entry.lemma, entry.pos, entry.id)
-    _print(f"Added: {entry.lemma} ({entry.pos}) — {'; '.join(entry.glosses[:2])}")
-
-
-def _table(*columns: str) -> Table:
-    return Table(*columns, box=box.SQUARE, header_style="bold")
+    print_text(f"Added: {entry.lemma} ({entry.pos}) — {'; '.join(entry.glosses[:2])}")
 
 
 def cmd_list(args: argparse.Namespace) -> None:
     store = Store(paths.user_db())
-    table = _table("Word", "Type", "Mastery", "Attempts", "Next")
+    grid = table("Word", "Type", "Mastery", "Attempts", "Next")
     for s in store.all_stats():
-        table.add_row(s.word.lemma, s.word.pos, f"{s.mastery}%", str(s.attempts), s.due.strftime("%d.%m %H:%M") if s.due else "—")
-    console.print(table)
+        grid.add_row(s.word.lemma, s.word.pos, f"{s.mastery}%", str(s.attempts), s.due.strftime("%d.%m %H:%M") if s.due else "—")
+    console.print(grid)
 
 
 def cmd_history(args: argparse.Namespace) -> None:
-    table = _table("Time", "Query", "Found")
-    for q in Store(paths.user_db()).queries()[-args.limit :]:
-        table.add_row(q.ts.strftime("%Y-%m-%d %H:%M"), q.query, "yes" if q.found else "no")
-    console.print(table)
+    store = HistoryStore(paths.data_repo())
+    rows = sorted(
+        ((i.ts, n, kind, i.text, i.found) for kind in dataschema.FILES for n, i in enumerate(store.unique(kind))),
+        key=lambda row: row[:2],  # the time; within one second, the position in the file
+        reverse=True,  # newest first
+    )
+    grid = table("Time", "Type", "Query", "Found")
+    for when, _, kind, text, found in rows[: args.limit]:
+        grid.add_row(when.astimezone().strftime("%Y-%m-%d %H:%M"), kind, text, "yes" if found else "no")
+    console.print(grid)
+    for kind, count in store.skipped.items():
+        if count:
+            print_text(f"{count} invalid line(s) in {dataschema.FILES[kind]} were ignored.")
 
 
-def cmd_export(args: argparse.Namespace) -> None:
-    text = json.dumps(export_words(Store(paths.user_db())), ensure_ascii=False, indent=2) + "\n"
-    if args.file in (None, "-"):
-        sys.stdout.write(text)
+def cmd_migrate_history(args: argparse.Namespace) -> None:
+    """Merge the old query log from user.db into the history files (words.jsonl, sentences.jsonl); safe to repeat."""
+    store = HistoryStore(paths.data_repo())
+    if not history.legacy_count(paths.user_db()):
+        print_text("Nothing to migrate: user.db has no old history.")
         return
-    Path(args.file).write_text(text, encoding="utf-8")
-    _print(f"Exported: {args.file}")
+    try:
+        dictionary = Dictionary(paths.dictionary_db())
+        classify = lambda text, found: is_sentence(dictionary, text)  # noqa: E731  (the same test as a live lookup)
+    except FileNotFoundError:
+        print_text(f"The dictionary is not imported: sentences are told apart by their length only ({MIN_SENTENCE_WORDS}+ words and not found).")
+        classify = history.legacy_kind
+    result = history.migrate(paths.user_db(), store, classify)
+    extra = [f"{result.present} already there" if result.present else "", f"{result.skipped} skipped (they break the storage rules)" if result.skipped else ""]
+    print_text(f"Migrated {result.words} words and {result.sentences} sentences to {store.root}" + "".join(f"; {x}" for x in extra if x) + ".")
+
+
+def cmd_sync(args: argparse.Namespace) -> None:
+    """Push the two history files to `main` of the data repository (git; the only network use)."""
+    try:
+        print_text(datarepo.sync(paths.data_repo()))
+    except datarepo.SyncError as exc:
+        print_text(f"Sync failed: {exc}")
+        sys.exit(1)
+
+
+def cmd_init_data(args: argparse.Namespace) -> None:
+    """Create or refresh the data repository (git init, scaffold, validator) so that `wort sync` has somewhere to push."""
+    root = Path(args.dir).expanduser() if args.dir else paths.data_repo()
+    try:
+        notes = datarepo.init(root, args.remote)
+    except datarepo.SyncError as exc:
+        print_text(f"init-data failed: {exc}")
+        sys.exit(1)
+    for note in notes:
+        print_text(note)
 
 
 def cmd_install_translation(args: argparse.Namespace) -> None:
     try:
         count = sentence.install([Path(f) for f in args.files])
     except (sentence.TranslationUnavailable, RuntimeError) as exc:
-        _print(str(exc))
+        print_text(str(exc))
         sys.exit(1)
-    _print(f"Installed {count} sentence translation model(s).")
-
-
-def cmd_sync(args: argparse.Namespace) -> None:
-    try:
-        config = syncing.load_config()
-        if config is None:
-            raise syncing.SyncError(f"sync is not configured: create {syncing.config_path()} (see DEPLOY.md, CLI network)")
-        token = syncing.read_token(config.token_file)
-        payload = json.dumps(export_words(Store(paths.user_db())), ensure_ascii=False).encode("utf-8")
-        result = syncing.push(payload, config, token)
-    except syncing.SyncError as exc:
-        _print(f"Sync failed: {exc}")
-        sys.exit(1)
-    _print(f"Synced: {result.get('words_new', 0)} new of {result.get('words_total', 0)} words, "
-           f"{result.get('queries_new', 0)} new of {result.get('queries_total', 0)} queries.")
+    print_text(f"Installed {count} sentence translation model(s).")
 
 
 def cmd_tui(args: argparse.Namespace) -> None:
     from wort.tui.app import WortApp
 
-    WortApp(_open_dictionary(), Store(paths.user_db())).run()
+    WortApp(open_dictionary(), Store(paths.user_db())).run()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -538,9 +203,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--file", required=True, help="kaikki-English-uk.jsonl.gz fetched with scripts/fetch_data.py en-uk")
     p.set_defaults(func=cmd_import_en_uk)
 
-    p = sub.add_parser("sync", help="push words and history to the web app (the only network use; see DEPLOY.md)")
-    p.set_defaults(func=cmd_sync)
-
     p = sub.add_parser("t", help="look a word up explicitly (needed for words like `list` or `add`)")
     p.add_argument("word", nargs="+")
     p.set_defaults(func=cmd_lookup)
@@ -553,28 +215,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("list", help="show your practice words and mastery")
     p.set_defaults(func=cmd_list)
 
-    p = sub.add_parser("history", help="show what you looked up")
+    p = sub.add_parser("history", help="show what you looked up, newest first")
     p.add_argument("--limit", type=int, default=50, help="how many recent queries to show (default 50)")
     p.set_defaults(func=cmd_history)
 
-    p = sub.add_parser("export", help="export history and practice words as JSON (for import into the web app)")
-    p.add_argument("file", nargs="?", help="destination file (omit or use '-' for stdout)")
-    p.set_defaults(func=cmd_export)
+    p = sub.add_parser("migrate-history", help="move the old history from user.db into the history files")
+    p.set_defaults(func=cmd_migrate_history)
+
+    p = sub.add_parser("init-data", help="create or refresh the data repository for the history files")
+    p.add_argument("dir", nargs="?", help="where it lives (default: WORT_DATA_REPO, else ~/wort-data)")
+    p.add_argument("--remote", help="its GitHub URL, e.g. https://github.com/USER/wort-data.git")
+    p.set_defaults(func=cmd_init_data)
+
+    p = sub.add_parser("sync", help="push the history files to the data repository on GitHub (the only network use)")
+    p.set_defaults(func=cmd_sync)
 
     return parser
 
 
-def _install_netguard() -> None:
-    """From here on the process may only reach loopback and the configured sync endpoint."""
-    try:
-        config = syncing.load_config()
-    except syncing.SyncError:
-        config = None  # an invalid config allows nothing; `wort sync` reports the problem
-    netguard.install({config.endpoint} if config else set())
-
-
 def main(argv: list[str] | None = None) -> None:
-    _install_netguard()
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
         return cmd_session()

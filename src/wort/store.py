@@ -1,4 +1,7 @@
-"""The learner's own data: saved words, answers and spaced-repetition state (user.db)."""
+"""The learner's practice data: saved words, answers and spaced-repetition state (user.db).
+
+The query history is not here: it lives in the data repository (`wort.history`).
+"""
 
 from __future__ import annotations
 
@@ -18,12 +21,6 @@ CREATE TABLE IF NOT EXISTS words (
     note TEXT NOT NULL DEFAULT '',
     added_at TEXT NOT NULL,
     UNIQUE (lemma, pos)
-);
-CREATE TABLE IF NOT EXISTS queries (
-    id INTEGER PRIMARY KEY,
-    query TEXT NOT NULL,
-    found INTEGER NOT NULL,
-    ts TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS reviews (
     id INTEGER PRIMARY KEY,
@@ -51,14 +48,6 @@ class Word:
     pos: str
     entry_id: int | None
     added_at: datetime
-
-
-@dataclass
-class Query:
-    id: int
-    query: str
-    found: bool
-    ts: datetime
 
 
 @dataclass
@@ -90,48 +79,6 @@ class Store:
         )
         self.conn.commit()
         return self.get_word(lemma, pos)
-
-    def log_query(self, query: str, found: bool, now: datetime | None = None) -> None:
-        """Record what the user typed, whether or not anything was found."""
-        now = now or datetime.now()
-        self.conn.execute(
-            "INSERT INTO queries (query, found, ts) VALUES (?, ?, ?)",
-            (query, int(found), now.isoformat(timespec="seconds")),
-        )
-        self.conn.commit()
-
-    def queries(self) -> list[Query]:
-        return [
-            Query(r["id"], r["query"], bool(r["found"]), datetime.fromisoformat(r["ts"]))
-            for r in self.conn.execute("SELECT * FROM queries ORDER BY id")
-        ]
-
-    def clear_queries(self) -> int:
-        """Delete the whole query history (practice words and reviews are not touched); returns how many rows."""
-        count = self.conn.execute("DELETE FROM queries").rowcount
-        self.conn.commit()
-        return count
-
-    def last_query_id(self) -> int:
-        """The id of the newest logged query (0 if none): a marker for 'since now'."""
-        return self.conn.execute("SELECT COALESCE(MAX(id), 0) FROM queries").fetchone()[0]
-
-    def unique_queries(self, after_id: int = 0) -> list[tuple[str, bool, int, datetime]]:
-        """One row per query, case-insensitive: (latest spelling, found at the latest try, count, latest time).
-
-        Oldest first, so the most recent query ends up at the bottom. Only queries logged after `after_id`
-        (see `last_query_id`) count: that is how a session sees just its own.
-        """
-        latest: dict[str, Query] = {}
-        counts: dict[str, int] = {}
-        for q in self.queries():
-            if q.id <= after_id:
-                continue
-            key = q.query.casefold()
-            latest.pop(key, None)  # re-insert so dict order follows the latest occurrence
-            latest[key] = q
-            counts[key] = counts.get(key, 0) + 1
-        return [(q.query, q.found, counts[key], q.ts) for key, q in latest.items()]
 
     def get_word(self, lemma: str, pos: str) -> Word | None:
         row = self.conn.execute("SELECT * FROM words WHERE lemma = ? AND pos = ?", (lemma, pos)).fetchone()

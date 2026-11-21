@@ -8,4 +8,4 @@ build/
 *.db
 *.jsonl
 !tests/fixtures/*.jsonl
-.env.dev
+.DS_Store
